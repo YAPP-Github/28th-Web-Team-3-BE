@@ -94,10 +94,20 @@ When writing or modifying Kotlin code, Agent must treat the official Kotlin conv
 
 - `api`
 - `core`
+- `infra`
 - `common`
 
-`api` 모듈만 실행 가능한 Spring Boot jar(`bootJar`)를 생성하며, `core`와 `common`은 일반 라이브러리 jar로 빌드된다.
-의존성 방향은 `api` → `core` → `common`으로 한 방향만 허용하며, 역방향 의존성은 금지한다.
+`api` 모듈만 실행 가능한 Spring Boot jar(`bootJar`)를 생성하며, 나머지 모듈은 일반 라이브러리 jar로 빌드된다.
+의존성 방향은 한 방향만 허용한다.
+
+```
+api → infra → core → common
+api ────────→ core
+api ─────────────→ common
+infra ───────────→ common
+```
+
+역방향 의존성(`common` → `core`, `core` → `infra`, `infra` → `api` 등)은 금지한다.
 
 ### `api` Module
 
@@ -107,14 +117,22 @@ When writing or modifying Kotlin code, Agent must treat the official Kotlin conv
 ### `core` Module
 
 `core` 모듈은 도메인 비즈니스 로직, 도메인 모델, 서비스, 영속성 계층(JPA 엔티티와 리포지터리)을 담는다.
+외부 시스템과 직접 통신하지 않는다. 외부 연동이 필요하면 `core` 안에 포트(인터페이스)만 정의하고, 구현은 `infra`에서 제공한다.
 프로젝트가 커지면 이 영역 아래에 도메인별 서브모듈을 만들 수 있다.
 서브모듈 경계는 비즈니스 컨텍스트, 응집도, 결합도를 기준으로 나눈다.
+
+### `infra` Module
+
+`infra` 모듈은 외부 시스템 어댑터를 담는다.
+예: JWT 발급/검증, AWS S3 클라이언트, OAuth 통신, 외부 HTTP API 클라이언트, Redis/Kafka 등 외부 SDK 래퍼.
+`core`가 정의한 포트 인터페이스를 구현하여 외부 SDK가 도메인 코드로 새어 나오지 않도록 격리하는 것이 목적이다.
+`infra`는 `common`과 `core`에만 의존할 수 있다.
 
 ### `common` Module
 
 `common` 모듈은 특정 도메인이나 외부 인프라에 결합되지 않은 프로젝트 전역 공통 코드를 담는다.
 예: 공통 베이스 타입, 공용 유틸리티, 횡단 관심사 예외, 여러 모듈에서 재사용되는 값 객체 등.
-`common` 모듈은 `core`나 `api`에 의존해서는 안 된다.
+`common` 모듈은 다른 어떤 모듈에도 의존해서는 안 된다.
 
 ## Module Boundary Rules
 
@@ -125,9 +143,10 @@ When writing or modifying Kotlin code, Agent must treat the official Kotlin conv
 - 기존 모듈의 책임을 깨뜨리는가
 - 모듈 간 불필요한 결합을 만드는가
 - 모듈 내부 응집도를 약화시키는가
-- 역방향 의존성을 만드는가 (`common` → `core`, `core` → `api` 등)
+- 역방향 의존성을 만드는가 (`common` → `core`, `core` → `infra`, `infra` → `api` 등)
 - 도메인 비즈니스 로직이나 영속성 코드를 `api`에 배치하는가
-- 웹/HTTP 관심사를 `core`나 `common`에 배치하는가
+- 웹/HTTP 관심사를 `core`, `infra`, `common`에 배치하는가
+- 외부 SDK나 외부 시스템 통신 코드를 `infra` 바깥(`core`, `common`)에 배치하는가
 - 재사용 가능한 내부 공통 로직을 명확한 이유 없이 특정 기능 전용 모듈에 배치하는가
 
 요청된 경계가 위 규칙을 위반할 우려가 있다면, Agent는 구현을 멈추고 우려 사항을 설명한 뒤 더 나은 방향을 제안하고 사용자에게 확인을 받아야 한다.
