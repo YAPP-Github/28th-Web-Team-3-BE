@@ -88,51 +88,50 @@ When writing or modifying Kotlin code, Agent must treat the official Kotlin conv
 
 ## Module Structure
 
-This project is intended to be structured as a multi-module Spring Boot project.
+이 프로젝트는 멀티 모듈 Spring Boot 프로젝트로 구성된다.
 
-Top-level modules:
+최상위 모듈:
 
 - `api`
-- `domain`
-- `global`
-- `infra`
+- `core`
+- `common`
+
+`api` 모듈만 실행 가능한 Spring Boot jar(`bootJar`)를 생성하며, `core`와 `common`은 일반 라이브러리 jar로 빌드된다.
+의존성 방향은 `api` → `core` → `common`으로 한 방향만 허용하며, 역방향 의존성은 금지한다.
 
 ### `api` Module
 
-The `api` module contains web entry points such as controllers and request/response handling.
-It should focus on HTTP/API boundaries and should not contain core domain business logic.
+`api` 모듈은 Spring Boot 진입점과 컨트롤러, 요청/응답 DTO, HTTP 레벨 예외 처리 등 웹 경계 코드를 담는다.
+도메인 비즈니스 로직이나 영속성 관련 코드는 포함하지 않는다.
 
-### `domain` Module
+### `core` Module
 
-The `domain` module contains domain business logic.
-Domain-specific submodules may be created under this area as the project grows.
-Submodule boundaries should be based on business context, cohesion, and coupling.
+`core` 모듈은 도메인 비즈니스 로직, 도메인 모델, 서비스, 영속성 계층(JPA 엔티티와 리포지터리)을 담는다.
+프로젝트가 커지면 이 영역 아래에 도메인별 서브모듈을 만들 수 있다.
+서브모듈 경계는 비즈니스 컨텍스트, 응집도, 결합도를 기준으로 나눈다.
 
-### `global` Module
+### `common` Module
 
-The `global` module contains project-wide shared code that is not coupled to external tools or infrastructure.
-Use this module for internal shared concerns that are broadly reusable across modules.
-
-### `infra` Module
-
-The `infra` module contains integrations with external systems and tools.
-Examples include JWT, AWS, database-specific infrastructure, third-party clients, and external service adapters.
+`common` 모듈은 특정 도메인이나 외부 인프라에 결합되지 않은 프로젝트 전역 공통 코드를 담는다.
+예: 공통 베이스 타입, 공용 유틸리티, 횡단 관심사 예외, 여러 모듈에서 재사용되는 값 객체 등.
+`common` 모듈은 `core`나 `api`에 의존해서는 안 된다.
 
 ## Module Boundary Rules
 
-When a developer requests new code or refactoring, Agent must respect the requested context boundary, but should not apply it blindly.
+개발자가 새로운 코드 작성이나 리팩터링을 요청할 때, Agent는 요청한 컨텍스트 경계를 존중하되 무비판적으로 적용해서는 안 된다.
 
-Before changing module boundaries, Agent must check whether the change:
+모듈 경계를 변경하기 전에 Agent는 해당 변경이 다음에 해당하는지 확인해야 한다.
 
-- Breaks existing module responsibility
-- Creates unnecessary coupling between modules
-- Weakens cohesion inside a module
-- Places external infrastructure concerns outside `infra`
-- Places domain business logic inside `api` or external integration code
-- Places reusable internal shared logic in a feature-specific module without clear reason
+- 기존 모듈의 책임을 깨뜨리는가
+- 모듈 간 불필요한 결합을 만드는가
+- 모듈 내부 응집도를 약화시키는가
+- 역방향 의존성을 만드는가 (`common` → `core`, `core` → `api` 등)
+- 도메인 비즈니스 로직이나 영속성 코드를 `api`에 배치하는가
+- 웹/HTTP 관심사를 `core`나 `common`에 배치하는가
+- 재사용 가능한 내부 공통 로직을 명확한 이유 없이 특정 기능 전용 모듈에 배치하는가
 
-If the requested boundary appears to violate these rules, Agent must pause before implementation, explain the concern, propose a better direction, and ask the user for confirmation.
-The final implementation should follow the best-practice direction accepted by the user.
+요청된 경계가 위 규칙을 위반할 우려가 있다면, Agent는 구현을 멈추고 우려 사항을 설명한 뒤 더 나은 방향을 제안하고 사용자에게 확인을 받아야 한다.
+최종 구현은 사용자가 수용한 모범 방향을 따른다.
 
 ## Secrets And Environment Variables
 
