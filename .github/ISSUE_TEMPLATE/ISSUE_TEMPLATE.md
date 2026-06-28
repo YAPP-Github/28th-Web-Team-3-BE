@@ -1,8 +1,8 @@
 ---
 name: "☃️ 이슈 템플릿"
 about: "❄️ 이슈 생성 시 사용"
-title: "✨ feat : "
-labels: enhancement
+title: "feat : "
+labels: Feature
 assignees: ''
 ---
 
