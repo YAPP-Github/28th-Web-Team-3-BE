@@ -19,7 +19,7 @@ AI Agent는 아래 우선순위를 따른다.
 
 ## Project Stack
 
-- Language: Kotlin 2.3.20
+- Language: Kotlin 2.4.0
 - JDK: 25
 - Framework: Spring Boot 4.0.6
 - Build Tool: Gradle
