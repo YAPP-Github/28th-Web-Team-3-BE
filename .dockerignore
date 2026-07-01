@@ -1,0 +1,9 @@
+.git
+.github
+.gradle
+**/build
+!build
+!build/docker
+!build/docker/app.jar
+README.md
+AGENTS.md
