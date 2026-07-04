@@ -116,6 +116,6 @@ jobs:
             --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
             --set-env-vars "SPRING_PROFILES_ACTIVE=prod" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest" \
-            --set-secrets "SERVER_URL=server-url:latest"
+            --set-secrets "SERVER_URL=SERVER_URL:latest"
             --allow-unauthenticated \
             --quiet
