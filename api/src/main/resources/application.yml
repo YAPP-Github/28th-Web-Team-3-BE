@@ -1,3 +1,6 @@
 spring:
   application:
     name: yapp
+
+  config:
+    import: classpath:application-db.yml
