@@ -13,6 +13,7 @@ import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
@@ -23,6 +24,7 @@ class HmacJwtAuthTokenAdapter(
     private val properties: JwtProperties,
     private val clock: Clock,
 ) : AuthTokenPort {
+    private val clockSkew = Duration.ofSeconds(60)
     private val secret = properties.secret.toByteArray(Charsets.UTF_8).also {
         require(it.size >= 32) { "jwt.secret must be at least 32 bytes" }
     }
@@ -70,9 +72,9 @@ class HmacJwtAuthTokenAdapter(
             claims.issuer != properties.issuer ||
             !claims.audience.contains(properties.audience) ||
             claims.issueTime == null || claims.expirationTime == null ||
-            claims.issueTime.toInstant().isAfter(now) ||
+            claims.issueTime.toInstant().minus(clockSkew).isAfter(now) ||
             !claims.expirationTime.toInstant().isAfter(claims.issueTime.toInstant()) ||
-            !claims.expirationTime.toInstant().isAfter(now) ||
+            !claims.expirationTime.toInstant().plus(clockSkew).isAfter(now) ||
             claims.getStringClaim("type") != expectedType
         ) unauthorized()
         claims
