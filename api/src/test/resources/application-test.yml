@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:guest-auth;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+jwt:
+  secret: test-secret-key-that-is-at-least-32-bytes
+  issuer: yapp-test
+  audience: yapp-client
+  access-token-ttl: PT1H
+  refresh-token-ttl: PT24H
