@@ -3,6 +3,8 @@ package backend.yapp.api.auth
 import backend.yapp.core.auth.fixture.GuestAuthFixture
 import backend.yapp.core.auth.port.AuthTokenPort
 import org.hamcrest.Matchers.not
+import org.assertj.core.api.Assertions.assertThat
+import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -36,13 +38,13 @@ class GuestAuthAcceptanceTest(
         val first = issue(GuestAuthFixture.IDENTIFIER)
         val second = issue(GuestAuthFixture.IDENTIFIER)
 
-        check(tokenPort.parseAccessToken(first).guestUserId == tokenPort.parseAccessToken(second).guestUserId)
+        assertThat(tokenPort.parseAccessToken(first).guestUserId)
+            .isEqualTo(tokenPort.parseAccessToken(second).guestUserId)
     }
 
     @Test
     fun `refresh rotates token and rejects replay`() {
-        val refreshToken = issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString
-            .substringAfter("\"refreshToken\":\"").substringBefore('"')
+        val refreshToken = refreshTokenOf(issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString)
 
         val rotated = mockMvc.perform(
             post("/api/auth/guest/refresh")
@@ -58,13 +60,12 @@ class GuestAuthAcceptanceTest(
                 .content("{\"refreshToken\":\"$refreshToken\"}"),
         ).andExpect(status().isUnauthorized)
 
-        check(rotated.isNotBlank())
+        assertThat(rotated).isNotBlank()
     }
 
     @Test
     fun `refresh token cannot authenticate bearer request`() {
-        val response = issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString
-        val refreshToken = response.substringAfter("\"refreshToken\":\"").substringBefore('"')
+        val refreshToken = refreshTokenOf(issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString)
 
         mockMvc.perform(
             get("/api/unknown")
@@ -74,8 +75,7 @@ class GuestAuthAcceptanceTest(
 
     @Test
     fun `only one simultaneous refresh can consume the same token`() {
-        val refreshToken = issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString
-            .substringAfter("\"refreshToken\":\"").substringBefore('"')
+        val refreshToken = refreshTokenOf(issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString)
         val executor = Executors.newFixedThreadPool(2)
         try {
             val statuses = executor.invokeAll(List(2) {
@@ -87,8 +87,7 @@ class GuestAuthAcceptanceTest(
                     ).andReturn().response.status
                 }
             }).map { it.get() }
-            check(statuses.count { it == 200 } == 1)
-            check(statuses.count { it == 401 } == 1)
+            assertThat(statuses).containsExactlyInAnyOrder(200, 401)
         } finally {
             executor.shutdownNow()
         }
@@ -107,7 +106,7 @@ class GuestAuthAcceptanceTest(
                     ).andReturn().response.status
                 }
             }).map { it.get() }
-            check(statuses.all { it == 201 })
+            assertThat(statuses).containsOnly(201)
         } finally {
             executor.shutdownNow()
         }
@@ -130,6 +129,18 @@ class GuestAuthAcceptanceTest(
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"$accessToken\"}"),
         ).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `expired access token header does not block refresh endpoint`() {
+        val refreshToken = refreshTokenOf(issueWithResponse(GuestAuthFixture.IDENTIFIER).response.contentAsString)
+
+        mockMvc.perform(
+            post("/api/auth/guest/refresh")
+                .header("Authorization", "Bearer ${expiredAccessToken()}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"$refreshToken\"}"),
+        ).andExpect(status().isOk)
     }
 
     @Test
@@ -162,8 +173,9 @@ class GuestAuthAcceptanceTest(
     }
 
     private fun issue(identifier: String): String =
-        issueWithResponse(identifier).response.contentAsString
-            .substringAfter("\"accessToken\":\"").substringBefore('"')
+        JsonPath.read(issueWithResponse(identifier).response.contentAsString, "$.accessToken")
+
+    private fun refreshTokenOf(responseJson: String): String = JsonPath.read(responseJson, "$.refreshToken")
 
     private fun issueWithResponse(identifier: String) =
         mockMvc.perform(
@@ -175,22 +187,30 @@ class GuestAuthAcceptanceTest(
             .andExpect(jsonPath("$.refreshToken").isNotEmpty)
             .andReturn()
 
-    private fun expiredRefreshToken(): String = signedRefreshToken(
+    private fun expiredRefreshToken(): String = signedToken(
         secret = "test-secret-key-that-is-at-least-32-bytes",
         expiresAt = Instant.now().minusSeconds(60),
+        type = "refresh",
     )
 
-    private fun forgedRefreshToken(): String = signedRefreshToken(
+    private fun forgedRefreshToken(): String = signedToken(
         secret = "forged-secret-key-that-is-at-least-32-bytes",
         expiresAt = Instant.now().plusSeconds(3600),
+        type = "refresh",
     )
 
-    private fun signedRefreshToken(secret: String, expiresAt: Instant): String {
+    private fun expiredAccessToken(): String = signedToken(
+        secret = "test-secret-key-that-is-at-least-32-bytes",
+        expiresAt = Instant.now().minusSeconds(60),
+        type = "access",
+    )
+
+    private fun signedToken(secret: String, expiresAt: Instant, type: String): String {
         val now = Instant.now().minusSeconds(120)
         val claims = JWTClaimsSet.Builder()
             .subject("1").issuer("yapp-test").audience("yapp-client")
             .issueTime(Date.from(now)).expirationTime(Date.from(expiresAt))
-            .jwtID("8d1ec76a-9df0-43d0-89b8-aedec558dc23").claim("type", "refresh").build()
+            .jwtID("8d1ec76a-9df0-43d0-89b8-aedec558dc23").claim("type", type).build()
         return SignedJWT(JWSHeader(JWSAlgorithm.HS256), claims).also {
             it.sign(MACSigner(secret.toByteArray()))
         }.serialize()

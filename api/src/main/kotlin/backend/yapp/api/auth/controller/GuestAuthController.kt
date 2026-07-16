@@ -31,10 +31,7 @@ class GuestAuthController(private val guestAuthService: GuestAuthService) : Gues
         TokenResponse.from(guestAuthService.rotate(request.refreshToken))
 
     private fun validateUuid(value: String) {
-        try {
-            UUID.fromString(value)
-        } catch (_: IllegalArgumentException) {
-            throw BaseException(ErrorCode.INVALID_IDENTIFIER)
-        }
+        runCatching { UUID.fromString(value) }
+            .onFailure { throw BaseException(ErrorCode.INVALID_IDENTIFIER) }
     }
 }

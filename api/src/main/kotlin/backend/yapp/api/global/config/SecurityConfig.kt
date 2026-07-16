@@ -29,7 +29,7 @@ class SecurityConfig(
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         val entryPoint = { _: HttpServletRequest, response: HttpServletResponse, _: org.springframework.security.core.AuthenticationException ->
-            writeUnauthorized(response)
+            writeErrorResponse(response, objectMapper, ErrorCode.UNAUTHORIZED)
         }
         http
             .csrf { it.disable() }
@@ -43,20 +43,15 @@ class SecurityConfig(
         return http.build()
     }
 
-    private fun writeUnauthorized(response: HttpServletResponse) {
-        response.status = HttpServletResponse.SC_UNAUTHORIZED
-        response.contentType = MediaType.APPLICATION_JSON_VALUE
-        objectMapper.writeValue(
-            response.outputStream,
-            ErrorResponseEntity(ErrorCode.UNAUTHORIZED.code, ErrorCode.UNAUTHORIZED.name, ErrorCode.UNAUTHORIZED.message),
-        )
-    }
 }
 
 private class BearerTokenFilter(
     private val guestAuthService: GuestAuthService,
     private val objectMapper: ObjectMapper,
 ) : OncePerRequestFilter() {
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean =
+        request.requestURI.startsWith("/api/auth/")
+
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authorization = request.getHeader("Authorization")
         if (authorization?.startsWith("Bearer ") == true) {
@@ -64,16 +59,20 @@ private class BearerTokenFilter(
                 val guestUserId = guestAuthService.authenticate(authorization.removePrefix("Bearer "))
                 SecurityContextHolder.getContext().authentication =
                     UsernamePasswordAuthenticationToken(guestUserId, null, emptyList())
-            } catch (_: BaseException) {
-                response.status = HttpServletResponse.SC_UNAUTHORIZED
-                response.contentType = MediaType.APPLICATION_JSON_VALUE
-                objectMapper.writeValue(
-                    response.outputStream,
-                    ErrorResponseEntity(ErrorCode.UNAUTHORIZED.code, ErrorCode.UNAUTHORIZED.name, ErrorCode.UNAUTHORIZED.message),
-                )
+            } catch (ex: BaseException) {
+                writeErrorResponse(response, objectMapper, ex.errorCode)
                 return
             }
         }
         filterChain.doFilter(request, response)
     }
+}
+
+private fun writeErrorResponse(response: HttpServletResponse, objectMapper: ObjectMapper, errorCode: ErrorCode) {
+    response.status = errorCode.httpStatus.value()
+    response.contentType = MediaType.APPLICATION_JSON_VALUE
+    objectMapper.writeValue(
+        response.outputStream,
+        ErrorResponseEntity(errorCode.code, errorCode.name, errorCode.message),
+    )
 }
