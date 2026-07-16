@@ -4,5 +4,9 @@ spring:
     username: ${SPRING_DATABASE_USERNAME}
     password: ${SPRING_DATABASE_PASSWORD}
 
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE}
