@@ -61,6 +61,7 @@ jobs:
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.RUNTIME_SERVICE_ACCOUNT }}
       WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
       DEPLOY_SERVICE_ACCOUNT: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+      SERVER_URL: ${{ vars.SERVER_URL }}
 
     steps:
       - name: Checkout
@@ -119,5 +120,6 @@ jobs:
             --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
             --set-env-vars "SPRING_PROFILES_ACTIVE=dev" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest" \
+            --set-secrets "SERVER_URL=SERVER_URL:latest" \
             --allow-unauthenticated \
             --quiet
