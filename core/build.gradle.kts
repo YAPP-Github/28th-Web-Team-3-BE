@@ -1,5 +1,6 @@
 plugins {
     kotlin("plugin.jpa")
+    `java-test-fixtures`
 }
 
 dependencies {

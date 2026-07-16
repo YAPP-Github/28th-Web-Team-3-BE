@@ -4,3 +4,7 @@ spring:
 
   config:
     import: classpath:application-db.yml
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
