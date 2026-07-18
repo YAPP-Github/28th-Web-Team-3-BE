@@ -16,4 +16,8 @@ enum class ErrorCode(
 
     // Validation
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, 400, "요청한 값이 올바르지 않습니다."),
+
+    // Authentication
+    INVALID_IDENTIFIER(HttpStatus.BAD_REQUEST, 400, "식별값이 올바르지 않습니다."),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "인증이 필요하거나 토큰이 유효하지 않습니다."),
 }

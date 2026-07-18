@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -26,6 +27,10 @@ class GlobalExceptionHandler {
         val errors = ex.bindingResult.fieldErrors.map { "${it.field}: ${it.defaultMessage}" }
         return ErrorResponseEntity.toResponseEntity(ErrorCode.VALIDATION_FAILED, errors)
     }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<ErrorResponseEntity> =
+        ErrorResponseEntity.toResponseEntity(ErrorCode.VALIDATION_FAILED)
 
     @ExceptionHandler(MissingServletRequestPartException::class)
     fun handleMissingPart(ex: MissingServletRequestPartException): ResponseEntity<ErrorResponseEntity> {
