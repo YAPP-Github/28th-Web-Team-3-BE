@@ -20,4 +20,9 @@ enum class ErrorCode(
     // Authentication
     INVALID_IDENTIFIER(HttpStatus.BAD_REQUEST, 400, "식별값이 올바르지 않습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "인증이 필요하거나 토큰이 유효하지 않습니다."),
+
+    // Onboarding
+    INVALID_ONBOARDING_INPUT(HttpStatus.BAD_REQUEST, 400, "온보딩 입력값이 올바르지 않습니다."),
+    ONBOARDING_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "온보딩 정보가 없습니다."),
+    ONBOARDING_INCOMPLETE(HttpStatus.CONFLICT, 409, "온보딩 입력이 완료되지 않았습니다."),
 }

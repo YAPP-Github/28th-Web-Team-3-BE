@@ -6,6 +6,7 @@ import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
+import io.swagger.v3.oas.models.tags.Tag
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -51,6 +52,12 @@ class SwaggerConfig(
             )
             .addSecurityItem(SecurityRequirement().addList(ACCESS_TOKEN_SCHEME_NAME))
             .addSecurityItem(SecurityRequirement().addList(REFRESH_TOKEN_SCHEME_NAME))
+            .tags(
+                listOf(
+                    Tag().name("Guest Authentication").description("게스트 식별값 및 토큰 관리"),
+                    Tag().name("Onboarding").description("온보딩 입력 저장 및 재무 리포트·목표 금액 산출"),
+                ),
+            )
 
     companion object {
         private const val ACCESS_TOKEN_SCHEME_NAME = "accessTokenAuth"
