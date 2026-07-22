@@ -17,8 +17,10 @@ import io.swagger.v3.oas.annotations.tags.Tag
 
 @Tag(
     name = "Onboarding",
-    description = "온보딩 플로우 API. 사용자에게 생년월일·월급·월저축액·순자산·목표기간을 입력받아 저장하고, " +
-        "이를 바탕으로 재무 분석 리포트와 2가지 목표 금액안을 산출한 뒤 목표를 확정한다. 모든 API는 게스트 액세스 토큰 인증이 필요하다.",
+    description = "온보딩 플로우 API. <br>" +
+            "사용자에게 생년월일·월급·월저축액·순자산·목표기간을 입력받아 저장하고, " +
+        "이를 바탕으로 재무 분석 리포트와 2가지 목표 금액안을 산출한 뒤 목표를 확정한다. <br>" +
+            "모든 API는 게스트 액세스 토큰 인증이 필요하다.",
 )
 @SecurityRequirement(name = "accessTokenAuth")
 interface OnboardingApi {
