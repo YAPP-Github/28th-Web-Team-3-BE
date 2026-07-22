@@ -94,13 +94,13 @@ class FinancialReportCalculatorTest {
     fun `open ended top income bin caps at its lower bound`() {
         val richProfile = OnboardingProfile(
             guestUserId = 2,
-            monthlySalaryManwon = 650,
+            monthlySalaryManwon = 1_000,
             monthlySavingManwon = 0,
             netWorthManwon = 9_000,
             goalPeriodMonths = 12,
         )
-        // 연소득 7,800만 -> (7000~10000 구간) 상위 약 10%
+        // 연소득 12,000만 -> 개방 구간(10,000~) -> 하한 캡으로 상위 약 5%
         val report = FinancialReportCalculator(config(annualRate = 0.03), stats).calculate(richProfile)
-        assertEquals(10, report.peer.incomeTopPercent)
+        assertEquals(5, report.peer.incomeTopPercent)
     }
 }

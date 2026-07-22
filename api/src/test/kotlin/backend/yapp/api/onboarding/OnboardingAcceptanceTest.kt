@@ -64,6 +64,28 @@ class OnboardingAcceptanceTest(
     }
 
     @Test
+    fun `editing goal inputs after completion reopens onboarding`() {
+        val token = issueGuestToken()
+        patchProfile(token, """{"birthDate":"1998-03-01"}""")
+        patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
+        patchProfile(token, """{"netWorthManwon":1800}""")
+        patchProfile(token, """{"goalPeriodMonths":24}""")
+        mockMvc.perform(
+            post("/api/onboarding/goal")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"plan":"PLAN_1"}"""),
+        ).andExpect(status().isCreated)
+
+        // 확정 후 목표 금액에 영향을 주는 월저축액을 바꾸면 온보딩이 다시 진행 중으로 돌아간다.
+        patchProfile(token, """{"monthlySavingManwon":150}""")
+
+        mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+    }
+
+    @Test
     fun `saving greater than salary is rejected`() {
         val token = issueGuestToken()
         mockMvc.perform(
