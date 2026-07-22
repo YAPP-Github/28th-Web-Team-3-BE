@@ -3,6 +3,10 @@ spring:
     url: ${SPRING_DATABASE_URL}
     username: ${SPRING_DATABASE_USERNAME}
     password: ${SPRING_DATABASE_PASSWORD}
+    hikari:
+      # Supabase 트랜잭션 풀러(PgBouncer)는 서버사이드 prepared statement를 지원하지 않으므로 비활성화한다.
+      data-source-properties:
+        prepareThreshold: 0
 
   jpa:
     hibernate:
