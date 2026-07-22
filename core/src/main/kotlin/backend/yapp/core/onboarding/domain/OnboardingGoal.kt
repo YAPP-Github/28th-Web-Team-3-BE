@@ -13,7 +13,7 @@ import java.time.Instant
 @Entity
 @Table(name = "onboarding_goal")
 class OnboardingGoal(
-    @Column(name = "guest_user_id", nullable = false)
+    @Column(name = "guest_user_id", nullable = false, unique = true)
     val guestUserId: Long,
     @Enumerated(EnumType.STRING)
     @Column(name = "plan", nullable = false, length = 10)
