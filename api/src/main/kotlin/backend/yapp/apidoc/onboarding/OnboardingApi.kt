@@ -36,6 +36,7 @@ interface OnboardingApi {
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun getProfile(guestUserId: Long): ProfileResponse
@@ -46,6 +47,7 @@ interface OnboardingApi {
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = ReportResponse::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
@@ -57,6 +59,7 @@ interface OnboardingApi {
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = GoalPlansResponse::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
@@ -69,6 +72,7 @@ interface OnboardingApi {
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "확정 성공", content = [Content(schema = Schema(implementation = GoalResponse::class))]),
         ApiResponse(responseCode = "400", description = "VALIDATION_FAILED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
