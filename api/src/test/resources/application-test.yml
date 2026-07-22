@@ -9,6 +9,10 @@ spring:
   flyway:
     enabled: true
 
+app:
+  server:
+    deployment-url: http://localhost:8080
+
 jwt:
   secret: test-secret-key-that-is-at-least-32-bytes
   issuer: yapp-test
