@@ -2,6 +2,7 @@ package backend.yapp.api.onboarding.dto
 
 import backend.yapp.core.onboarding.domain.GoalPlan
 import backend.yapp.core.onboarding.service.ProfilePatchCommand
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotNull
@@ -10,14 +11,19 @@ import java.time.LocalDate
 
 /** 온보딩 스텝별 부분 저장 요청. 각 스텝에서 입력한 필드만 전송한다(모두 선택). */
 data class ProfilePatchRequest(
+    @field:Schema(description = "생년월일(YYYY-MM-DD). 온보딩 1/4 '나이' 스텝.", example = "1998-03-01")
     @field:Past
     val birthDate: LocalDate? = null,
+    @field:Schema(description = "월급(세후 실수령액, 만원). 0~650. 온보딩 2/4 스텝.", example = "300")
     @field:Min(0) @field:Max(650)
     val monthlySalaryManwon: Int? = null,
+    @field:Schema(description = "월 저축액(만원). 0~650이며 월급을 초과할 수 없다. 온보딩 2/4 스텝.", example = "82")
     @field:Min(0) @field:Max(650)
     val monthlySavingManwon: Int? = null,
+    @field:Schema(description = "현재 순자산(투자·예/적금 총합, 만원). 0~10000(1억). 온보딩 3/4 스텝.", example = "1800")
     @field:Min(0) @field:Max(10_000)
     val netWorthManwon: Int? = null,
+    @field:Schema(description = "목표 기간(개월). 3~36. 온보딩 4/4 스텝.", example = "24")
     @field:Min(3) @field:Max(36)
     val goalPeriodMonths: Int? = null,
 ) {
@@ -33,6 +39,7 @@ data class ProfilePatchRequest(
 
 /** 목표 확정("이 목표로 시작") 요청. */
 data class GoalConfirmRequest(
+    @field:Schema(description = "확정할 목표안. PLAN_1=확실하게(기본), PLAN_2=여유롭게.", example = "PLAN_1")
     @field:NotNull
     val plan: GoalPlan,
 )
