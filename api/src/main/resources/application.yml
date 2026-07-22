@@ -16,3 +16,18 @@ springdoc:
 app:
   server:
     deployment-url: ${SERVER_URL}
+
+onboarding:
+  version: v1
+  annual-rate: 0.03
+  report-uplift-percent: 15
+  # 입력 월급은 세후 실수령액. 세전 경상소득 기준 통계와 비교하기 위한 gross-up 보정계수(공제율 ≈13%)
+  salary-correction-factor: 1.15
+  plan1:
+    min: 0.15
+    max: 0.30
+    single: 0.15
+  plan2:
+    min: 0.05
+    max: 0.15
+    single: 0.05
