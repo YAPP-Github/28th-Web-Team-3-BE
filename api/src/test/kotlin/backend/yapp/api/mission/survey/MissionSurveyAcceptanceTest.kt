@@ -1,10 +1,14 @@
 package backend.yapp.api.mission.survey
 
+import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionCatalog
+import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionCode
+import com.jayway.jsonpath.Configuration
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
 import java.util.UUID
 import javax.sql.DataSource
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -322,8 +326,8 @@ class MissionSurveyAcceptanceTest(
     }
 
     @Test
-    fun `OpenAPI publishes mission survey paths security and responses`() {
-        mockMvc.perform(get("/v3/api-docs"))
+    fun `OpenAPI publishes detailed mission survey request contract`() {
+        val document = mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.paths['$SURVEY_PATH/questions'].get.responses['200']").exists())
             .andExpect(jsonPath("$.paths['$SURVEY_PATH/questions'].get.responses['400']").exists())
@@ -339,11 +343,127 @@ class MissionSurveyAcceptanceTest(
             .andExpect(jsonPath("$.paths['$SURVEY_PATH'].put.responses['409']").exists())
             .andExpect(jsonPath("$.paths['$SURVEY_PATH'].put.responses['500']").exists())
             .andExpect(jsonPath("$.paths['$SURVEY_PATH'].put.security[0].accessTokenAuth").exists())
-            .andExpect(
-                jsonPath(
-                    "$.paths['$SURVEY_PATH'].put.requestBody.content['application/json'].example",
-                ).exists(),
-            )
+            .andReturn()
+            .response
+            .contentAsString
+
+        val examples: Map<String, Any> = JsonPath.read(
+            document,
+            "$.paths['$SURVEY_PATH'].put.requestBody.content['application/json'].examples",
+        )
+        assertEquals(
+            setOf(
+                "allCategories",
+                "singleCategory",
+                "mealAndTransportUnknown",
+                "hobbyDoNotReduce",
+                "keyedFrequencies",
+            ),
+            examples.keys,
+        )
+        val token = issueGuestToken()
+        examples.values.forEach { example ->
+            val value = (example as Map<*, *>)["value"]
+            putSurvey(token, Configuration.defaultConfiguration().jsonProvider().toJson(value))
+                .andExpect(status().isOk)
+        }
+
+        val operationDescription: String = JsonPath.read(document, "$.paths['$SURVEY_PATH'].put.description")
+        listOf(
+            "form state",
+            "meal.target이 UNKNOWN",
+            "transport.target이 UNKNOWN",
+            "hobby.spendingTypes가 [DO_NOT_REDUCE]",
+            "living.areas가 [UNKNOWN]",
+            "key는 한 번만 등장",
+        ).forEach { expected -> assertTrue(operationDescription.contains(expected), expected) }
+
+        val questionCatalog = MissionSurveyQuestionCatalog()
+        val documentedOptionPaths = mapOf(
+            MissionSurveyQuestionCode.MEAL_TARGET to "$.components.schemas.MealSurveyRequest.properties.target.enum",
+            MissionSurveyQuestionCode.MEAL_ALTERNATIVES to "$.components.schemas.MealSurveyRequest.properties.alternatives.items.enum",
+            MissionSurveyQuestionCode.MEAL_REASON to "$.components.schemas.MealSurveyRequest.properties.reason.enum",
+            MissionSurveyQuestionCode.MEAL_EXCLUSIONS to "$.components.schemas.MealSurveyRequest.properties.exclusions.items.enum",
+            MissionSurveyQuestionCode.TRANSPORT_PRIMARY_MODE to "$.components.schemas.TransportSurveyRequest.properties.primaryMode.enum",
+            MissionSurveyQuestionCode.TRANSPORT_TARGET to "$.components.schemas.TransportSurveyRequest.properties.target.enum",
+            MissionSurveyQuestionCode.TRANSPORT_REASON to "$.components.schemas.TransportSurveyRequest.properties.reason.enum",
+            MissionSurveyQuestionCode.TRANSPORT_EXCLUSIONS to "$.components.schemas.TransportSurveyRequest.properties.exclusions.items.enum",
+            MissionSurveyQuestionCode.HOBBY_TYPES to "$.components.schemas.HobbySurveyRequest.properties.hobbies.items.enum",
+            MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES to "$.components.schemas.HobbySurveyRequest.properties.spendingTypes.items.enum",
+            MissionSurveyQuestionCode.HOBBY_MONTHLY_SPENDING to "$.components.schemas.HobbySurveyRequest.properties.monthlySpendingRange.enum",
+            MissionSurveyQuestionCode.HOBBY_SAVING_METHODS to "$.components.schemas.HobbySurveyRequest.properties.savingMethods.items.enum",
+            MissionSurveyQuestionCode.LIVING_AREAS to "$.components.schemas.LivingSurveyRequest.properties.areas.items.enum",
+            MissionSurveyQuestionCode.LIVING_MONTHLY_SPENDING to "$.components.schemas.LivingSurveyRequest.properties.monthlySpendingRange.enum",
+            MissionSurveyQuestionCode.LIVING_TRIGGER to "$.components.schemas.LivingSurveyRequest.properties.trigger.enum",
+            MissionSurveyQuestionCode.LIVING_SAVING_METHODS to "$.components.schemas.LivingSurveyRequest.properties.savingMethods.items.enum",
+        )
+        documentedOptionPaths.forEach { (questionCode, path) ->
+            val expectedCodes = questionCatalog.question(questionCode).options.map { it.code }
+            val documentedCodes: List<String> = JsonPath.read(document, path)
+            assertEquals(expectedCodes, documentedCodes, questionCode.code)
+        }
+
+        val hobbyFrequencyCodes: List<String> = JsonPath.read(
+            document,
+            "$.components.schemas.HobbyFrequencyRequest.properties.spendingType.enum",
+        )
+        assertEquals(
+            questionCatalog.question(MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES)
+                .options.map { it.code }
+                .filterNot { it == "DO_NOT_REDUCE" },
+            hobbyFrequencyCodes,
+        )
+        val livingFrequencyCodes: List<String> = JsonPath.read(
+            document,
+            "$.components.schemas.LivingFrequencyRequest.properties.area.enum",
+        )
+        assertEquals(
+            questionCatalog.question(MissionSurveyQuestionCode.LIVING_AREAS)
+                .options.map { it.code }
+                .filterNot { it == "UNKNOWN" },
+            livingFrequencyCodes,
+        )
+
+        val documentedSelectionPaths = mapOf(
+            MissionSurveyQuestionCode.MEAL_ALTERNATIVES to "$.components.schemas.MealSurveyRequest.properties.alternatives",
+            MissionSurveyQuestionCode.MEAL_EXCLUSIONS to "$.components.schemas.MealSurveyRequest.properties.exclusions",
+            MissionSurveyQuestionCode.TRANSPORT_EXCLUSIONS to "$.components.schemas.TransportSurveyRequest.properties.exclusions",
+            MissionSurveyQuestionCode.HOBBY_TYPES to "$.components.schemas.HobbySurveyRequest.properties.hobbies",
+            MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES to "$.components.schemas.HobbySurveyRequest.properties.spendingTypes",
+            MissionSurveyQuestionCode.HOBBY_SAVING_METHODS to "$.components.schemas.HobbySurveyRequest.properties.savingMethods",
+            MissionSurveyQuestionCode.LIVING_AREAS to "$.components.schemas.LivingSurveyRequest.properties.areas",
+            MissionSurveyQuestionCode.LIVING_SAVING_METHODS to "$.components.schemas.LivingSurveyRequest.properties.savingMethods",
+        )
+        documentedSelectionPaths.forEach { (questionCode, path) ->
+            val question = questionCatalog.question(questionCode)
+            assertEquals(question.minSelections, JsonPath.read(document, "$path.minItems"), "${questionCode.code} minItems")
+            assertEquals(question.maxSelections, JsonPath.read(document, "$path.maxItems"), "${questionCode.code} maxItems")
+        }
+
+        assertEquals(0, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.minimum"))
+        assertEquals(31, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.maximum"))
+        assertEquals(0, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.minimum"))
+        assertEquals(31, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.maximum"))
+        assertEquals(0, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.minimum"))
+        assertEquals(7, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.maximum"))
+        assertEquals(0, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.minimum"))
+        assertEquals(14, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.maximum"))
+
+        val mealFrequencyDescription: String = JsonPath.read(
+            document,
+            "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.description",
+        )
+        assertTrue(mealFrequencyDescription.contains("PAID_BEVERAGE는 0~14"))
+        val hobbyFrequencyDescription: String = JsonPath.read(
+            document,
+            "$.components.schemas.HobbySurveyRequest.properties.frequencies.description",
+        )
+        assertTrue(hobbyFrequencyDescription.contains("spendingTypes와 정확히 일치"))
+        val livingCountDescription: String = JsonPath.read(
+            document,
+            "$.components.schemas.LivingFrequencyRequest.properties.count.description",
+        )
+        assertTrue(livingCountDescription.contains("SUBSCRIPTION은 구독 개수 0~20"))
     }
 
     private fun putSurvey(token: String, body: String): ResultActions =
