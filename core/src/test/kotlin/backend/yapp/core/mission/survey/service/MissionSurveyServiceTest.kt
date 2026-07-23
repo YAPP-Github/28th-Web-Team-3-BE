@@ -38,7 +38,7 @@ class MissionSurveyServiceTest {
         `when`(repository.saveAndFlush(any(MissionSurvey::class.java))).thenThrow(repositoryFailure)
         val service = MissionSurveyService(
             repository = repository,
-            validator = MissionSurveyValidator(),
+            validator = MissionSurveyValidator(MissionSurveyQuestionCatalog()),
             questionCatalog = MissionSurveyQuestionCatalog(),
         )
 

@@ -61,6 +61,12 @@ class MissionSurveyQuestionCatalog {
             .filter(categories::contains)
             .map { category -> MissionSurveyCategoryQuestions(category, definitions.getValue(category)) }
 
+    fun question(code: MissionSurveyQuestionCode): MissionSurveyQuestionDefinition =
+        definitions.values
+            .asSequence()
+            .flatten()
+            .single { it.code == code.code }
+
     private fun invalid(): Nothing = throw BaseException(ErrorCode.MISSION_SURVEY_INVALID)
 
     private val definitions: Map<MissionSurveyCategory, List<MissionSurveyQuestionDefinition>> = mapOf(

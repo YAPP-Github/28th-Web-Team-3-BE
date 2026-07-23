@@ -5,7 +5,9 @@ import backend.yapp.common.exception.ErrorCode
 import org.springframework.stereotype.Component
 
 @Component
-class MissionSurveyValidator {
+class MissionSurveyValidator(
+    private val questionCatalog: MissionSurveyQuestionCatalog,
+) {
     fun validate(command: MissionSurveyReplaceCommand) {
         val categoryCount = listOf(command.meal, command.transport, command.hobby, command.living).count { it != null }
         requireValid(categoryCount in 1..4)
@@ -16,36 +18,37 @@ class MissionSurveyValidator {
     }
 
     private fun validateMeal(answers: MealSurveyAnswers) {
-        requireDistinctSize(answers.alternatives, 1..MealAlternative.entries.size)
-        requireDistinctSize(answers.exclusions, 1..MealExclusion.entries.size)
-        requireExclusive(answers.alternatives, MealAlternative.NO_ALTERNATIVE)
-        requireExclusive(answers.exclusions, MealExclusion.NONE)
+        requireSelections(answers.alternatives, MissionSurveyQuestionCode.MEAL_ALTERNATIVES)
+        requireSelections(answers.exclusions, MissionSurveyQuestionCode.MEAL_EXCLUSIONS)
 
         if (answers.target == MealTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null && answers.reason == null)
         } else {
-            val maximum = if (answers.target == MealTarget.PAID_BEVERAGE) 14 else 7
-            requireValid(answers.weeklyFrequency != null && answers.weeklyFrequency in 0..maximum)
+            val weeklyFrequency = requireValue(answers.weeklyFrequency)
+            requireNumeric(MissionSurveyQuestionCode.MEAL_FREQUENCY, answers.target, weeklyFrequency)
             requireValid(answers.reason != null)
         }
     }
 
     private fun validateTransport(answers: TransportSurveyAnswers) {
-        requireDistinctSize(answers.exclusions, 1..TransportExclusion.entries.size)
-        requireExclusive(answers.exclusions, TransportExclusion.NONE)
+        requireSelections(answers.exclusions, MissionSurveyQuestionCode.TRANSPORT_EXCLUSIONS)
         if (answers.target == TransportTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null)
         } else {
-            requireValid(answers.weeklyFrequency != null && answers.weeklyFrequency in 0..7)
+            val weeklyFrequency = requireValue(answers.weeklyFrequency)
+            requireNumeric(MissionSurveyQuestionCode.TRANSPORT_FREQUENCY, answers.target, weeklyFrequency)
         }
     }
 
     private fun validateHobby(answers: HobbySurveyAnswers) {
-        requireDistinctSize(answers.hobbies, 1..HobbyType.entries.size)
-        requireDistinctSize(answers.spendingTypes, 1..2)
-        requireDistinctSize(answers.savingMethods, 1..HobbySavingMethod.entries.size)
-        requireExclusive(answers.spendingTypes, HobbySpendingType.DO_NOT_REDUCE)
-        requireExclusive(answers.savingMethods, HobbySavingMethod.NO_HOBBY_MISSION)
+        requireSelections(answers.hobbies, MissionSurveyQuestionCode.HOBBY_TYPES)
+        requireSelections(answers.spendingTypes, MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES)
+        requireSelections(answers.savingMethods, MissionSurveyQuestionCode.HOBBY_SAVING_METHODS)
+        requireConditionalOptions(
+            answers.savingMethods,
+            MissionSurveyQuestionCode.HOBBY_SAVING_METHODS,
+            MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES to answers.spendingTypes,
+        )
 
         if (answers.spendingTypes == listOf(HobbySpendingType.DO_NOT_REDUCE)) {
             requireValid(answers.monthlySpendingRange == null)
@@ -57,18 +60,15 @@ class MissionSurveyValidator {
         requireValid(answers.monthlySpendingRange != null)
         requireValid(answers.frequencies.map { it.spendingType }.toSet() == answers.spendingTypes.toSet())
         requireValid(answers.frequencies.size == answers.spendingTypes.size)
-        requireValid(HobbySavingMethod.NO_HOBBY_MISSION !in answers.savingMethods)
         answers.frequencies.forEach {
             requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
-            requireValid(it.count in 0..maximumFor(it.spendingType))
+            requireNumeric(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it.spendingType, it.count)
         }
     }
 
     private fun validateLiving(answers: LivingSurveyAnswers) {
-        requireDistinctSize(answers.areas, 1..2)
-        requireDistinctSize(answers.savingMethods, 1..LivingSavingMethod.entries.size)
-        requireExclusive(answers.areas, LivingArea.UNKNOWN)
-        requireExclusive(answers.savingMethods, LivingSavingMethod.NO_LIVING_MISSION)
+        requireSelections(answers.areas, MissionSurveyQuestionCode.LIVING_AREAS)
+        requireSelections(answers.savingMethods, MissionSurveyQuestionCode.LIVING_SAVING_METHODS)
 
         if (answers.areas == listOf(LivingArea.UNKNOWN)) {
             requireValid(answers.monthlySpendingRange == null)
@@ -81,25 +81,61 @@ class MissionSurveyValidator {
         requireValid(answers.frequencies.size == answers.areas.size)
         answers.frequencies.forEach {
             requireValid(it.area != LivingArea.UNKNOWN)
-            requireValid(it.count in 0..maximumFor(it.area))
+            requireNumeric(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it.area, it.count)
         }
     }
 
-    private fun maximumFor(type: HobbySpendingType): Int =
-        if (type == HobbySpendingType.SUBSCRIPTION) 20 else 31
-
-    private fun maximumFor(area: LivingArea): Int =
-        if (area == LivingArea.SUBSCRIPTION) 20 else 31
-
-    private fun <T> requireDistinctSize(values: List<T>, range: IntRange) {
-        requireValid(values.size in range && values.distinct().size == values.size)
+    private fun <T> requireSelections(
+        values: List<T>,
+        questionCode: MissionSurveyQuestionCode,
+    ) where T : MissionSurveyCode {
+        val question = questionCatalog.question(questionCode)
+        val minimum = checkNotNull(question.minSelections)
+        val maximum = checkNotNull(question.maxSelections)
+        val codes = values.map(MissionSurveyCode::code)
+        requireValid(codes.size in minimum..maximum && codes.distinct().size == codes.size)
+        requireValid(question.exclusiveOptionCodes.none(codes::contains) || codes.size == 1)
     }
 
-    private fun <T> requireExclusive(values: List<T>, exclusive: T) {
-        requireValid(exclusive !in values || values.size == 1)
+    private fun requireNumeric(
+        questionCode: MissionSurveyQuestionCode,
+        subject: MissionSurveyCode,
+        value: Int,
+    ) {
+        val rule = questionCatalog.question(questionCode).numericRules
+            .singleOrNull { it.subjectOptionCode == subject.code }
+        requireValid(rule != null && value in rule.minimum..rule.maximum)
+    }
+
+    private fun <T, D> requireConditionalOptions(
+        values: List<T>,
+        questionCode: MissionSurveyQuestionCode,
+        dependency: Pair<MissionSurveyQuestionCode, List<D>>,
+    ) where T : MissionSurveyCode, D : MissionSurveyCode {
+        val rules = questionCatalog.question(questionCode).conditionalOptionRules
+        if (rules.isEmpty()) return
+
+        val selectedCodes = values.map(MissionSurveyCode::code)
+        val dependencyCodes = dependency.second.map(MissionSurveyCode::code)
+        val matchingRule = rules.singleOrNull {
+            it.dependsOnQuestionCode == dependency.first.code &&
+                dependencyCodes.containsAll(it.whenOptionCodes)
+        }
+        val conditionallyRestrictedCodes = rules.flatMap { it.allowedOptionCodes }.toSet()
+
+        if (matchingRule == null) {
+            requireValid(selectedCodes.none(conditionallyRestrictedCodes::contains))
+        } else {
+            requireValid(selectedCodes.all(matchingRule.allowedOptionCodes::contains))
+        }
     }
 
     private fun requireValid(condition: Boolean) {
         if (!condition) throw BaseException(ErrorCode.MISSION_SURVEY_INVALID)
+    }
+
+    private fun <T : Any> requireValue(value: T?): T {
+        requireValid(value != null)
+        return checkNotNull(value)
     }
 }

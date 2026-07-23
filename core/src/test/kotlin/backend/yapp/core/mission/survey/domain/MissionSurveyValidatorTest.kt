@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class MissionSurveyValidatorTest {
-    private val validator = MissionSurveyValidator()
+    private val validator = MissionSurveyValidator(MissionSurveyQuestionCatalog())
 
     @Test
     fun `zero selected categories is rejected`() {
