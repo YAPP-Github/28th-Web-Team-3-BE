@@ -1,0 +1,217 @@
+package backend.yapp.core.mission.survey.domain
+
+interface MissionSurveyCode {
+    val code: String
+}
+
+enum class MissionSurveyCategory(override val code: String) : MissionSurveyCode {
+    MEAL("MEAL"),
+    TRANSPORT("TRANSPORT"),
+    HOBBY("HOBBY"),
+    LIVING("LIVING"),
+}
+
+enum class SurveyAnswerType(override val code: String) : MissionSurveyCode {
+    SINGLE_CHOICE("SINGLE_CHOICE"),
+    MULTI_CHOICE("MULTI_CHOICE"),
+    NUMBER("NUMBER"),
+    KEYED_NUMBER("KEYED_NUMBER"),
+}
+
+enum class SurveyFrequencyUnit(override val code: String) : MissionSurveyCode {
+    TIMES_PER_WEEK("TIMES_PER_WEEK"),
+    TIMES_PER_FOUR_WEEKS("TIMES_PER_FOUR_WEEKS"),
+    DAYS_PER_WEEK("DAYS_PER_WEEK"),
+    SUBSCRIPTION_COUNT("SUBSCRIPTION_COUNT"),
+}
+
+enum class MissionSurveyImpact(override val code: String) : MissionSurveyCode {
+    MISSION_FILTER("MISSION_FILTER"),
+    REDUCTION_TARGET("REDUCTION_TARGET"),
+    BASELINE_FREQUENCY("BASELINE_FREQUENCY"),
+    ALTERNATIVE_ACTION("ALTERNATIVE_ACTION"),
+    EXCLUSION_CONDITION("EXCLUSION_CONDITION"),
+}
+
+enum class MissionSurveyQuestionCode(override val code: String) : MissionSurveyCode {
+    MEAL_TARGET("MEAL_TARGET"),
+    MEAL_FREQUENCY("MEAL_FREQUENCY"),
+    MEAL_ALTERNATIVES("MEAL_ALTERNATIVES"),
+    MEAL_REASON("MEAL_REASON"),
+    MEAL_EXCLUSIONS("MEAL_EXCLUSIONS"),
+    TRANSPORT_PRIMARY_MODE("TRANSPORT_PRIMARY_MODE"),
+    TRANSPORT_TARGET("TRANSPORT_TARGET"),
+    TRANSPORT_FREQUENCY("TRANSPORT_FREQUENCY"),
+    TRANSPORT_REASON("TRANSPORT_REASON"),
+    TRANSPORT_EXCLUSIONS("TRANSPORT_EXCLUSIONS"),
+    HOBBY_TYPES("HOBBY_TYPES"),
+    HOBBY_SPENDING_TYPES("HOBBY_SPENDING_TYPES"),
+    HOBBY_MONTHLY_SPENDING("HOBBY_MONTHLY_SPENDING"),
+    HOBBY_FREQUENCIES("HOBBY_FREQUENCIES"),
+    HOBBY_SAVING_METHODS("HOBBY_SAVING_METHODS"),
+    LIVING_AREAS("LIVING_AREAS"),
+    LIVING_MONTHLY_SPENDING("LIVING_MONTHLY_SPENDING"),
+    LIVING_FREQUENCIES("LIVING_FREQUENCIES"),
+    LIVING_TRIGGER("LIVING_TRIGGER"),
+    LIVING_SAVING_METHODS("LIVING_SAVING_METHODS"),
+}
+
+enum class MealTarget(override val code: String) : MissionSurveyCode {
+    DELIVERY("DELIVERY"),
+    DINING_OUT("DINING_OUT"),
+    PAID_BEVERAGE("PAID_BEVERAGE"),
+    CONVENIENCE_FOOD("CONVENIENCE_FOOD"),
+    DRINKING_GATHERING("DRINKING_GATHERING"),
+    UNKNOWN("UNKNOWN"),
+}
+
+enum class MealAlternative(override val code: String) : MissionSurveyCode {
+    COOK("COOK"),
+    PREPARE_MEAL("PREPARE_MEAL"),
+    PREPARE_BEVERAGE("PREPARE_BEVERAGE"),
+    PICKUP("PICKUP"),
+    USE_FRIDGE_FIRST("USE_FRIDGE_FIRST"),
+    BUY_PLANNED_INGREDIENTS("BUY_PLANNED_INGREDIENTS"),
+    NO_ALTERNATIVE("NO_ALTERNATIVE"),
+}
+
+enum class MealReason(override val code: String) : MissionSurveyCode {
+    TIME_OR_ENERGY("TIME_OR_ENERGY"),
+    HABIT("HABIT"),
+    SOCIAL("SOCIAL"),
+    DISCOUNT_OR_NOTIFICATION("DISCOUNT_OR_NOTIFICATION"),
+    NO_COOKING_OR_STORAGE("NO_COOKING_OR_STORAGE"),
+    ALTERNATIVE_INCONVENIENT("ALTERNATIVE_INCONVENIENT"),
+}
+
+enum class MealExclusion(override val code: String) : MissionSurveyCode {
+    HEALTH_OR_DIET("HEALTH_OR_DIET"),
+    FIXED_MEAL("FIXED_MEAL"),
+    NO_COOKING_ENVIRONMENT("NO_COOKING_ENVIRONMENT"),
+    UNAVOIDABLE_SCHEDULE("UNAVOIDABLE_SCHEDULE"),
+    NO_REDUCE_FOOD_AMOUNT("NO_REDUCE_FOOD_AMOUNT"),
+    NONE("NONE"),
+}
+
+enum class TransportPrimaryMode(override val code: String) : MissionSurveyCode {
+    PUBLIC_TRANSIT("PUBLIC_TRANSIT"),
+    TAXI("TAXI"),
+    CAR("CAR"),
+    WALK_OR_BICYCLE("WALK_OR_BICYCLE"),
+    SHARED_MOBILITY("SHARED_MOBILITY"),
+    VARIES("VARIES"),
+}
+
+enum class TransportTarget(override val code: String) : MissionSurveyCode {
+    TAXI("TAXI"),
+    SHORT_DISTANCE_PAID_MOVE("SHORT_DISTANCE_PAID_MOVE"),
+    CAR_DRIVING("CAR_DRIVING"),
+    PARKING_OR_TOLL("PARKING_OR_TOLL"),
+    RUSH_COST("RUSH_COST"),
+    UNKNOWN("UNKNOWN"),
+}
+
+enum class TransportReason(override val code: String) : MissionSurveyCode {
+    LATE_NIGHT_OR_SAFETY("LATE_NIGHT_OR_SAFETY"),
+    TIME_PRESSURE("TIME_PRESSURE"),
+    WEATHER("WEATHER"),
+    LUGGAGE_OR_CARE("LUGGAGE_OR_CARE"),
+    POOR_TRANSIT_CONNECTION("POOR_TRANSIT_CONNECTION"),
+    WALKING_DIFFICULTY("WALKING_DIFFICULTY"),
+    CONVENIENCE_OR_HABIT("CONVENIENCE_OR_HABIT"),
+}
+
+enum class TransportExclusion(override val code: String) : MissionSurveyCode {
+    LATE_NIGHT_DANGER("LATE_NIGHT_DANGER"),
+    EXTREME_WEATHER("EXTREME_WEATHER"),
+    MOBILITY_CONSTRAINT("MOBILITY_CONSTRAINT"),
+    LUGGAGE_OR_CARE("LUGGAGE_OR_CARE"),
+    NO_TRANSIT("NO_TRANSIT"),
+    NONE("NONE"),
+}
+
+enum class HobbyType(override val code: String) : MissionSurveyCode {
+    READING("READING"),
+    MOVIE_OR_OTT("MOVIE_OR_OTT"),
+    GAME("GAME"),
+    EXERCISE("EXERCISE"),
+    PERFORMANCE_OR_EXHIBITION("PERFORMANCE_OR_EXHIBITION"),
+    MUSIC_OR_CREATION("MUSIC_OR_CREATION"),
+    TRAVEL_OR_OUTDOOR("TRAVEL_OR_OUTDOOR"),
+    GATHERING("GATHERING"),
+    OTHER("OTHER"),
+}
+
+enum class HobbySpendingType(override val code: String) : MissionSurveyCode {
+    GOODS("GOODS"),
+    DIGITAL_CONTENT("DIGITAL_CONTENT"),
+    SUBSCRIPTION("SUBSCRIPTION"),
+    CLASS("CLASS"),
+    TICKET("TICKET"),
+    GATHERING_FEE("GATHERING_FEE"),
+    RENTAL_OR_SPACE("RENTAL_OR_SPACE"),
+    DO_NOT_REDUCE("DO_NOT_REDUCE"),
+}
+
+enum class HobbySpendingRange(override val code: String) : MissionSurveyCode {
+    UNDER_50K("UNDER_50K"),
+    FROM_50K_TO_150K("FROM_50K_TO_150K"),
+    FROM_150K_TO_300K("FROM_150K_TO_300K"),
+    OVER_300K("OVER_300K"),
+    UNKNOWN("UNKNOWN"),
+}
+
+enum class HobbySavingMethod(override val code: String) : MissionSurveyCode {
+    WAIT_BEFORE_BUYING("WAIT_BEFORE_BUYING"),
+    SET_WEEKLY_LIMIT("SET_WEEKLY_LIMIT"),
+    USE_OWNED_FIRST("USE_OWNED_FIRST"),
+    USE_CHEAPER_ALTERNATIVE("USE_CHEAPER_ALTERNATIVE"),
+    REVIEW_SUBSCRIPTIONS("REVIEW_SUBSCRIPTIONS"),
+    KEEP_TIME_REDUCE_COST("KEEP_TIME_REDUCE_COST"),
+    NO_HOBBY_MISSION("NO_HOBBY_MISSION"),
+}
+
+enum class LivingArea(override val code: String) : MissionSurveyCode {
+    SUBSCRIPTION("SUBSCRIPTION"),
+    ONLINE_SHOPPING("ONLINE_SHOPPING"),
+    CLOTHING("CLOTHING"),
+    HOUSEHOLD_GOODS("HOUSEHOLD_GOODS"),
+    CONVENIENCE_PURCHASE("CONVENIENCE_PURCHASE"),
+    BEAUTY("BEAUTY"),
+    EXERCISE_OR_LEARNING("EXERCISE_OR_LEARNING"),
+    UNKNOWN("UNKNOWN"),
+}
+
+enum class LivingSpendingRange(override val code: String) : MissionSurveyCode {
+    UNDER_30K("UNDER_30K"),
+    FROM_30K_TO_100K("FROM_30K_TO_100K"),
+    FROM_100K_TO_300K("FROM_100K_TO_300K"),
+    OVER_300K("OVER_300K"),
+    UNKNOWN("UNKNOWN"),
+}
+
+enum class LivingSpendingTrigger(override val code: String) : MissionSurveyCode {
+    DISCOUNT_OR_LIMITED_SALE("DISCOUNT_OR_LIMITED_SALE"),
+    AD_OR_SOCIAL_MEDIA("AD_OR_SOCIAL_MEDIA"),
+    INVENTORY_UNCHECKED("INVENTORY_UNCHECKED"),
+    STRESS_OR_BOREDOM("STRESS_OR_BOREDOM"),
+    CONVENIENCE("CONVENIENCE"),
+    FORGOT_AUTO_PAYMENT("FORGOT_AUTO_PAYMENT"),
+    RARELY_UNPLANNED("RARELY_UNPLANNED"),
+}
+
+enum class LivingSavingMethod(override val code: String) : MissionSurveyCode {
+    WAIT_24_HOURS("WAIT_24_HOURS"),
+    USE_SHOPPING_LIST("USE_SHOPPING_LIST"),
+    CHECK_INVENTORY("CHECK_INVENTORY"),
+    LIMIT_FREQUENCY("LIMIT_FREQUENCY"),
+    REVIEW_SUBSCRIPTIONS("REVIEW_SUBSCRIPTIONS"),
+    CONSIDER_REUSE("CONSIDER_REUSE"),
+    EXCLUDE_NECESSARY_COST("EXCLUDE_NECESSARY_COST"),
+    NO_LIVING_MISSION("NO_LIVING_MISSION"),
+}
+
+inline fun <reified T> missionSurveyCodeOf(code: String): T
+    where T : Enum<T>, T : MissionSurveyCode =
+    enumValues<T>().firstOrNull { it.code == code }
+        ?: throw IllegalArgumentException("Unknown ${T::class.simpleName} code")
