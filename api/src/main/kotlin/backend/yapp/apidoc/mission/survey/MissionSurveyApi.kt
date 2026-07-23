@@ -61,14 +61,59 @@ interface MissionSurveyApi {
 
     @Operation(
         summary = "전체 미션 설문 저장·교체",
-        description = "meal, transport, hobby, living 중 선택한 1~4개 카테고리의 완전한 응답을 한 번에 저장한다. " +
-            "기존 설문이 있으면 요청에 없는 카테고리와 이전 답변까지 포함해 전체 상태를 원자적으로 교체한다. " +
-            "검증 실패 시 기존 상태는 유지되며, 성공 응답은 직후 GET과 동일하다.",
+        description = """
+            meal, transport, hobby, living 중 선택한 1~4개 카테고리의 완전한 응답을 한 번에 저장한다.
+
+            클라이언트는 (1) 카테고리를 선택하고, (2) 선택한 모든 카테고리로 질문 API를 한 번 호출한 뒤,
+            (3) 응답 option의 `code`를 그대로 form state에 저장한다. 화면은 카테고리별로 순차 표시할 수 있지만,
+            (4) 마지막에는 같은 code를 사용해 선택한 모든 카테고리 응답을 한 번의 PUT으로 제출한다.
+
+            분기 규칙:
+            - meal.target이 UNKNOWN이면 weeklyFrequency와 reason을 생략하거나 null로 보낸다.
+            - transport.target이 UNKNOWN이면 weeklyFrequency만 생략하거나 null로 보내며 reason은 필수다.
+            - hobby.spendingTypes가 [DO_NOT_REDUCE]이면 monthlySpendingRange를 생략하거나 null로,
+              frequencies를 빈 배열로, savingMethods를 [NO_HOBBY_MISSION]으로 보낸다.
+            - 일반 취미 분기에서 NO_HOBBY_MISSION은 다른 savingMethods와 함께 보낼 수 없다.
+            - living.areas가 [UNKNOWN]이면 monthlySpendingRange를 생략하거나 null로 보내고 frequencies는 빈 배열로 보낸다.
+            - UNKNOWN, DO_NOT_REDUCE, NONE, NO_ALTERNATIVE, NO_HOBBY_MISSION, NO_LIVING_MISSION 같은
+              배타 옵션은 해당 필드의 다른 옵션과 함께 보낼 수 없다.
+            - hobby.frequencies의 spendingType 집합은 hobby.spendingTypes와, living.frequencies의 area 집합은
+              living.areas와 정확히 일치해야 하며 각 key는 한 번만 등장한다.
+
+            기존 설문이 있으면 요청에 없는 카테고리와 이전 답변까지 포함해 전체 상태를 원자적으로 교체한다.
+            검증 실패 시 기존 상태는 유지되며, 성공 응답은 직후 GET과 동일하다.
+        """,
         requestBody = io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = [Content(
                 schema = Schema(implementation = MissionSurveyPutRequest::class),
-                examples = [ExampleObject(value = SURVEY_REQUEST_EXAMPLE)],
+                examples = [
+                    ExampleObject(
+                        name = "allCategories",
+                        summary = "일반적인 4개 카테고리 전체 요청",
+                        value = ALL_CATEGORIES_REQUEST_EXAMPLE,
+                    ),
+                    ExampleObject(
+                        name = "singleCategory",
+                        summary = "최소 1개 카테고리 요청",
+                        value = SINGLE_CATEGORY_REQUEST_EXAMPLE,
+                    ),
+                    ExampleObject(
+                        name = "mealAndTransportUnknown",
+                        summary = "식사·교통 UNKNOWN 분기",
+                        value = MEAL_TRANSPORT_UNKNOWN_REQUEST_EXAMPLE,
+                    ),
+                    ExampleObject(
+                        name = "hobbyDoNotReduce",
+                        summary = "취미 DO_NOT_REDUCE 분기",
+                        value = HOBBY_DO_NOT_REDUCE_REQUEST_EXAMPLE,
+                    ),
+                    ExampleObject(
+                        name = "keyedFrequencies",
+                        summary = "취미·생활 keyed frequency 요청",
+                        value = KEYED_FREQUENCIES_REQUEST_EXAMPLE,
+                    ),
+                ],
             )],
         ),
     )
@@ -85,7 +130,7 @@ interface MissionSurveyApi {
     fun replace(guestUserId: Long, request: MissionSurveyPutRequest): MissionSurveyResponse
 
     companion object {
-        private const val SURVEY_REQUEST_EXAMPLE = """
+        private const val ALL_CATEGORIES_REQUEST_EXAMPLE = """
             {
               "meal": {
                 "target": "DELIVERY",
@@ -101,8 +146,88 @@ interface MissionSurveyApi {
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },
-              "hobby": null,
-              "living": null
+              "hobby": {
+                "hobbies": ["READING", "GAME"],
+                "spendingTypes": ["SUBSCRIPTION", "GOODS"],
+                "monthlySpendingRange": "FROM_50K_TO_150K",
+                "frequencies": [
+                  {"spendingType": "SUBSCRIPTION", "count": 2},
+                  {"spendingType": "GOODS", "count": 3}
+                ],
+                "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_BEFORE_BUYING"]
+              },
+              "living": {
+                "areas": ["SUBSCRIPTION", "ONLINE_SHOPPING"],
+                "monthlySpendingRange": "FROM_30K_TO_100K",
+                "frequencies": [
+                  {"area": "SUBSCRIPTION", "count": 3},
+                  {"area": "ONLINE_SHOPPING", "count": 4}
+                ],
+                "trigger": "DISCOUNT_OR_LIMITED_SALE",
+                "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_24_HOURS"]
+              }
+            }
+        """
+
+        private const val SINGLE_CATEGORY_REQUEST_EXAMPLE = """
+            {
+              "meal": {
+                "target": "UNKNOWN",
+                "alternatives": ["NO_ALTERNATIVE"],
+                "exclusions": ["NONE"]
+              }
+            }
+        """
+
+        private const val MEAL_TRANSPORT_UNKNOWN_REQUEST_EXAMPLE = """
+            {
+              "meal": {
+                "target": "UNKNOWN",
+                "alternatives": ["NO_ALTERNATIVE"],
+                "exclusions": ["NONE"]
+              },
+              "transport": {
+                "primaryMode": "VARIES",
+                "target": "UNKNOWN",
+                "reason": "CONVENIENCE_OR_HABIT",
+                "exclusions": ["NONE"]
+              }
+            }
+        """
+
+        private const val HOBBY_DO_NOT_REDUCE_REQUEST_EXAMPLE = """
+            {
+              "hobby": {
+                "hobbies": ["READING"],
+                "spendingTypes": ["DO_NOT_REDUCE"],
+                "frequencies": [],
+                "savingMethods": ["NO_HOBBY_MISSION"]
+              }
+            }
+        """
+
+        private const val KEYED_FREQUENCIES_REQUEST_EXAMPLE = """
+            {
+              "hobby": {
+                "hobbies": ["MOVIE_OR_OTT"],
+                "spendingTypes": ["SUBSCRIPTION", "TICKET"],
+                "monthlySpendingRange": "FROM_50K_TO_150K",
+                "frequencies": [
+                  {"spendingType": "SUBSCRIPTION", "count": 2},
+                  {"spendingType": "TICKET", "count": 1}
+                ],
+                "savingMethods": ["REVIEW_SUBSCRIPTIONS"]
+              },
+              "living": {
+                "areas": ["SUBSCRIPTION", "CLOTHING"],
+                "monthlySpendingRange": "FROM_100K_TO_300K",
+                "frequencies": [
+                  {"area": "SUBSCRIPTION", "count": 3},
+                  {"area": "CLOTHING", "count": 2}
+                ],
+                "trigger": "AD_OR_SOCIAL_MEDIA",
+                "savingMethods": ["WAIT_24_HOURS"]
+              }
             }
         """
 
