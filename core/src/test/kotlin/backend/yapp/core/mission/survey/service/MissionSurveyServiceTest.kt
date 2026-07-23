@@ -8,13 +8,16 @@ import backend.yapp.core.mission.survey.domain.MealReason
 import backend.yapp.core.mission.survey.domain.MealSurveyAnswers
 import backend.yapp.core.mission.survey.domain.MealTarget
 import backend.yapp.core.mission.survey.domain.MissionSurvey
+import backend.yapp.core.mission.survey.domain.MissionSurveyAnswerValue
 import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionCatalog
 import backend.yapp.core.mission.survey.domain.MissionSurveyReplaceCommand
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveyValidator
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -30,6 +33,36 @@ class MissionSurveyServiceTest {
     @Test
     fun `data integrity violation is mapped to mission survey conflict`() {
         assertConflict(DataIntegrityViolationException("duplicate guest survey"))
+    }
+
+    @Test
+    fun `decode failure preserves its original cause`() {
+        val repository = mock(MissionSurveyRepository::class.java)
+        val survey = MissionSurvey(guestUserId = GUEST_USER_ID, id = 1L)
+        survey.addAnswers(
+            listOf(
+                MissionSurveyAnswerValue(
+                    categoryCode = "MEAL",
+                    questionCode = "MEAL_TARGET",
+                    valueType = "OPTION",
+                    answerCode = "UNSUPPORTED",
+                ),
+            ),
+            Instant.EPOCH,
+        )
+        `when`(repository.findByGuestUserId(GUEST_USER_ID)).thenReturn(survey)
+        val service = MissionSurveyService(
+            repository = repository,
+            validator = MissionSurveyValidator(MissionSurveyQuestionCatalog()),
+            questionCatalog = MissionSurveyQuestionCatalog(),
+        )
+
+        val exception = assertFailsWith<BaseException> {
+            service.get(GUEST_USER_ID)
+        }
+
+        assertEquals(ErrorCode.INTERNAL_SERVER_ERROR, exception.errorCode)
+        assertIs<IllegalArgumentException>(exception.cause)
     }
 
     private fun assertConflict(repositoryFailure: RuntimeException) {

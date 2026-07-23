@@ -228,8 +228,8 @@ class MissionSurveyService(
                 hobby = decodeHobby(persisted),
                 living = decodeLiving(persisted),
             ).also(validator::validate)
-        } catch (_: Exception) {
-            internal()
+        } catch (cause: Exception) {
+            internal(cause)
         }
 
         val canonicalValues = encode(command)
@@ -359,7 +359,8 @@ class MissionSurveyService(
             SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
         }
 
-    private fun internal(): Nothing = throw BaseException(ErrorCode.INTERNAL_SERVER_ERROR)
+    private fun internal(cause: Throwable? = null): Nothing =
+        throw BaseException(ErrorCode.INTERNAL_SERVER_ERROR, cause)
 
     private class CategoryRows(
         allRows: List<MissionSurveyAnswerValue>,
