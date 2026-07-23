@@ -38,4 +38,9 @@ enum class ErrorCode(
     MISSION_DRAFT_EXPIRED(HttpStatus.CONFLICT, 409, "미션 초안이 만료되었습니다. 다시 생성해 주세요."),
     MISSION_CONFIRM_INVALID(HttpStatus.BAD_REQUEST, 400, "선택한 미션 초안이 올바르지 않습니다."),
     MISSION_CONFIRM_CONFLICT(HttpStatus.CONFLICT, 409, "이미 다른 미션 선택으로 시작했습니다."),
+
+    // Goal
+    INVALID_GOAL_INPUT(HttpStatus.BAD_REQUEST, 400, "목표 입력값이 올바르지 않습니다."),
+    GOAL_ONBOARDING_REQUIRED(HttpStatus.CONFLICT, 409, "목표를 시작하려면 온보딩을 완료해야 합니다."),
+    GOAL_CONFLICT(HttpStatus.CONFLICT, 409, "목표가 동시에 변경되었습니다. 다시 시도해 주세요."),
 }
