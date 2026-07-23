@@ -121,11 +121,8 @@ class MissionSurveyValidator(
             it.dependsOnQuestionCode == dependency.first.code &&
                 dependencyCodes.containsAll(it.whenOptionCodes)
         }
-        val conditionallyRestrictedCodes = rules.flatMap { it.allowedOptionCodes }.toSet()
 
-        if (matchingRule == null) {
-            requireValid(selectedCodes.none(conditionallyRestrictedCodes::contains))
-        } else {
+        if (matchingRule != null) {
             requireValid(selectedCodes.all(matchingRule.allowedOptionCodes::contains))
         }
     }

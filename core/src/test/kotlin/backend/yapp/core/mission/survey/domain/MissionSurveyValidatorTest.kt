@@ -125,11 +125,22 @@ class MissionSurveyValidatorTest {
     }
 
     @Test
-    fun `normal hobby branch rejects no hobby mission saving method`() {
-        assertInvalid(
+    fun `normal hobby branch allows no hobby mission only as an exclusive choice`() {
+        validator.validate(
             MissionSurveyReplaceCommand(
                 hobby = validHobby(
                     savingMethods = listOf(HobbySavingMethod.NO_HOBBY_MISSION),
+                ),
+            ),
+        )
+
+        assertInvalid(
+            MissionSurveyReplaceCommand(
+                hobby = validHobby(
+                    savingMethods = listOf(
+                        HobbySavingMethod.WAIT_BEFORE_BUYING,
+                        HobbySavingMethod.NO_HOBBY_MISSION,
+                    ),
                 ),
             ),
         )
