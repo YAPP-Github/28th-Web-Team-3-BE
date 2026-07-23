@@ -7,5 +7,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")
+    implementation("tools.jackson.module:jackson-module-kotlin")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
+
+    testImplementation("org.mockito:mockito-core")
 }

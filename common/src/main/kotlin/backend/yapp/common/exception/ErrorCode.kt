@@ -30,4 +30,12 @@ enum class ErrorCode(
     MISSION_SURVEY_INVALID(HttpStatus.BAD_REQUEST, 400, "미션 설문 응답이 올바르지 않습니다."),
     MISSION_SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "저장된 미션 설문을 찾을 수 없습니다."),
     MISSION_SURVEY_CONFLICT(HttpStatus.CONFLICT, 409, "미션 설문이 동시에 변경되었습니다. 다시 시도해 주세요."),
+
+    // Mission generation
+    MISSION_GENERATION_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "미션 생성 작업을 찾을 수 없습니다."),
+    MISSION_GENERATION_NOT_READY(HttpStatus.CONFLICT, 409, "미션 생성 작업이 아직 완료되지 않았습니다."),
+    MISSION_GENERATION_FAILED(HttpStatus.CONFLICT, 409, "미션 생성 작업이 실패했습니다. 다시 요청해 주세요."),
+    MISSION_DRAFT_EXPIRED(HttpStatus.CONFLICT, 409, "미션 초안이 만료되었습니다. 다시 생성해 주세요."),
+    MISSION_CONFIRM_INVALID(HttpStatus.BAD_REQUEST, 400, "선택한 미션 초안이 올바르지 않습니다."),
+    MISSION_CONFIRM_CONFLICT(HttpStatus.CONFLICT, 409, "이미 다른 미션 선택으로 시작했습니다."),
 }
