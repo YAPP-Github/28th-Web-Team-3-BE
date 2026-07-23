@@ -36,7 +36,7 @@ interface GoalApi {
 
     @Operation(
         summary = "현재 저축액 입력",
-        description = "입력 금액을 저축 기록으로 추가(누적)한다. 총 저축액과 이번 달 저축액에 함께 반영되며, 갱신된 현황을 반환한다.",
+        description = "이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액(온보딩 순자산 + 월별 합)에 반영되며, 갱신된 현황을 반환한다.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "입력 성공", content = [Content(schema = Schema(implementation = GoalStatusResponse::class))]),
@@ -44,7 +44,7 @@ interface GoalApi {
         ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "409", description = "GOAL_ONBOARDING_REQUIRED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
-    fun addSaving(guestUserId: Long, request: SavingRequest): GoalStatusResponse
+    fun setSaving(guestUserId: Long, request: SavingRequest): GoalStatusResponse
 
     @Operation(
         summary = "목표 금액/기간 수정",

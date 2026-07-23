@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -22,7 +23,7 @@ class GoalAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
-    fun `goal status is derived from onboarding and savings accumulate`() {
+    fun `goal status is derived from onboarding and this month saving is overwritten`() {
         val token = completeOnboarding()
 
         // 최초 조회: 온보딩 확정값으로 목표 지연 생성. base = 순자산(1800), 이번달 목표 = 월저축(100), 목표액 = 100*1.15*24 = 2760
@@ -33,20 +34,20 @@ class GoalAcceptanceTest(
             .andExpect(jsonPath("$.thisMonth.targetManwon").value(100))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(0))
 
-        // 저축액 입력은 누적된다.
-        addSaving(token, 30)
-        mockMvc.perform(post("/api/goal/savings").header("Authorization", "Bearer $token")
-            .contentType(MediaType.APPLICATION_JSON).content("""{"amountManwon":20}"""))
+        // 저축액 입력은 이번 달 값을 덮어쓴다(누적 아님).
+        setSaving(token, 30)
+        mockMvc.perform(put("/api/goal/savings").header("Authorization", "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON).content("""{"savedAmountManwon":20}"""))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.totalSavedManwon").value(1850)) // 1800 + 30 + 20
-            .andExpect(jsonPath("$.thisMonth.savedManwon").value(50))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1820)) // 1800 + 20 (덮어쓰기)
+            .andExpect(jsonPath("$.thisMonth.savedManwon").value(20))
 
         // 목표 금액/기간 수정
         mockMvc.perform(patch("/api/goal").header("Authorization", "Bearer $token")
             .contentType(MediaType.APPLICATION_JSON).content("""{"targetAmountManwon":5000,"periodMonths":36}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(5000))
-            .andExpect(jsonPath("$.totalSavedManwon").value(1850))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1820))
     }
 
     @Test
@@ -64,16 +65,16 @@ class GoalAcceptanceTest(
     }
 
     @Test
-    fun `non-positive saving amount is rejected`() {
+    fun `negative saving amount is rejected`() {
         val token = completeOnboarding()
-        mockMvc.perform(post("/api/goal/savings").header("Authorization", "Bearer $token")
-            .contentType(MediaType.APPLICATION_JSON).content("""{"amountManwon":0}"""))
+        mockMvc.perform(put("/api/goal/savings").header("Authorization", "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON).content("""{"savedAmountManwon":-1}"""))
             .andExpect(status().isBadRequest)
     }
 
-    private fun addSaving(token: String, amount: Int) {
-        mockMvc.perform(post("/api/goal/savings").header("Authorization", "Bearer $token")
-            .contentType(MediaType.APPLICATION_JSON).content("""{"amountManwon":$amount}"""))
+    private fun setSaving(token: String, amount: Int) {
+        mockMvc.perform(put("/api/goal/savings").header("Authorization", "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON).content("""{"savedAmountManwon":$amount}"""))
             .andExpect(status().isOk)
     }
 

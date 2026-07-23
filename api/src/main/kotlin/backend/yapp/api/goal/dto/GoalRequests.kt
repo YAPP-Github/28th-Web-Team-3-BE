@@ -4,11 +4,11 @@ import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 
-/** 현재 저축액 입력. 입력 금액이 이번 달 저축액과 총 저축액에 누적된다. */
+/** 현재 저축액 입력. 이번 달 저축액을 입력값으로 덮어쓴다(set). */
 data class SavingRequest(
-    @field:Schema(description = "이번에 저축한 금액(만원). 총 저축액·이번 달 저축액에 누적된다.", example = "30")
-    @field:Min(1) @field:Max(100_000)
-    val amountManwon: Int,
+    @field:Schema(description = "이번 달 저축액(만원). 이 값으로 이번 달 저축액을 덮어쓰며, 총 저축액에 반영된다.", example = "30")
+    @field:Min(0) @field:Max(100_000)
+    val savedAmountManwon: Int,
 )
 
 /** 목표 금액/기간 수정. 변경할 필드만 전송한다. */
