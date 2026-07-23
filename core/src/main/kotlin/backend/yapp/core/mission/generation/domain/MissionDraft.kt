@@ -36,6 +36,8 @@ class MissionDraft(
     val targetUnit: String,
     @Column(name = "estimated_savings_won", nullable = false)
     val estimatedSavingsWon: Int,
+    @Column(name = "savings_estimate_version", nullable = false, length = 40)
+    val savingsEstimateVersion: String = "V1",
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant,
 )

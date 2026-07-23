@@ -67,6 +67,7 @@ data class MissionDraftResponse(
     val targetCount: Int,
     val targetUnit: String,
     val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String,
     val savingsLabel: String,
 ) {
     companion object {
@@ -80,6 +81,7 @@ data class MissionDraftResponse(
                 targetCount = snapshot.targetCount,
                 targetUnit = snapshot.targetUnit,
                 estimatedSavingsWon = snapshot.estimatedSavingsWon,
+                savingsEstimateVersion = snapshot.savingsEstimateVersion,
                 savingsLabel = "약 ${snapshot.estimatedSavingsWon}원 절약 예상",
             )
     }
@@ -105,6 +107,7 @@ data class MissionResponse(
     val targetCount: Int,
     val targetUnit: String,
     val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String,
     val savingsLabel: String,
     val status: String,
 ) {
@@ -120,6 +123,7 @@ data class MissionResponse(
                 targetCount = snapshot.targetCount,
                 targetUnit = snapshot.targetUnit,
                 estimatedSavingsWon = snapshot.estimatedSavingsWon,
+                savingsEstimateVersion = snapshot.savingsEstimateVersion,
                 savingsLabel = "약 ${snapshot.estimatedSavingsWon}원 절약 예상",
                 status = snapshot.status,
             )

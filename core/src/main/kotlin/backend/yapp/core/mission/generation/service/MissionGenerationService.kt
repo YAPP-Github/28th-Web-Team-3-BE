@@ -16,6 +16,9 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
+import java.time.DayOfWeek
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
@@ -79,6 +82,7 @@ class MissionGenerationService(
                 targetCount = draft.targetCount,
                 targetUnit = draft.targetUnit,
                 estimatedSavingsWon = draft.estimatedSavingsWon,
+                savingsEstimateVersion = draft.savingsEstimateVersion,
             )
         }
     }
@@ -125,6 +129,8 @@ class MissionGenerationService(
                 targetCount = draft.targetCount,
                 targetUnit = draft.targetUnit,
                 estimatedSavingsWon = draft.estimatedSavingsWon,
+                savingsEstimateVersion = draft.savingsEstimateVersion,
+                weekEndsAt = weekEnd(now),
                 createdAt = now,
             )
         }
@@ -169,6 +175,7 @@ class MissionGenerationService(
             targetCount = targetCount,
             targetUnit = targetUnit,
             estimatedSavingsWon = estimatedSavingsWon,
+            savingsEstimateVersion = savingsEstimateVersion,
             status = status.name,
         )
 
@@ -177,6 +184,14 @@ class MissionGenerationService(
         return MessageDigest.getInstance("SHA-256")
             .digest(canonical.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
+    }
+
+    private fun weekEnd(now: Instant): Instant {
+        val zone = ZoneId.of("Asia/Seoul")
+        val date = now.atZone(zone).toLocalDate()
+        return date.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+            .atStartOfDay(zone)
+            .toInstant()
     }
 
     companion object {

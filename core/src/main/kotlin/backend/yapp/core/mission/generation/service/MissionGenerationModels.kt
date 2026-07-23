@@ -27,6 +27,7 @@ data class MissionDraftSnapshot(
     val targetCount: Int,
     val targetUnit: String,
     val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String,
 )
 
 data class MissionSnapshot(
@@ -39,6 +40,7 @@ data class MissionSnapshot(
     val targetCount: Int,
     val targetUnit: String,
     val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String,
     val status: String,
 )
 

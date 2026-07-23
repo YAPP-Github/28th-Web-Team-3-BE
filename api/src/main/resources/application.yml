@@ -33,6 +33,8 @@ onboarding:
     single: 0.05
 
 mission:
+  lifecycle:
+    scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:true}
   generation:
     provider: ${MISSION_GENERATION_PROVIDER:mock}
     stale-running-timeout: PT10M
@@ -50,3 +52,26 @@ mission:
       connect-timeout: PT3S
       request-timeout: PT20S
       max-output-tokens: 2000
+    recommendation:
+      provider: ${MISSION_RECOMMENDATION_PROVIDER:personalized}
+      semantic-provider: ${MISSION_SEMANTIC_PROVIDER:openai}
+      algorithm-version: rule-v1
+      normal-reduction: 1
+      aggressive-reduction: 2
+      normal-replacement-count: 1
+      aggressive-replacement-count: 2
+      exact-cooldown-days: 56
+      family-cooldown-days: 28
+      signal-decay-days: 84
+      category-concentration-penalty: 0.04
+      archetype-concentration-penalty: 0.08
+      recent-category-exposure-penalty: 0.03
+      exploration-bonus: 0.05
+      exploration-rate: 0.20
+      embedding:
+        base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+        api-key: ${OPENAI_API_KEY:}
+        model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+        dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:256}
+        connect-timeout: PT3S
+        request-timeout: PT10S

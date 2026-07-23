@@ -4,9 +4,7 @@ import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
-import org.springframework.stereotype.Component
 
-@Component
 class DatabaseMissionDraftCandidateProvider(
     private val templateRepository: MissionDraftTemplateRepository,
 ) : MissionDraftCandidateProvider {
@@ -27,6 +25,7 @@ class DatabaseMissionDraftCandidateProvider(
                     targetCount = template.targetCount,
                     targetUnit = template.targetUnit,
                     estimatedSavingsWon = template.estimatedSavingsWon,
+                    savingsEstimateVersion = template.savingsEstimateVersion,
                 )
             }
     }

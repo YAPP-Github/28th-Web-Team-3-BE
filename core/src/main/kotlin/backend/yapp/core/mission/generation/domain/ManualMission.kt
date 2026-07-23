@@ -10,36 +10,23 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity
-@Table(name = "mission")
-class Mission(
+@Table(name = "manual_mission")
+class ManualMission(
     @Id
     val id: UUID,
-    @Column(name = "job_id", nullable = false)
-    val jobId: UUID,
-    @Column(name = "draft_id", nullable = false, unique = true)
-    val draftId: UUID,
     @Column(name = "guest_user_id", nullable = false)
     val guestUserId: Long,
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 20)
     val category: MissionCategory,
-    @Column(name = "title", nullable = false, length = 120)
-    val title: String,
-    @Column(name = "description", nullable = false, length = 500)
-    val description: String,
-    @Column(name = "action_code", nullable = false, length = 80)
-    val actionCode: String,
-    @Enumerated(EnumType.STRING)
-    @Column(name = "metric_type", nullable = false, length = 20)
-    val metricType: MissionMetricType,
+    @Column(name = "mission_text", nullable = false, length = 500)
+    val missionText: String,
+    @Column(name = "structured_tags", nullable = false, length = 500)
+    val structuredTags: String,
     @Column(name = "target_count", nullable = false)
     val targetCount: Int,
     @Column(name = "target_unit", nullable = false, length = 40)
     val targetUnit: String,
-    @Column(name = "estimated_savings_won", nullable = false)
-    val estimatedSavingsWon: Int,
-    @Column(name = "savings_estimate_version", nullable = false, length = 40)
-    val savingsEstimateVersion: String = "V1",
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     var status: MissionStatus = MissionStatus.ACTIVE,
@@ -64,10 +51,4 @@ class Mission(
         status = MissionStatus.INCOMPLETE
         return true
     }
-}
-
-enum class MissionStatus {
-    ACTIVE,
-    COMPLETED,
-    INCOMPLETE,
 }
