@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 @Tag(
     name = "Goal",
     description = "온보딩 확정 이후의 목표 추적 API. 전체 목표 대비 총 저축액·진행률, 서비스 사용기간·목표일 D-day, " +
-        "이번 달 저축 목표 현황을 제공하고, 저축액 입력(누적)과 목표 금액·기간 수정을 처리한다. 게스트 액세스 토큰 인증 필요.",
+        "이번 달 저축 목표 현황을 제공하고, 저축액 입력(덮어쓰기)과 목표 금액·기간 수정을 처리한다. 게스트 액세스 토큰 인증 필요.",
 )
 @SecurityRequirement(name = "accessTokenAuth")
 interface GoalApi {
