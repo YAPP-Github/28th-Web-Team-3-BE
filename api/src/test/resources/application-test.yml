@@ -19,3 +19,7 @@ jwt:
   audience: yapp-client
   access-token-ttl: PT1H
   refresh-token-ttl: PT24H
+
+mission:
+  generation:
+    provider: mock
