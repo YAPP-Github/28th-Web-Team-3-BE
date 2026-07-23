@@ -38,4 +38,7 @@ enum class ErrorCode(
     MISSION_DRAFT_EXPIRED(HttpStatus.CONFLICT, 409, "미션 초안이 만료되었습니다. 다시 생성해 주세요."),
     MISSION_CONFIRM_INVALID(HttpStatus.BAD_REQUEST, 400, "선택한 미션 초안이 올바르지 않습니다."),
     MISSION_CONFIRM_CONFLICT(HttpStatus.CONFLICT, 409, "이미 다른 미션 선택으로 시작했습니다."),
+    MISSION_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "미션을 찾을 수 없습니다."),
+    MISSION_STATUS_CONFLICT(HttpStatus.CONFLICT, 409, "현재 상태에서는 미션을 완료할 수 없습니다."),
+    MANUAL_MISSION_INVALID(HttpStatus.BAD_REQUEST, 400, "수동 미션 입력값이 올바르지 않습니다."),
 }
