@@ -56,6 +56,7 @@ class SwaggerConfig(
                 listOf(
                     Tag().name("Guest Authentication").description("게스트 식별값 및 토큰 관리"),
                     Tag().name("Onboarding").description("온보딩 입력 저장 및 재무 리포트·목표 금액 산출"),
+                    Tag().name("Mission Surveys").description("미션 생성을 위한 관심 카테고리 설문 문항 및 응답 관리"),
                 ),
             )
 

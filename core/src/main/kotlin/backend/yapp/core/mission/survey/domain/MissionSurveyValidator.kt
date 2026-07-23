@@ -1,0 +1,138 @@
+package backend.yapp.core.mission.survey.domain
+
+import backend.yapp.common.exception.BaseException
+import backend.yapp.common.exception.ErrorCode
+import org.springframework.stereotype.Component
+
+@Component
+class MissionSurveyValidator(
+    private val questionCatalog: MissionSurveyQuestionCatalog,
+) {
+    fun validate(command: MissionSurveyReplaceCommand) {
+        val categoryCount = listOf(command.meal, command.transport, command.hobby, command.living).count { it != null }
+        requireValid(categoryCount in 1..4)
+        command.meal?.let(::validateMeal)
+        command.transport?.let(::validateTransport)
+        command.hobby?.let(::validateHobby)
+        command.living?.let(::validateLiving)
+    }
+
+    private fun validateMeal(answers: MealSurveyAnswers) {
+        requireSelections(answers.alternatives, MissionSurveyQuestionCode.MEAL_ALTERNATIVES)
+        requireSelections(answers.exclusions, MissionSurveyQuestionCode.MEAL_EXCLUSIONS)
+
+        if (answers.target == MealTarget.UNKNOWN) {
+            requireValid(answers.weeklyFrequency == null && answers.reason == null)
+        } else {
+            val weeklyFrequency = requireValue(answers.weeklyFrequency)
+            requireNumeric(MissionSurveyQuestionCode.MEAL_FREQUENCY, answers.target, weeklyFrequency)
+            requireValid(answers.reason != null)
+        }
+    }
+
+    private fun validateTransport(answers: TransportSurveyAnswers) {
+        requireSelections(answers.exclusions, MissionSurveyQuestionCode.TRANSPORT_EXCLUSIONS)
+        if (answers.target == TransportTarget.UNKNOWN) {
+            requireValid(answers.weeklyFrequency == null)
+        } else {
+            val weeklyFrequency = requireValue(answers.weeklyFrequency)
+            requireNumeric(MissionSurveyQuestionCode.TRANSPORT_FREQUENCY, answers.target, weeklyFrequency)
+        }
+    }
+
+    private fun validateHobby(answers: HobbySurveyAnswers) {
+        requireSelections(answers.hobbies, MissionSurveyQuestionCode.HOBBY_TYPES)
+        requireSelections(answers.spendingTypes, MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES)
+        requireSelections(answers.savingMethods, MissionSurveyQuestionCode.HOBBY_SAVING_METHODS)
+        requireConditionalOptions(
+            answers.savingMethods,
+            MissionSurveyQuestionCode.HOBBY_SAVING_METHODS,
+            MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES to answers.spendingTypes,
+        )
+
+        if (answers.spendingTypes == listOf(HobbySpendingType.DO_NOT_REDUCE)) {
+            requireValid(answers.monthlySpendingRange == null)
+            requireValid(answers.frequencies.isEmpty())
+            requireValid(answers.savingMethods == listOf(HobbySavingMethod.NO_HOBBY_MISSION))
+            return
+        }
+
+        requireValid(answers.monthlySpendingRange != null)
+        requireValid(answers.frequencies.map { it.spendingType }.toSet() == answers.spendingTypes.toSet())
+        requireValid(answers.frequencies.size == answers.spendingTypes.size)
+        answers.frequencies.forEach {
+            requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
+            requireNumeric(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it.spendingType, it.count)
+        }
+    }
+
+    private fun validateLiving(answers: LivingSurveyAnswers) {
+        requireSelections(answers.areas, MissionSurveyQuestionCode.LIVING_AREAS)
+        requireSelections(answers.savingMethods, MissionSurveyQuestionCode.LIVING_SAVING_METHODS)
+
+        if (answers.areas == listOf(LivingArea.UNKNOWN)) {
+            requireValid(answers.monthlySpendingRange == null)
+            requireValid(answers.frequencies.isEmpty())
+            return
+        }
+
+        requireValid(answers.monthlySpendingRange != null)
+        requireValid(answers.frequencies.map { it.area }.toSet() == answers.areas.toSet())
+        requireValid(answers.frequencies.size == answers.areas.size)
+        answers.frequencies.forEach {
+            requireValid(it.area != LivingArea.UNKNOWN)
+            requireNumeric(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it.area, it.count)
+        }
+    }
+
+    private fun <T> requireSelections(
+        values: List<T>,
+        questionCode: MissionSurveyQuestionCode,
+    ) where T : MissionSurveyCode {
+        val question = questionCatalog.question(questionCode)
+        val minimum = checkNotNull(question.minSelections)
+        val maximum = checkNotNull(question.maxSelections)
+        val codes = values.map(MissionSurveyCode::code)
+        requireValid(codes.size in minimum..maximum && codes.distinct().size == codes.size)
+        requireValid(question.exclusiveOptionCodes.none(codes::contains) || codes.size == 1)
+    }
+
+    private fun requireNumeric(
+        questionCode: MissionSurveyQuestionCode,
+        subject: MissionSurveyCode,
+        value: Int,
+    ) {
+        val rule = questionCatalog.question(questionCode).numericRules
+            .singleOrNull { it.subjectOptionCode == subject.code }
+        requireValid(rule != null && value in rule.minimum..rule.maximum)
+    }
+
+    private fun <T, D> requireConditionalOptions(
+        values: List<T>,
+        questionCode: MissionSurveyQuestionCode,
+        dependency: Pair<MissionSurveyQuestionCode, List<D>>,
+    ) where T : MissionSurveyCode, D : MissionSurveyCode {
+        val rules = questionCatalog.question(questionCode).conditionalOptionRules
+        if (rules.isEmpty()) return
+
+        val selectedCodes = values.map(MissionSurveyCode::code)
+        val dependencyCodes = dependency.second.map(MissionSurveyCode::code)
+        val matchingRule = rules.singleOrNull {
+            it.dependsOnQuestionCode == dependency.first.code &&
+                dependencyCodes.containsAll(it.whenOptionCodes)
+        }
+
+        if (matchingRule != null) {
+            requireValid(selectedCodes.all(matchingRule.allowedOptionCodes::contains))
+        }
+    }
+
+    private fun requireValid(condition: Boolean) {
+        if (!condition) throw BaseException(ErrorCode.MISSION_SURVEY_INVALID)
+    }
+
+    private fun <T : Any> requireValue(value: T?): T {
+        requireValid(value != null)
+        return checkNotNull(value)
+    }
+}
