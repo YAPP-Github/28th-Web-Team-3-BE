@@ -57,6 +57,7 @@ class MissionSurveyValidator {
         requireValid(answers.monthlySpendingRange != null)
         requireValid(answers.frequencies.map { it.spendingType }.toSet() == answers.spendingTypes.toSet())
         requireValid(answers.frequencies.size == answers.spendingTypes.size)
+        requireValid(HobbySavingMethod.NO_HOBBY_MISSION !in answers.savingMethods)
         answers.frequencies.forEach {
             requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
             requireValid(it.count in 0..maximumFor(it.spendingType))
