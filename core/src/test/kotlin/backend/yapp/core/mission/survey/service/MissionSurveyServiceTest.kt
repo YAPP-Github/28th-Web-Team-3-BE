@@ -18,8 +18,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
@@ -63,6 +66,43 @@ class MissionSurveyServiceTest {
 
         assertEquals(ErrorCode.INTERNAL_SERVER_ERROR, exception.errorCode)
         assertIs<IllegalArgumentException>(exception.cause)
+    }
+
+    @Test
+    fun `existing survey is cleared and flushed before replacement answers are inserted`() {
+        val repository = mock(MissionSurveyRepository::class.java)
+        val survey = MissionSurvey(guestUserId = GUEST_USER_ID, id = 1L)
+        survey.addAnswers(
+            listOf(
+                MissionSurveyAnswerValue(
+                    categoryCode = "MEAL",
+                    questionCode = "MEAL_TARGET",
+                    valueType = "OPTION",
+                    answerCode = "DINING_OUT",
+                ),
+            ),
+            Instant.EPOCH,
+        )
+        `when`(repository.findByGuestUserId(GUEST_USER_ID)).thenReturn(survey)
+        doAnswer {
+            assertTrue(survey.answerRows().isEmpty())
+            null
+        }.`when`(repository).flush()
+        `when`(repository.saveAndFlush(survey)).thenAnswer {
+            assertTrue(survey.answerRows().isNotEmpty())
+            survey
+        }
+        val service = MissionSurveyService(
+            repository = repository,
+            validator = MissionSurveyValidator(MissionSurveyQuestionCatalog()),
+            questionCatalog = MissionSurveyQuestionCatalog(),
+        )
+
+        val result = service.replace(GUEST_USER_ID, validCommand())
+
+        verify(repository).flush()
+        verify(repository).saveAndFlush(survey)
+        assertEquals(validCommand().meal, result.meal)
     }
 
     private fun assertConflict(repositoryFailure: RuntimeException) {
