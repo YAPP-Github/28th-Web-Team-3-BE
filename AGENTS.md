@@ -31,6 +31,8 @@ AI Agent는 아래 우선순위를 따른다.
 
 - Production branch: `main`
 - Development branch: `dev`
+- Pull Request target/base branch: `main` only
+- Every Pull Request must target `main`. The existence of `dev` as the development branch does not make it a Pull Request target/base branch.
 - Feature and task branches use this format:
 
 ```text
