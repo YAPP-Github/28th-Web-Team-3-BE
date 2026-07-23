@@ -114,7 +114,7 @@ class MissionSurveyAcceptanceTest(
             )
 
         assertEquals(
-            listOf("1", "2", "3", "4", "5"),
+            listOf("1", "2", "3", "4", "5", "6"),
             queryStrings(
                 """
                     SELECT version
