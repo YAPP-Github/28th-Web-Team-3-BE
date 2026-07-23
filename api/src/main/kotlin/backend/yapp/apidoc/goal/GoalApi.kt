@@ -54,7 +54,7 @@ interface GoalApi {
         ApiResponse(responseCode = "200", description = "수정 성공", content = [Content(schema = Schema(implementation = GoalStatusResponse::class))]),
         ApiResponse(responseCode = "400", description = "INVALID_GOAL_INPUT 또는 VALIDATION_FAILED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
-        ApiResponse(responseCode = "409", description = "GOAL_ONBOARDING_REQUIRED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "409", description = "GOAL_ONBOARDING_REQUIRED 또는 GOAL_CONFLICT", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun update(guestUserId: Long, request: GoalUpdateRequest): GoalStatusResponse
 }

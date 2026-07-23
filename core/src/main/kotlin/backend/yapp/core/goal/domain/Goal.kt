@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import java.time.Instant
 
 /**
@@ -31,6 +32,9 @@ class Goal(
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.now(),
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0,
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 )

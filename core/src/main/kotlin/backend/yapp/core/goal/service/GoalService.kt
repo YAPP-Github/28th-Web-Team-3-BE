@@ -12,6 +12,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -44,7 +45,11 @@ class GoalService(
         targetAmountManwon?.let { goal.targetAmountManwon = validateRange(it, MIN_TARGET_MANWON, MAX_TARGET_MANWON) }
         periodMonths?.let { goal.periodMonths = validateRange(it, MIN_MONTHS, MAX_MONTHS) }
         goal.updatedAt = clock.instant()
-        goalRepository.save(goal)
+        try {
+            goalRepository.saveAndFlush(goal)
+        } catch (_: OptimisticLockingFailureException) {
+            throw BaseException(ErrorCode.GOAL_CONFLICT)
+        }
         return computeStatus(goal)
     }
 

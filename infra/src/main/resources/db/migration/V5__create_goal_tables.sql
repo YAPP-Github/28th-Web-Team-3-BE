@@ -7,7 +7,8 @@ CREATE TABLE goal (
     base_amount_manwon     INTEGER NOT NULL,
     started_at             TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at             TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at             TIMESTAMP WITH TIME ZONE NOT NULL
+    updated_at             TIMESTAMP WITH TIME ZONE NOT NULL,
+    version                BIGINT NOT NULL
 );
 
 CREATE TABLE saving_record (

@@ -42,4 +42,5 @@ enum class ErrorCode(
     // Goal
     INVALID_GOAL_INPUT(HttpStatus.BAD_REQUEST, 400, "목표 입력값이 올바르지 않습니다."),
     GOAL_ONBOARDING_REQUIRED(HttpStatus.CONFLICT, 409, "목표를 시작하려면 온보딩을 완료해야 합니다."),
+    GOAL_CONFLICT(HttpStatus.CONFLICT, 409, "목표가 동시에 변경되었습니다. 다시 시도해 주세요."),
 }
