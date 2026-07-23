@@ -4,11 +4,11 @@ import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
 import backend.yapp.core.goal.domain.Goal
 import backend.yapp.core.goal.domain.GoalRepository
-import backend.yapp.core.goal.domain.SavingRecord
-import backend.yapp.core.goal.domain.SavingRecordRepository
+import backend.yapp.core.goal.domain.MonthlySaving
+import backend.yapp.core.goal.domain.MonthlySavingRepository
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import org.springframework.dao.DataIntegrityViolationException
@@ -19,23 +19,37 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class GoalService(
     private val goalRepository: GoalRepository,
-    private val savingRecordRepository: SavingRecordRepository,
+    private val monthlySavingRepository: MonthlySavingRepository,
     private val goalInitializer: GoalInitializer,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun status(guestUserId: Long): GoalStatus = computeStatus(getOrCreateGoal(guestUserId))
 
-    /** "현재 저축액 입력": 입력 금액을 저축 기록으로 추가(누적)한다. 총 저축액과 이번 달 저축액에 함께 반영된다. */
+    /**
+     * "현재 저축액 입력": 이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액은 온보딩 순자산 + 월별 합으로 재계산된다.
+     */
     @Transactional
-    fun addSaving(guestUserId: Long, amountManwon: Int): GoalStatus {
-        if (amountManwon < MIN_SAVING_MANWON || amountManwon > MAX_SAVING_MANWON) {
-            throw BaseException(ErrorCode.INVALID_GOAL_INPUT)
-        }
+    fun setThisMonthSaving(guestUserId: Long, savedAmountManwon: Int): GoalStatus {
+        val amount = validateRange(savedAmountManwon, MIN_SAVING_MANWON, MAX_SAVING_MANWON)
         val goal = getOrCreateGoal(guestUserId)
-        savingRecordRepository.save(
-            SavingRecord(guestUserId = guestUserId, amountManwon = amountManwon, recordedAt = clock.instant()),
-        )
+        val yearMonth = currentYearMonth()
+
+        val existing = monthlySavingRepository.findByGuestUserIdAndYearMonth(guestUserId, yearMonth)
+        if (existing != null) {
+            existing.savedAmountManwon = amount
+            existing.updatedAt = clock.instant()
+            monthlySavingRepository.save(existing)
+        } else {
+            monthlySavingRepository.save(
+                MonthlySaving(
+                    guestUserId = guestUserId,
+                    yearMonth = yearMonth,
+                    savedAmountManwon = amount,
+                    updatedAt = clock.instant(),
+                ),
+            )
+        }
         return computeStatus(goal)
     }
 
@@ -65,16 +79,13 @@ class GoalService(
 
     private fun computeStatus(goal: Goal): GoalStatus {
         val today = LocalDate.ofInstant(clock.instant(), ZONE)
-        val monthStart = today.withDayOfMonth(1)
-        val monthEndExclusive = monthStart.plusMonths(1)
+        val monthEndExclusive = today.withDayOfMonth(1).plusMonths(1)
         val lastDayOfMonth = monthEndExclusive.minusDays(1)
 
-        val totalSaved = goal.baseAmountManwon + savingRecordRepository.sumAmountByGuestUserId(goal.guestUserId).toInt()
-        val thisMonthSaved = savingRecordRepository.sumAmountInRange(
-            guestUserId = goal.guestUserId,
-            from = monthStart.atStartOfDay(ZONE).toInstant(),
-            to = monthEndExclusive.atStartOfDay(ZONE).toInstant(),
-        ).toInt()
+        val totalSaved = goal.baseAmountManwon + monthlySavingRepository.sumSavedByGuestUserId(goal.guestUserId).toInt()
+        val thisMonthSaved = monthlySavingRepository
+            .findByGuestUserIdAndYearMonth(goal.guestUserId, currentYearMonth())
+            ?.savedAmountManwon ?: 0
 
         val startedDate = LocalDate.ofInstant(goal.startedAt, ZONE)
         val deadlineDate = startedDate.plusMonths(goal.periodMonths.toLong())
@@ -94,6 +105,8 @@ class GoalService(
         )
     }
 
+    private fun currentYearMonth(): String = YearMonth.from(LocalDate.ofInstant(clock.instant(), ZONE)).toString()
+
     /** 진행률 = 값/목표 × 100 (반올림). 금액은 실제값을 쓰되 표시 %는 100으로 캡한다. */
     private fun cappedPercent(value: Int, target: Int): Int {
         if (target <= 0) return 0
@@ -107,7 +120,7 @@ class GoalService(
 
     companion object {
         private val ZONE: ZoneId = ZoneId.of("Asia/Seoul")
-        private const val MIN_SAVING_MANWON = 1
+        private const val MIN_SAVING_MANWON = 0
         private const val MAX_SAVING_MANWON = 100_000
         private const val MIN_TARGET_MANWON = 1
         private const val MAX_TARGET_MANWON = 1_000_000
