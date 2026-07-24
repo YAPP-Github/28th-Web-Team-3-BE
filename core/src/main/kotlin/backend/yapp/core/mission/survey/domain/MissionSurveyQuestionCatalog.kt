@@ -14,6 +14,7 @@ data class MissionSurveyQuestionDefinition(
     val dependsOnQuestionCode: String? = null,
     val skipWhenOptionCodes: List<String> = emptyList(),
     val numericRules: List<MissionSurveyNumericRule> = emptyList(),
+    val textRules: List<MissionSurveyTextRule> = emptyList(),
     val exclusiveOptionCodes: List<String> = emptyList(),
     val conditionalOptionRules: List<MissionSurveyConditionalOptionRule> = emptyList(),
     val impacts: List<MissionSurveyImpact>,
@@ -29,6 +30,12 @@ data class MissionSurveyNumericRule(
     val unit: SurveyFrequencyUnit,
     val minimum: Int,
     val maximum: Int,
+)
+
+data class MissionSurveyTextRule(
+    val subjectOptionCode: String,
+    val minimumLength: Int,
+    val maximumLength: Int,
 )
 
 data class MissionSurveyConditionalOptionRule(
@@ -79,7 +86,7 @@ class MissionSurveyQuestionCatalog {
     private fun mealQuestions(): List<MissionSurveyQuestionDefinition> = listOf(
         choice(
             MissionSurveyQuestionCode.MEAL_TARGET,
-            "식사비 중 가장 먼저 바꾸고 싶은 습관은 무엇인가요?",
+            "식사비 중 가장 소비가 큰 부분이 어디인가요?",
             options(
                 MealTarget.DELIVERY to "배달 음식",
                 MealTarget.DINING_OUT to "외식",
@@ -237,6 +244,13 @@ class MissionSurveyQuestionCatalog {
                 HobbyType.OTHER to "기타",
             ),
             maximum = HobbyType.entries.size,
+            textRules = listOf(
+                MissionSurveyTextRule(
+                    subjectOptionCode = HobbyType.OTHER.code,
+                    minimumLength = 1,
+                    maximumLength = HobbySurveyAnswers.MAX_OTHER_HOBBY_LENGTH,
+                ),
+            ),
             impacts = listOf(MissionSurveyImpact.MISSION_FILTER),
         ),
         multiChoice(
@@ -424,6 +438,7 @@ class MissionSurveyQuestionCatalog {
         options: List<MissionSurveyOptionDefinition>,
         maximum: Int,
         exclusive: List<MissionSurveyCode> = emptyList(),
+        textRules: List<MissionSurveyTextRule> = emptyList(),
         conditionalOptionRules: List<MissionSurveyConditionalOptionRule> = emptyList(),
         impacts: List<MissionSurveyImpact>,
     ): MissionSurveyQuestionDefinition =
@@ -434,6 +449,7 @@ class MissionSurveyQuestionCatalog {
             options = options,
             minSelections = 1,
             maxSelections = maximum,
+            textRules = textRules,
             exclusiveOptionCodes = exclusive.map(MissionSurveyCode::code),
             conditionalOptionRules = conditionalOptionRules,
             impacts = impacts,

@@ -65,6 +65,7 @@ data class TransportSurveyResponse(
 
 data class HobbySurveyResponse(
     val hobbies: List<String>,
+    val otherHobby: String?,
     val spendingTypes: List<String>,
     val monthlySpendingRange: String?,
     val frequencies: List<HobbyFrequencyResponse>,
@@ -74,6 +75,7 @@ data class HobbySurveyResponse(
         fun from(answers: HobbySurveyAnswers): HobbySurveyResponse =
             HobbySurveyResponse(
                 hobbies = answers.hobbies.map { it.code },
+                otherHobby = answers.otherHobby,
                 spendingTypes = answers.spendingTypes.map { it.code },
                 monthlySpendingRange = answers.monthlySpendingRange?.code,
                 frequencies = answers.frequencies.map { HobbyFrequencyResponse(it.spendingType.code, it.count) },

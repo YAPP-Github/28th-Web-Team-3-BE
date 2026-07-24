@@ -58,6 +58,10 @@ class MissionSurveyAcceptanceTest(
             .andExpect(jsonPath("$.categories[0].questions.length()").value(5))
             .andExpect(jsonPath("$.categories[1].questions.length()").value(5))
             .andExpect(jsonPath("$.categories[0].questions[0].code").value("MEAL_TARGET"))
+            .andExpect(
+                jsonPath("$.categories[0].questions[0].prompt")
+                    .value("식사비 중 가장 소비가 큰 부분이 어디인가요?"),
+            )
             .andExpect(jsonPath("$.categories[0].questions[1].code").value("MEAL_FREQUENCY"))
             .andExpect(
                 jsonPath("$.categories[0].questions[1].dependsOnQuestionCode")
@@ -97,6 +101,9 @@ class MissionSurveyAcceptanceTest(
                 .header("Authorization", "Bearer $token")
                 .param("categories", "HOBBY"),
         ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].subjectOptionCode").value("OTHER"))
+            .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].minimumLength").value(1))
+            .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].maximumLength").value(50))
             .andExpect(
                 jsonPath(
                     "$.categories[0].questions[4].conditionalOptionRules[0].dependsOnQuestionCode",
@@ -114,7 +121,7 @@ class MissionSurveyAcceptanceTest(
             )
 
         assertEquals(
-            listOf("1", "2", "3", "4", "5", "6"),
+            listOf("1", "2", "3", "4", "5", "6", "7"),
             queryStrings(
                 """
                     SELECT version
@@ -140,7 +147,8 @@ class MissionSurveyAcceptanceTest(
               },
               "transport": null,
               "hobby": {
-                "hobbies": ["GAME", "READING"],
+                "hobbies": ["GAME", "OTHER", "READING"],
+                "otherHobby": "  보드게임  ",
                 "spendingTypes": ["SUBSCRIPTION", "GOODS"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
@@ -155,11 +163,13 @@ class MissionSurveyAcceptanceTest(
 
         val putJson = putSurvey(token, request)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.schemaVersion").value("V1"))
+            .andExpect(jsonPath("$.schemaVersion").value("V2"))
             .andExpect(jsonPath("$.meal.weeklyFrequency").value(0))
             .andExpect(jsonPath("$.meal.alternatives[0]").value("COOK"))
             .andExpect(jsonPath("$.meal.alternatives[1]").value("PICKUP"))
             .andExpect(jsonPath("$.hobby.hobbies[0]").value("READING"))
+            .andExpect(jsonPath("$.hobby.hobbies[2]").value("OTHER"))
+            .andExpect(jsonPath("$.hobby.otherHobby").value("보드게임"))
             .andExpect(jsonPath("$.hobby.spendingTypes[0]").value("GOODS"))
             .andExpect(jsonPath("$.hobby.frequencies[0].spendingType").value("GOODS"))
             .andExpect(jsonPath("$.transport").isEmpty)
@@ -170,6 +180,20 @@ class MissionSurveyAcceptanceTest(
             .andReturn().response.contentAsString
 
         assertEquals(jsonObject(putJson), jsonObject(getJson))
+        assertEquals(
+            listOf("보드게임"),
+            queryStrings(
+                """
+                    SELECT answer.text_value
+                    FROM mission_survey_answer answer
+                    JOIN mission_survey survey ON survey.id = answer.mission_survey_id
+                    WHERE survey.guest_user_id = ?
+                      AND answer.question_code = 'HOBBY_TYPES'
+                      AND answer.answer_code = 'OTHER'
+                """.trimIndent(),
+                guestUserId(token),
+            ),
+        )
     }
 
     @Test
@@ -317,8 +341,37 @@ class MissionSurveyAcceptanceTest(
               }
             }
         """.trimIndent()
+        val otherWithoutText = """
+            {
+              "hobby": {
+                "hobbies": ["OTHER"],
+                "spendingTypes": ["GOODS"],
+                "monthlySpendingRange": "UNDER_50K",
+                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "savingMethods": ["WAIT_BEFORE_BUYING"]
+              }
+            }
+        """.trimIndent()
+        val textWithoutOther = """
+            {
+              "hobby": {
+                "hobbies": ["READING"],
+                "otherHobby": "보드게임",
+                "spendingTypes": ["GOODS"],
+                "monthlySpendingRange": "UNDER_50K",
+                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "savingMethods": ["WAIT_BEFORE_BUYING"]
+              }
+            }
+        """.trimIndent()
 
-        listOf(unknownWithFrequency, keyedFrequencyMismatch, doNotReduceWithFollowUp).forEach { body ->
+        listOf(
+            unknownWithFrequency,
+            keyedFrequencyMismatch,
+            doNotReduceWithFollowUp,
+            otherWithoutText,
+            textWithoutOther,
+        ).forEach { body ->
             putSurvey(token, body)
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.name").value("MISSION_SURVEY_INVALID"))
@@ -357,6 +410,7 @@ class MissionSurveyAcceptanceTest(
                 "singleCategory",
                 "mealAndTransportUnknown",
                 "hobbyDoNotReduce",
+                "hobbyOther",
                 "keyedFrequencies",
             ),
             examples.keys,
@@ -373,6 +427,7 @@ class MissionSurveyAcceptanceTest(
             "form state",
             "meal.target이 UNKNOWN",
             "transport.target이 UNKNOWN",
+            "hobby.hobbies에 OTHER",
             "hobby.spendingTypes가 [DO_NOT_REDUCE]",
             "living.areas가 [UNKNOWN]",
             "key는 한 번만 등장",
@@ -448,6 +503,7 @@ class MissionSurveyAcceptanceTest(
         assertEquals(7, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.maximum"))
         assertEquals(0, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.minimum"))
         assertEquals(14, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.maximum"))
+        assertEquals(50, JsonPath.read(document, "$.components.schemas.HobbySurveyRequest.properties.otherHobby.maxLength"))
 
         val mealFrequencyDescription: String = JsonPath.read(
             document,
@@ -459,6 +515,11 @@ class MissionSurveyAcceptanceTest(
             "$.components.schemas.HobbySurveyRequest.properties.frequencies.description",
         )
         assertTrue(hobbyFrequencyDescription.contains("spendingTypes와 정확히 일치"))
+        val otherHobbyDescription: String = JsonPath.read(
+            document,
+            "$.components.schemas.HobbySurveyRequest.properties.otherHobby.description",
+        )
+        assertTrue(otherHobbyDescription.contains("OTHER가 포함되면 필수"))
         val livingCountDescription: String = JsonPath.read(
             document,
             "$.components.schemas.LivingFrequencyRequest.properties.count.description",

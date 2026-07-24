@@ -4,6 +4,7 @@ import backend.yapp.core.mission.survey.domain.MissionSurveyCategoryQuestions
 import backend.yapp.core.mission.survey.domain.MissionSurveyConditionalOptionRule
 import backend.yapp.core.mission.survey.domain.MissionSurveyNumericRule
 import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionDefinition
+import backend.yapp.core.mission.survey.domain.MissionSurveyTextRule
 
 data class MissionSurveyQuestionsResponse(
     val categories: List<MissionSurveyCategoryQuestionsResponse>,
@@ -37,6 +38,7 @@ data class MissionSurveyQuestionResponse(
     val dependsOnQuestionCode: String?,
     val skipWhenOptionCodes: List<String>,
     val numericRules: List<MissionSurveyNumericRuleResponse>,
+    val textRules: List<MissionSurveyTextRuleResponse>,
     val exclusiveOptionCodes: List<String>,
     val conditionalOptionRules: List<MissionSurveyConditionalOptionRuleResponse>,
     val impacts: List<String>,
@@ -53,6 +55,7 @@ data class MissionSurveyQuestionResponse(
                 dependsOnQuestionCode = question.dependsOnQuestionCode,
                 skipWhenOptionCodes = question.skipWhenOptionCodes,
                 numericRules = question.numericRules.map(MissionSurveyNumericRuleResponse::from),
+                textRules = question.textRules.map(MissionSurveyTextRuleResponse::from),
                 exclusiveOptionCodes = question.exclusiveOptionCodes,
                 conditionalOptionRules = question.conditionalOptionRules
                     .map(MissionSurveyConditionalOptionRuleResponse::from),
@@ -79,6 +82,21 @@ data class MissionSurveyNumericRuleResponse(
                 unit = rule.unit.code,
                 minimum = rule.minimum,
                 maximum = rule.maximum,
+            )
+    }
+}
+
+data class MissionSurveyTextRuleResponse(
+    val subjectOptionCode: String,
+    val minimumLength: Int,
+    val maximumLength: Int,
+) {
+    companion object {
+        fun from(rule: MissionSurveyTextRule): MissionSurveyTextRuleResponse =
+            MissionSurveyTextRuleResponse(
+                subjectOptionCode = rule.subjectOptionCode,
+                minimumLength = rule.minimumLength,
+                maximumLength = rule.maximumLength,
             )
     }
 }

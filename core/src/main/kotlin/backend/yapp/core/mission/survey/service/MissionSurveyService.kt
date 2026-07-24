@@ -129,7 +129,14 @@ class MissionSurveyService(
     }
 
     private fun MutableList<MissionSurveyAnswerValue>.addHobby(answers: HobbySurveyAnswers) {
-        options(MissionSurveyCategory.HOBBY, MissionSurveyQuestionCode.HOBBY_TYPES, answers.hobbies)
+        answers.hobbies.forEach { hobby ->
+            option(
+                MissionSurveyCategory.HOBBY,
+                MissionSurveyQuestionCode.HOBBY_TYPES,
+                hobby,
+                textValue = answers.otherHobby.takeIf { hobby == HobbyType.OTHER },
+            )
+        }
         options(
             MissionSurveyCategory.HOBBY,
             MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES,
@@ -180,6 +187,7 @@ class MissionSurveyService(
         category: MissionSurveyCategory,
         question: MissionSurveyQuestionCode,
         answer: MissionSurveyCode,
+        textValue: String? = null,
     ) {
         add(
             MissionSurveyAnswerValue(
@@ -187,6 +195,7 @@ class MissionSurveyService(
                 questionCode = question.code,
                 valueType = OPTION_VALUE_TYPE,
                 answerCode = answer.code,
+                textValue = textValue,
             ),
         )
     }
@@ -227,7 +236,7 @@ class MissionSurveyService(
                 transport = decodeTransport(persisted),
                 hobby = decodeHobby(persisted),
                 living = decodeLiving(persisted),
-            ).also(validator::validate)
+            ).also(validator::validateStored)
         } catch (cause: Exception) {
             internal(cause)
         }
@@ -284,10 +293,16 @@ class MissionSurveyService(
     private fun decodeHobby(rows: List<MissionSurveyAnswerValue>): HobbySurveyAnswers? {
         val reader = CategoryRows(rows, MissionSurveyCategory.HOBBY)
         if (reader.isEmpty()) return null
+        val hobbies = reader.many<HobbyType>(MissionSurveyQuestionCode.HOBBY_TYPES)
         val spendingTypes = reader.many<HobbySpendingType>(MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES)
         val noReduction = spendingTypes == listOf(HobbySpendingType.DO_NOT_REDUCE)
         return HobbySurveyAnswers(
-            hobbies = reader.many(MissionSurveyQuestionCode.HOBBY_TYPES),
+            hobbies = hobbies,
+            otherHobby = if (HobbyType.OTHER in hobbies) {
+                reader.text(MissionSurveyQuestionCode.HOBBY_TYPES, HobbyType.OTHER)
+            } else {
+                null
+            },
             spendingTypes = spendingTypes,
             monthlySpendingRange = if (noReduction) {
                 null
@@ -342,6 +357,7 @@ class MissionSurveyService(
             valueType = valueType,
             answerCode = answerCode,
             numericValue = numericValue,
+            textValue = textValue,
             unitCode = unitCode,
         )
 
@@ -393,6 +409,16 @@ class MissionSurveyService(
             check(row.unitCode == expectedUnit.code)
             return checkNotNull(row.numericValue)
         }
+
+        fun text(
+            question: MissionSurveyQuestionCode,
+            subject: MissionSurveyCode,
+        ): String? =
+            rows.single {
+                it.questionCode == question.code &&
+                    it.valueType == OPTION_VALUE_TYPE &&
+                    it.answerCode == subject.code
+            }.textValue
 
         fun optionCodes(question: MissionSurveyQuestionCode): List<String> =
             rows.filter { it.questionCode == question.code && it.valueType == OPTION_VALUE_TYPE }

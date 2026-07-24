@@ -8,6 +8,6 @@ data class MissionSurveySnapshot(
     val living: LivingSurveyAnswers?,
 ) {
     companion object {
-        const val CURRENT_SCHEMA_VERSION = "V1"
+        const val CURRENT_SCHEMA_VERSION = "V2"
     }
 }
