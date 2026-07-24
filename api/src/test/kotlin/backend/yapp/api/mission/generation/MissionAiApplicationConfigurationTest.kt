@@ -13,12 +13,14 @@ import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import tools.jackson.databind.ObjectMapper
 
 class MissionAiApplicationConfigurationTest {
@@ -33,6 +35,29 @@ class MissionAiApplicationConfigurationTest {
             assertEquals("off", context.environment.getProperty("mission.generation.ai-activation"))
             assertEquals("none", context.environment.getProperty("spring.ai.model.chat"))
             assertEquals("none", context.environment.getProperty("spring.ai.model.embedding.text"))
+            assertEquals(
+                GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION,
+                context.environment.getProperty(AUTO_CONFIGURATION_EXCLUDE_PROPERTY),
+            )
+            assertIs<TemplateMissionDraftContentGenerator>(
+                context.getBean(MissionDraftContentGenerator::class.java),
+            )
+            assertIs<KeywordMissionSemanticRetriever>(
+                context.getBean(MissionSemanticRetriever::class.java),
+            )
+            assertNull(context.getBeanProvider(modelClass(CHAT_MODEL_CLASS)).ifAvailable)
+            assertNull(context.getBeanProvider(modelClass(EMBEDDING_MODEL_CLASS)).ifAvailable)
+        }
+    }
+
+    @Test
+    fun `off starts discovered auto configuration without Google credentials`() {
+        runAutoConfiguredApplication(
+            "AI_ACTIVATION=off",
+            "GOOGLE_GENAI_API_KEY=",
+            "spring.ai.google.genai.project-id=",
+        ) { context ->
+            assertEquals("off", context.environment.getProperty("mission.generation.ai-activation"))
             assertIs<TemplateMissionDraftContentGenerator>(
                 context.getBean(MissionDraftContentGenerator::class.java),
             )
@@ -121,6 +146,23 @@ class MissionAiApplicationConfigurationTest {
         }
     }
 
+    private fun runAutoConfiguredApplication(
+        vararg properties: String,
+        assertions: (ConfigurableApplicationContext) -> Unit,
+    ) {
+        TestPropertyValues.of(
+            "SPRING_PROFILES_ACTIVE=test",
+            *properties,
+        ).applyToSystemProperties {
+            SpringApplication(AutoConfiguredTestApplication::class.java)
+                .apply {
+                    setWebApplicationType(WebApplicationType.NONE)
+                }
+                .run()
+                .use(assertions)
+        }
+    }
+
     private fun autoConfiguration(className: String): Class<*> = Class.forName(className)
 
     @Suppress("UNCHECKED_CAST")
@@ -132,8 +174,17 @@ class MissionAiApplicationConfigurationTest {
         fun objectMapper(): ObjectMapper = ObjectMapper()
     }
 
+    @Configuration(proxyBeanMethods = false)
+    @EnableAutoConfiguration
+    @Import(MissionAiInfrastructureConfig::class, ObjectMapperTestConfig::class)
+    class AutoConfiguredTestApplication
+
     companion object {
         private const val CHAT_MODEL_CLASS = "org.springframework.ai.chat.model.ChatModel"
         private const val EMBEDDING_MODEL_CLASS = "org.springframework.ai.embedding.EmbeddingModel"
+        private const val AUTO_CONFIGURATION_EXCLUDE_PROPERTY = "spring.autoconfigure.exclude"
+        private const val GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION =
+            "org.springframework.ai.model.google.genai.autoconfigure.embedding." +
+                "GoogleGenAiEmbeddingConnectionAutoConfiguration"
     }
 }

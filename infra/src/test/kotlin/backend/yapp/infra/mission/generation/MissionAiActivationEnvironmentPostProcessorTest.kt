@@ -3,6 +3,7 @@ package backend.yapp.infra.mission.generation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import org.springframework.boot.SpringApplication
 import org.springframework.mock.env.MockEnvironment
 
@@ -21,6 +22,12 @@ class MissionAiActivationEnvironmentPostProcessorTest {
         assertEquals("off", environment.getProperty("mission.generation.ai-activation"))
         assertEquals("none", environment.getProperty("spring.ai.model.chat"))
         assertEquals("none", environment.getProperty("spring.ai.model.embedding.text"))
+        assertEquals(
+            MissionAiActivationEnvironmentPostProcessor.GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION,
+            environment.getProperty(
+                MissionAiActivationEnvironmentPostProcessor.AUTO_CONFIGURATION_EXCLUDE_PROPERTY,
+            ),
+        )
     }
 
     @Test
@@ -35,6 +42,11 @@ class MissionAiActivationEnvironmentPostProcessorTest {
         assertEquals("on", environment.getProperty("mission.generation.ai-activation"))
         assertEquals("google-genai", environment.getProperty("spring.ai.model.chat"))
         assertEquals("google-genai", environment.getProperty("spring.ai.model.embedding.text"))
+        assertNull(
+            environment.getProperty(
+                MissionAiActivationEnvironmentPostProcessor.AUTO_CONFIGURATION_EXCLUDE_PROPERTY,
+            ),
+        )
     }
 
     @Test
@@ -46,6 +58,36 @@ class MissionAiActivationEnvironmentPostProcessorTest {
         assertEquals("off", environment.getProperty("mission.generation.ai-activation"))
         assertEquals("none", environment.getProperty("spring.ai.model.chat"))
         assertEquals("none", environment.getProperty("spring.ai.model.embedding.text"))
+        assertEquals(
+            MissionAiActivationEnvironmentPostProcessor.GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION,
+            environment.getProperty(
+                MissionAiActivationEnvironmentPostProcessor.AUTO_CONFIGURATION_EXCLUDE_PROPERTY,
+            ),
+        )
+    }
+
+    @Test
+    fun `off preserves normalized existing auto configuration exclusions idempotently`() {
+        val existingExclusion = "com.example.FirstAutoConfiguration"
+        val environment = MockEnvironment()
+            .withProperty("AI_ACTIVATION", "off")
+            .withProperty(
+                "spring.autoconfigure.exclude",
+                " $existingExclusion, ,$existingExclusion ",
+            )
+
+        postProcessor.postProcessEnvironment(environment, SpringApplication())
+        postProcessor.postProcessEnvironment(environment, SpringApplication())
+
+        assertEquals(
+            listOf(
+                existingExclusion,
+                MissionAiActivationEnvironmentPostProcessor.GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION,
+            ).joinToString(","),
+            environment.getProperty(
+                MissionAiActivationEnvironmentPostProcessor.AUTO_CONFIGURATION_EXCLUDE_PROPERTY,
+            ),
+        )
     }
 
     @Test

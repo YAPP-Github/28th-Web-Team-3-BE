@@ -1,8 +1,14 @@
 name: Prod CI/CD
 
-run-name: "Prod deploy: ${{ inputs.reason || 'manual' }} (@${{ github.actor }})"
+run-name: "Prod CI/CD: ${{ inputs.reason || github.event_name }} (@${{ github.actor }})"
 
 on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       reason:
@@ -12,7 +18,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -24,7 +30,7 @@ env:
 jobs:
   ci:
     name: Test and build
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -51,7 +57,7 @@ jobs:
   deploy:
     name: Deploy to prod
     needs: ci
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: prod
     permissions:
