@@ -1,14 +1,13 @@
 package backend.yapp.infra.mission.generation
 
-import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
+import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import backend.yapp.core.onboarding.domain.OnboardingGoalRepository
 import backend.yapp.core.mission.generation.service.DatabaseMissionDraftCandidateProvider
 import backend.yapp.core.mission.generation.service.MissionRecommendationSettings
 import backend.yapp.core.mission.generation.service.PersonalizedMissionDraftCandidateProvider
-import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
 import backend.yapp.core.mission.generation.domain.MissionRecommendationSnapshotRepository
 import backend.yapp.core.mission.generation.domain.MissionRecommendationCandidateTraceRepository
@@ -25,7 +24,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
-import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableAsync
@@ -97,47 +95,6 @@ class MissionGenerationInfrastructureConfig {
         clock: Clock,
     ): MissionRecommendationTracePort =
         DatabaseMissionRecommendationTrace(snapshotRepository, candidateRepository, clock)
-
-    @Bean
-    @ConditionalOnProperty(
-        prefix = "mission.generation.recommendation",
-        name = ["semantic-provider"],
-        havingValue = "keyword",
-        matchIfMissing = true,
-    )
-    fun keywordMissionSemanticRetriever(): MissionSemanticRetriever = KeywordMissionSemanticRetriever()
-
-    @Bean
-    @ConditionalOnProperty(
-        prefix = "mission.generation.recommendation",
-        name = ["semantic-provider"],
-        havingValue = "openai",
-    )
-    fun openAiMissionSemanticRetriever(
-        objectMapper: ObjectMapper,
-        properties: MissionGenerationProperties,
-    ): MissionSemanticRetriever =
-        OpenAiMissionSemanticRetriever(objectMapper, properties.recommendation.embedding)
-
-    @Bean
-    @ConditionalOnProperty(
-        prefix = "mission.generation",
-        name = ["provider"],
-        havingValue = "mock",
-        matchIfMissing = true,
-    )
-    fun templateMissionDraftContentGenerator(): MissionDraftContentGenerator =
-        TemplateMissionDraftContentGenerator()
-
-    @Bean
-    @ConditionalOnProperty(prefix = "mission.generation", name = ["provider"], havingValue = "openai")
-    fun openAiMissionDraftContentGenerator(
-        objectMapper: ObjectMapper,
-        properties: MissionGenerationProperties,
-    ): MissionDraftContentGenerator {
-        val client = JdkOpenAiResponsesClient(properties.openai)
-        return OpenAiMissionDraftContentGenerator(client, objectMapper, properties.openai)
-    }
 
     @Bean("missionGenerationTaskExecutor")
     fun missionGenerationTaskExecutor(properties: MissionGenerationProperties): ThreadPoolTaskExecutor =

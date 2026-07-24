@@ -2,6 +2,9 @@ dependencies {
     api(project(":common"))
     implementation(project(":core"))
 
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
+    implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
+    implementation("org.springframework.ai:spring-ai-starter-model-google-genai-embedding")
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -11,4 +14,6 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
     testImplementation("org.mockito:mockito-core")
+    testImplementation("org.assertj:assertj-core")
+    testImplementation("org.springframework.boot:spring-boot-test")
 }
