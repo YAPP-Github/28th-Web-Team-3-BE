@@ -16,17 +16,31 @@ class MissionAiActivationEnvironmentPostProcessor : EnvironmentPostProcessor, Or
             "$ACTIVATION_ENV must be exactly '$ON' or '$OFF'"
         }
         val model = if (activation == ON) GOOGLE_GENAI else NONE
+        val properties = mutableMapOf<String, Any>(
+            ACTIVATION_PROPERTY to activation,
+            CHAT_MODEL_PROPERTY to model,
+            EMBEDDING_MODEL_PROPERTY to model,
+        )
+        if (activation == OFF) {
+            properties[AUTO_CONFIGURATION_EXCLUDE_PROPERTY] = mergedAutoConfigurationExclusions(environment)
+        }
         environment.propertySources.addFirst(
             MapPropertySource(
                 PROPERTY_SOURCE_NAME,
-                mapOf(
-                    ACTIVATION_PROPERTY to activation,
-                    CHAT_MODEL_PROPERTY to model,
-                    EMBEDDING_MODEL_PROPERTY to model,
-                ),
+                properties,
             ),
         )
     }
+
+    private fun mergedAutoConfigurationExclusions(environment: ConfigurableEnvironment): String =
+        (
+            environment.getProperty(AUTO_CONFIGURATION_EXCLUDE_PROPERTY)
+                .orEmpty()
+                .split(',')
+                .map(String::trim)
+                .filter(String::isNotEmpty) +
+                GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION
+        ).distinct().joinToString(",")
 
     override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
 
@@ -37,6 +51,11 @@ class MissionAiActivationEnvironmentPostProcessor : EnvironmentPostProcessor, Or
         const val EMBEDDING_MODEL_PROPERTY = "spring.ai.model.embedding.text"
         const val ON = "on"
         const val OFF = "off"
+
+        internal const val AUTO_CONFIGURATION_EXCLUDE_PROPERTY = "spring.autoconfigure.exclude"
+        internal const val GOOGLE_GENAI_EMBEDDING_CONNECTION_AUTO_CONFIGURATION =
+            "org.springframework.ai.model.google.genai.autoconfigure.embedding." +
+                "GoogleGenAiEmbeddingConnectionAutoConfiguration"
 
         private const val GOOGLE_GENAI = "google-genai"
         private const val NONE = "none"
