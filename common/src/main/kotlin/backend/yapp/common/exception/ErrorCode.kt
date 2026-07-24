@@ -41,4 +41,9 @@ enum class ErrorCode(
     MISSION_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "미션을 찾을 수 없습니다."),
     MISSION_STATUS_CONFLICT(HttpStatus.CONFLICT, 409, "현재 상태에서는 미션을 완료할 수 없습니다."),
     MANUAL_MISSION_INVALID(HttpStatus.BAD_REQUEST, 400, "수동 미션 입력값이 올바르지 않습니다."),
+
+    // Goal
+    INVALID_GOAL_INPUT(HttpStatus.BAD_REQUEST, 400, "목표 입력값이 올바르지 않습니다."),
+    GOAL_ONBOARDING_REQUIRED(HttpStatus.CONFLICT, 409, "목표를 시작하려면 온보딩을 완료해야 합니다."),
+    GOAL_CONFLICT(HttpStatus.CONFLICT, 409, "목표가 동시에 변경되었습니다. 다시 시도해 주세요."),
 }

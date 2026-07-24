@@ -1,7 +1,15 @@
 name: Prod CI/CD
 
+run-name: "Prod deploy: ${{ inputs.reason || 'manual' }} (@${{ github.actor }})"
+
 on:
   workflow_dispatch:
+    inputs:
+      reason:
+        description: "배포 사유"
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
