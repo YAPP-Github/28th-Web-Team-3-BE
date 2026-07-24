@@ -128,7 +128,7 @@ jobs:
             --region "${GCP_REGION}" \
             --image "${IMAGE_URI}" \
             --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
-            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,AI_ACTIVATION=off,JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,AI_ACTIVATION=on,JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest" \
             --set-secrets "SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
             --allow-unauthenticated \
