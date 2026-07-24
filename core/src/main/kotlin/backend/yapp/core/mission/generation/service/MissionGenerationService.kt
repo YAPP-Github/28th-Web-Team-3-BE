@@ -89,7 +89,7 @@ class MissionGenerationService(
 
     @Transactional
     fun confirm(guestUserId: Long, jobId: UUID, selectedDraftIds: List<UUID>): List<MissionSnapshot> {
-        if (selectedDraftIds.size !in MIN_SELECTION..MAX_SELECTION ||
+        if (selectedDraftIds.size < MIN_SELECTION ||
             selectedDraftIds.distinct().size != selectedDraftIds.size
         ) {
             throw BaseException(ErrorCode.MISSION_CONFIRM_INVALID)
@@ -196,6 +196,5 @@ class MissionGenerationService(
 
     companion object {
         private const val MIN_SELECTION = 1
-        private const val MAX_SELECTION = 4
     }
 }

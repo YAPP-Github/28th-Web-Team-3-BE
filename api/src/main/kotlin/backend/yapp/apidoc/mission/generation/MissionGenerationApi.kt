@@ -71,7 +71,7 @@ interface MissionGenerationApi {
 
     @Operation(
         summary = "미션 초안 선택 확정",
-        description = "전체 초안 중 중복 없이 1~4개를 ACTIVE 미션으로 저장한다.",
+        description = "전체 초안 중 중복 없이 1개 이상을 ACTIVE 미션으로 저장한다.",
     )
     @ApiResponses(
         ApiResponse(
