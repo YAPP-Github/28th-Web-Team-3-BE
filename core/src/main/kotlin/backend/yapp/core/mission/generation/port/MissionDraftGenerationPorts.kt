@@ -23,7 +23,40 @@ data class MissionDraftCandidate(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String = "V1",
+    val expenseEstimate: MissionExpenseEstimate? = null,
 )
+
+data class MissionExpenseEstimate(
+    val referenceExpenseLabel: String,
+    val alternativeExpenseLabel: String,
+    val referenceExpenseWon: Int,
+    val alternativeExpenseWon: Int,
+    val estimatedSavingsPerUnitWon: Int,
+    val estimatedSavingsWon: Int,
+    val unit: String,
+    val estimateBasis: String,
+    val savingsEstimateVersion: String,
+)
+
+interface MissionSavingsDescriptionGenerator {
+    fun generate(candidates: List<MissionDraftCandidate>): MissionSavingsDescriptionResult
+}
+
+data class MissionSavingsDescriptionResult(
+    val copies: List<MissionSavingsDescriptionCopy>,
+)
+
+data class MissionSavingsDescriptionCopy(
+    val templateId: Long,
+    val savingsDescription: String?,
+    val source: MissionSavingsCopySource?,
+    val version: String?,
+)
+
+enum class MissionSavingsCopySource {
+    AI,
+    TEMPLATE_FALLBACK,
+}
 
 data class MissionDraftContentRequest(
     val jobId: UUID,

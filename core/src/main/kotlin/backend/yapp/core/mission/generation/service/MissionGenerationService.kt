@@ -83,6 +83,9 @@ class MissionGenerationService(
                 targetUnit = draft.targetUnit,
                 estimatedSavingsWon = draft.estimatedSavingsWon,
                 savingsEstimateVersion = draft.savingsEstimateVersion,
+                expenseEstimate = draft.expenseEstimate(),
+                savingsDescription = draft.savingsDescription,
+                savingsCopyVersion = draft.savingsCopyVersion,
             )
         }
     }
@@ -130,6 +133,16 @@ class MissionGenerationService(
                 targetUnit = draft.targetUnit,
                 estimatedSavingsWon = draft.estimatedSavingsWon,
                 savingsEstimateVersion = draft.savingsEstimateVersion,
+                referenceExpenseLabel = draft.referenceExpenseLabel,
+                alternativeExpenseLabel = draft.alternativeExpenseLabel,
+                referenceExpenseWon = draft.referenceExpenseWon,
+                alternativeExpenseWon = draft.alternativeExpenseWon,
+                estimatedSavingsPerUnitWon = draft.estimatedSavingsPerUnitWon,
+                expenseUnit = draft.expenseUnit,
+                estimateBasis = draft.estimateBasis,
+                savingsDescription = draft.savingsDescription,
+                savingsCopySource = draft.savingsCopySource,
+                savingsCopyVersion = draft.savingsCopyVersion,
                 weekEndsAt = weekEnd(now),
                 createdAt = now,
             )
@@ -176,8 +189,28 @@ class MissionGenerationService(
             targetUnit = targetUnit,
             estimatedSavingsWon = estimatedSavingsWon,
             savingsEstimateVersion = savingsEstimateVersion,
+            expenseEstimate = expenseEstimate(),
+            savingsDescription = savingsDescription,
+            savingsCopyVersion = savingsCopyVersion,
             status = status.name,
         )
+
+    private fun backend.yapp.core.mission.generation.domain.MissionDraft.expenseEstimate() =
+        referenceExpenseWon?.let { reference ->
+            backend.yapp.core.mission.generation.port.MissionExpenseEstimate(
+                checkNotNull(referenceExpenseLabel), checkNotNull(alternativeExpenseLabel), reference,
+                checkNotNull(alternativeExpenseWon), checkNotNull(estimatedSavingsPerUnitWon), estimatedSavingsWon,
+                checkNotNull(expenseUnit), checkNotNull(estimateBasis), savingsEstimateVersion,
+            )
+        }
+
+    private fun Mission.expenseEstimate() = referenceExpenseWon?.let { reference ->
+        backend.yapp.core.mission.generation.port.MissionExpenseEstimate(
+            checkNotNull(referenceExpenseLabel), checkNotNull(alternativeExpenseLabel), reference,
+            checkNotNull(alternativeExpenseWon), checkNotNull(estimatedSavingsPerUnitWon), estimatedSavingsWon,
+            checkNotNull(expenseUnit), checkNotNull(estimateBasis), savingsEstimateVersion,
+        )
+    }
 
     private fun fingerprint(ids: List<UUID>): String {
         val canonical = ids.map(UUID::toString).sorted().joinToString(",")

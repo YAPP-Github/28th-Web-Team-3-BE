@@ -10,6 +10,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
 import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
+import backend.yapp.core.mission.generation.port.MissionSavingsDescriptionGenerator
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import java.time.Clock
 import java.time.Duration
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional
 class MissionGenerationExecutor(
     private val workService: MissionGenerationWorkService,
     private val contentGenerator: MissionDraftContentGenerator,
+    private val savingsDescriptionGenerator: MissionSavingsDescriptionGenerator,
 ) {
     fun execute(jobId: UUID) {
         val work = workService.prepare(jobId) ?: return
@@ -42,9 +44,11 @@ class MissionGenerationExecutor(
                     candidates = work.candidates,
                 ),
             )
+            val savingsCopies = savingsDescriptionGenerator.generate(work.candidates)
             workService.complete(
                 work = work,
                 copiesByTemplateId = result.copies.associateBy { it.templateId },
+                savingsCopiesByTemplateId = savingsCopies.copies.associateBy { it.templateId },
                 generationSource = result.source,
             )
         } catch (ex: Exception) {
@@ -84,6 +88,7 @@ class MissionGenerationWorkService(
     fun complete(
         work: MissionGenerationWork,
         copiesByTemplateId: Map<Long, backend.yapp.core.mission.generation.port.MissionDraftCopy>,
+        savingsCopiesByTemplateId: Map<Long, backend.yapp.core.mission.generation.port.MissionSavingsDescriptionCopy> = emptyMap(),
         generationSource: backend.yapp.core.mission.generation.port.MissionDraftGenerationSource,
     ) {
         val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
@@ -92,6 +97,8 @@ class MissionGenerationWorkService(
         val now = clock.instant()
         val drafts = work.candidates.map { candidate ->
             val copy = copiesByTemplateId[candidate.templateId]
+            val savingsCopy = savingsCopiesByTemplateId[candidate.templateId]
+            val estimate = candidate.expenseEstimate
             MissionDraft(
                 id = UUID.randomUUID(),
                 jobId = work.jobId,
@@ -107,6 +114,16 @@ class MissionGenerationWorkService(
                 targetUnit = candidate.targetUnit,
                 estimatedSavingsWon = candidate.estimatedSavingsWon,
                 savingsEstimateVersion = candidate.savingsEstimateVersion,
+                referenceExpenseLabel = estimate?.referenceExpenseLabel,
+                alternativeExpenseLabel = estimate?.alternativeExpenseLabel,
+                referenceExpenseWon = estimate?.referenceExpenseWon,
+                alternativeExpenseWon = estimate?.alternativeExpenseWon,
+                estimatedSavingsPerUnitWon = estimate?.estimatedSavingsPerUnitWon,
+                expenseUnit = estimate?.unit,
+                estimateBasis = estimate?.estimateBasis,
+                savingsDescription = savingsCopy?.savingsDescription,
+                savingsCopySource = savingsCopy?.source?.name,
+                savingsCopyVersion = savingsCopy?.version,
                 createdAt = now,
             )
         }

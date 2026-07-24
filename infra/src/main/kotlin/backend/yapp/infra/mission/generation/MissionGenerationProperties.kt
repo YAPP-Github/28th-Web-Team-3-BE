@@ -9,7 +9,14 @@ data class MissionGenerationProperties(
     val executor: ExecutorProperties = ExecutorProperties(),
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
     val prompt: MissionPromptProperties = MissionPromptProperties(),
+    val savingsCopy: MissionSavingsCopyPromptProperties = MissionSavingsCopyPromptProperties(),
     val recommendation: RecommendationProperties = RecommendationProperties(),
+)
+
+data class MissionSavingsCopyPromptProperties(
+    val version: String = "mission-expense-copy-v1",
+    val systemInstruction: String = "서버의 금액과 키워드를 바꾸지 말고 절감 안내문만 한국어로 작성하세요.",
+    val userInstruction: String = "각 후보를 정확히 한 번씩 반환하세요.",
 )
 
 data class MissionPromptProperties(

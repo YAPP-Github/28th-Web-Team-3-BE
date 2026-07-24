@@ -1,6 +1,7 @@
 package backend.yapp.infra.mission.generation
 
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
+import backend.yapp.core.mission.generation.port.MissionSavingsDescriptionGenerator
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.embedding.EmbeddingModel
@@ -25,6 +26,11 @@ class MissionAiInfrastructureConfig {
         TemplateMissionDraftContentGenerator()
 
     @Bean
+    @ConditionalOnProperty(prefix = "mission.generation", name = ["ai-activation"], havingValue = "off", matchIfMissing = true)
+    fun templateMissionSavingsDescriptionGenerator(properties: MissionGenerationProperties): MissionSavingsDescriptionGenerator =
+        TemplateMissionSavingsDescriptionGenerator(properties.savingsCopy.version)
+
+    @Bean
     @ConditionalOnProperty(
         prefix = "mission.generation",
         name = ["ai-activation"],
@@ -43,6 +49,27 @@ class MissionAiInfrastructureConfig {
             client = ChatClientMissionDraftAiClient(chatClientBuilder.build()),
             objectMapper = objectMapper,
             prompt = properties.prompt,
+        )
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "mission.generation", name = ["ai-activation"], havingValue = "on")
+    fun aiMissionSavingsDescriptionGenerator(
+        chatClientBuilder: ChatClient.Builder,
+        objectMapper: ObjectMapper,
+        properties: MissionGenerationProperties,
+        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
+        @Value("\${spring.ai.google.genai.project-id:}") projectId: String,
+        @Value("\${spring.ai.google.genai.location:}") location: String,
+    ): MissionSavingsDescriptionGenerator {
+        validateGoogleGenAiAuthentication(apiKey, projectId, location)
+        val chatClient = chatClientBuilder.build()
+        return SpringAiMissionSavingsDescriptionGenerator(
+            client = MissionSavingsDescriptionAiClient { request ->
+                checkNotNull(chatClient.prompt().system(request.systemInstruction).user(request.userInstruction).call().entity(MissionSavingsDescriptionAiResponse::class.java))
+            },
+            objectMapper = objectMapper,
+            prompt = properties.savingsCopy,
         )
     }
 

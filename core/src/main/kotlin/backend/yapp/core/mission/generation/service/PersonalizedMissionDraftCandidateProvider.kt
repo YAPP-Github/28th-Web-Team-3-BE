@@ -10,6 +10,7 @@ import backend.yapp.core.mission.generation.domain.MissionOutcomeEventRepository
 import backend.yapp.core.mission.generation.domain.MissionStatus
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
+import backend.yapp.core.mission.generation.port.MissionExpenseEstimate
 import backend.yapp.core.mission.generation.port.MissionSemanticDocument
 import backend.yapp.core.mission.generation.port.MissionSemanticRetrievalRequest
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
@@ -201,6 +202,7 @@ class PersonalizedMissionDraftCandidateProvider(
         val explorationApplied = (id % 100L).toDouble() / 100.0 < settings.explorationRate
         val adjustedScore = rawScore - (recentCategoryCount * settings.recentCategoryExposurePenalty) +
             if (explorationApplied) settings.explorationBonus else 0.0
+        val expenseEstimate = expenseEstimate(savingsUnits)
         return ScoredCandidate(
             candidate = MissionDraftCandidate(
                 templateId = id,
@@ -211,8 +213,9 @@ class PersonalizedMissionDraftCandidateProvider(
                 metricType = metricType,
                 targetCount = target,
                 targetUnit = targetUnit,
-                estimatedSavingsWon = savingsUnits * averageSavingsPerUnit,
+                estimatedSavingsWon = expenseEstimate?.estimatedSavingsWon ?: Math.multiplyExact(savingsUnits, averageSavingsPerUnit),
                 savingsEstimateVersion = savingsEstimateVersion,
+                expenseEstimate = expenseEstimate,
             ),
             rawScore = rawScore,
             adjustedScore = adjustedScore,
@@ -221,6 +224,29 @@ class PersonalizedMissionDraftCandidateProvider(
             explorationApplied = explorationApplied,
             cooldownFamily = cooldownFamily,
             recentCategoryPenalty = recentCategoryCount * settings.recentCategoryExposurePenalty,
+        )
+    }
+
+    private fun MissionDraftTemplate.expenseEstimate(savingsUnits: Int): MissionExpenseEstimate? {
+        if (targetFormula != MissionTargetFormula.REPLACE || targetUnit != "TIMES_PER_WEEK") return null
+        val reference = referenceExpenseWon ?: return null
+        val alternative = alternativeExpenseWon ?: return null
+        val referenceLabel = referenceExpenseLabel ?: return null
+        val alternativeLabel = alternativeExpenseLabel ?: return null
+        val unit = expenseUnit ?: return null
+        val basis = estimateBasis ?: return null
+        val perUnit = reference - alternative
+        if (reference <= alternative || savingsUnits <= 0) return null
+        return MissionExpenseEstimate(
+            referenceExpenseLabel = referenceLabel,
+            alternativeExpenseLabel = alternativeLabel,
+            referenceExpenseWon = reference,
+            alternativeExpenseWon = alternative,
+            estimatedSavingsPerUnitWon = perUnit,
+            estimatedSavingsWon = Math.multiplyExact(savingsUnits, perUnit),
+            unit = unit,
+            estimateBasis = basis,
+            savingsEstimateVersion = savingsEstimateVersion,
         )
     }
 

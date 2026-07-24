@@ -4,6 +4,7 @@ import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionStatus
 import backend.yapp.core.mission.generation.service.LifecycleMissionSnapshot
 import backend.yapp.core.mission.generation.service.MissionSource
+import backend.yapp.core.mission.generation.port.MissionExpenseEstimate
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
@@ -37,6 +38,9 @@ data class MissionLifecycleResponse(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
     val savingsLabel: String,
     val status: MissionStatus,
     val weekEndsAt: Instant,
@@ -51,6 +55,9 @@ data class MissionLifecycleResponse(
             targetUnit = snapshot.targetUnit,
             estimatedSavingsWon = snapshot.estimatedSavingsWon,
             savingsEstimateVersion = snapshot.savingsEstimateVersion,
+            expenseEstimate = snapshot.expenseEstimate,
+            savingsDescription = snapshot.savingsDescription,
+            savingsCopyVersion = snapshot.savingsCopyVersion,
             savingsLabel = if (snapshot.savingsEstimateVersion == "NOT_ESTIMATED") {
                 "예상 절약액 미산정"
             } else {

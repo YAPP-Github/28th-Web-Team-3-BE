@@ -5,6 +5,7 @@ import backend.yapp.core.mission.generation.domain.MissionMetricType
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
+import backend.yapp.core.mission.generation.port.MissionSavingsDescriptionGenerator
 import java.util.UUID
 import kotlin.test.Test
 import org.mockito.Mockito.mock
@@ -17,6 +18,7 @@ class MissionGenerationExecutorTest {
     fun `failed content generation does not complete drafts or mark exposure shown`() {
         val workService = mock(MissionGenerationWorkService::class.java)
         val generator = mock(MissionDraftContentGenerator::class.java)
+        val savingsGenerator = mock(MissionSavingsDescriptionGenerator::class.java)
         val jobId = UUID.randomUUID()
         val work = MissionGenerationWork(
             jobId,
@@ -46,7 +48,7 @@ class MissionGenerationExecutorTest {
             ),
         ).thenThrow(IllegalStateException("provider failed"))
 
-        MissionGenerationExecutor(workService, generator).execute(jobId)
+        MissionGenerationExecutor(workService, generator, savingsGenerator).execute(jobId)
 
         verify(workService).prepare(jobId)
         verify(workService).fail(jobId, "MISSION_GENERATION_EXECUTION_FAILED")

@@ -6,6 +6,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import backend.yapp.core.mission.generation.service.MissionDraftSnapshot
 import backend.yapp.core.mission.generation.service.MissionGenerationJobSnapshot
 import backend.yapp.core.mission.generation.service.MissionSnapshot
+import backend.yapp.core.mission.generation.port.MissionExpenseEstimate
 import java.time.Instant
 import java.util.UUID
 
@@ -68,6 +69,9 @@ data class MissionDraftResponse(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
     val savingsLabel: String,
 ) {
     companion object {
@@ -82,6 +86,9 @@ data class MissionDraftResponse(
                 targetUnit = snapshot.targetUnit,
                 estimatedSavingsWon = snapshot.estimatedSavingsWon,
                 savingsEstimateVersion = snapshot.savingsEstimateVersion,
+                expenseEstimate = snapshot.expenseEstimate,
+                savingsDescription = snapshot.savingsDescription,
+                savingsCopyVersion = snapshot.savingsCopyVersion,
                 savingsLabel = "약 ${snapshot.estimatedSavingsWon}원 절약 예상",
             )
     }
@@ -108,6 +115,9 @@ data class MissionResponse(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
     val savingsLabel: String,
     val status: String,
 ) {
@@ -124,6 +134,9 @@ data class MissionResponse(
                 targetUnit = snapshot.targetUnit,
                 estimatedSavingsWon = snapshot.estimatedSavingsWon,
                 savingsEstimateVersion = snapshot.savingsEstimateVersion,
+                expenseEstimate = snapshot.expenseEstimate,
+                savingsDescription = snapshot.savingsDescription,
+                savingsCopyVersion = snapshot.savingsCopyVersion,
                 savingsLabel = "약 ${snapshot.estimatedSavingsWon}원 절약 예상",
                 status = snapshot.status,
             )
