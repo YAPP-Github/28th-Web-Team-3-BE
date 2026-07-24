@@ -163,7 +163,7 @@ class MissionSurveyQuestionCatalog {
     private fun transportQuestions(): List<MissionSurveyQuestionDefinition> = listOf(
         choice(
             MissionSurveyQuestionCode.TRANSPORT_PRIMARY_MODE,
-            "평소 이용하는 주된 이동수단은 무엇인가요?",
+            "가장 지출이 큰 이동수단은 무엇인가요?",
             options(
                 TransportPrimaryMode.PUBLIC_TRANSIT to "버스·지하철",
                 TransportPrimaryMode.TAXI to "택시",
@@ -255,7 +255,7 @@ class MissionSurveyQuestionCatalog {
         ),
         multiChoice(
             MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES,
-            "취미비는 주로 어디에 사용하나요?",
+            "취미비 중 지출이 가장 큰 부분이 어디인가요?",
             options(
                 HobbySpendingType.GOODS to "용품·굿즈",
                 HobbySpendingType.DIGITAL_CONTENT to "게임·디지털 콘텐츠",
@@ -331,7 +331,7 @@ class MissionSurveyQuestionCatalog {
     private fun livingQuestions(): List<MissionSurveyQuestionDefinition> = listOf(
         multiChoice(
             MissionSurveyQuestionCode.LIVING_AREAS,
-            "생활비 중 가장 먼저 바꾸고 싶은 영역은 무엇인가요?",
+            "생활비 중 가장 지출이 큰 영역은 무엇인가요?",
             options(
                 LivingArea.SUBSCRIPTION to "정기구독",
                 LivingArea.ONLINE_SHOPPING to "온라인 쇼핑",
