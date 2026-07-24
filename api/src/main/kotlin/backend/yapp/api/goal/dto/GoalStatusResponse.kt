@@ -1,6 +1,7 @@
 package backend.yapp.api.goal.dto
 
 import backend.yapp.core.goal.service.GoalStatus
+import io.swagger.v3.oas.annotations.media.Schema
 
 data class GoalStatusResponse(
     val targetAmountManwon: Int,
@@ -32,5 +33,6 @@ data class ThisMonthResponse(
     val targetManwon: Int,
     val savedManwon: Int,
     val progressPercent: Int,
+    @get:Schema(name = "dDay")
     val dDay: Int,
 )
