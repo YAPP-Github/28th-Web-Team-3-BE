@@ -78,12 +78,20 @@ class MissionSurveyAcceptanceTest(
                     .value("NO_ALTERNATIVE"),
             )
             .andExpect(
-                jsonPath("$.categories[1].questions[2].numericRules[0].unit")
+                jsonPath("$.categories[1].questions[2].answerType")
+                    .value("KEYED_FREQUENCY_RANGE"),
+            )
+            .andExpect(
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[0].unit")
                     .value("SUBSCRIPTION_COUNT"),
             )
             .andExpect(
-                jsonPath("$.categories[1].questions[2].numericRules[1].unit")
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[1].unit")
                     .value("TIMES_PER_FOUR_WEEKS"),
+            )
+            .andExpect(
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[0].options[2].code")
+                    .value("THREE_OR_MORE"),
             )
 
         mockMvc.perform(
@@ -94,6 +102,19 @@ class MissionSurveyAcceptanceTest(
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].subjectOptionCode").value("OTHER"))
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].minimumLength").value(1))
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].maximumLength").value(50))
+            .andExpect(jsonPath("$.categories[0].questions[3].answerType").value("KEYED_FREQUENCY_RANGE"))
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[2].unit")
+                    .value("SUBSCRIPTION_COUNT"),
+            )
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[2].options[0].code")
+                    .value("ONE"),
+            )
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[0].unit")
+                    .value("TIMES_PER_FOUR_WEEKS"),
+            )
             .andExpect(
                 jsonPath(
                     "$.categories[0].questions[4].conditionalOptionRules[0].dependsOnQuestionCode",
@@ -142,8 +163,8 @@ class MissionSurveyAcceptanceTest(
                 "spendingTypes": ["SUBSCRIPTION", "GOODS"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 20},
-                  {"spendingType": "GOODS", "count": 31}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"spendingType": "GOODS", "frequencyRange": "SEVEN_OR_MORE"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_BEFORE_BUYING"]
               },
@@ -328,7 +349,7 @@ class MissionSurveyAcceptanceTest(
                 "hobbies": ["READING"],
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "SUBSCRIPTION", "count": 1}],
+                "frequencies": [{"spendingType": "SUBSCRIPTION", "frequencyRange": "ONE"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -350,7 +371,7 @@ class MissionSurveyAcceptanceTest(
                 "hobbies": ["OTHER"],
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "frequencies": [{"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -362,7 +383,7 @@ class MissionSurveyAcceptanceTest(
                 "otherHobby": "보드게임",
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "frequencies": [{"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -498,10 +519,14 @@ class MissionSurveyAcceptanceTest(
             assertEquals(question.maxSelections, JsonPath.read(document, "$path.maxItems"), "${questionCode.code} maxItems")
         }
 
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.minimum"))
-        assertEquals(31, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.minimum"))
-        assertEquals(31, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.maximum"))
+        assertEquals(
+            "string",
+            JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.frequencyRange.type"),
+        )
+        assertEquals(
+            "string",
+            JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.frequencyRange.type"),
+        )
         assertTrue(
             JsonPath.read<List<String>>(
                 document,
@@ -531,11 +556,11 @@ class MissionSurveyAcceptanceTest(
             "$.components.schemas.HobbySurveyRequest.properties.otherHobby.description",
         )
         assertTrue(otherHobbyDescription.contains("OTHER가 포함되면 필수"))
-        val livingCountDescription: String = JsonPath.read(
+        val livingFrequencyDescription: String = JsonPath.read(
             document,
-            "$.components.schemas.LivingFrequencyRequest.properties.count.description",
+            "$.components.schemas.LivingFrequencyRequest.properties.frequencyRange.description",
         )
-        assertTrue(livingCountDescription.contains("SUBSCRIPTION은 구독 개수 0~20"))
+        assertTrue(livingFrequencyDescription.contains("SUBSCRIPTION은 1개·2개·3개 이상"))
     }
 
     private fun putSurvey(token: String, body: String): ResultActions =

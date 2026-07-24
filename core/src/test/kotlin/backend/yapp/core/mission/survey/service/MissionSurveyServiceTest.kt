@@ -6,6 +6,7 @@ import backend.yapp.core.mission.survey.domain.HobbySavingMethod
 import backend.yapp.core.mission.survey.domain.HobbySpendingRange
 import backend.yapp.core.mission.survey.domain.HobbySpendingType
 import backend.yapp.core.mission.survey.domain.HobbyType
+import backend.yapp.core.mission.survey.domain.FourWeeklyFrequencyRange
 import backend.yapp.core.mission.survey.domain.MealAlternative
 import backend.yapp.core.mission.survey.domain.MealExclusion
 import backend.yapp.core.mission.survey.domain.MealReason
@@ -125,6 +126,7 @@ class MissionSurveyServiceTest {
                     valueType = "NUMBER",
                     answerCode = HobbySpendingType.GOODS.code,
                     numericValue = 1,
+                    rangeCode = FourWeeklyFrequencyRange.ONE_TO_TWO.code,
                     unitCode = "TIMES_PER_FOUR_WEEKS",
                 ),
                 optionValue("HOBBY_SAVING_METHODS", HobbySavingMethod.WAIT_BEFORE_BUYING.code),

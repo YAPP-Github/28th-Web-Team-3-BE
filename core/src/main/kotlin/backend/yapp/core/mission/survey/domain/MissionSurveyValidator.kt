@@ -75,7 +75,7 @@ class MissionSurveyValidator(
         requireValid(answers.frequencies.size == answers.spendingTypes.size)
         answers.frequencies.forEach {
             requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
-            requireNumeric(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it.spendingType, it.count)
+            requireFrequencyRange(it.range, unitFor(it.spendingType))
         }
     }
 
@@ -116,7 +116,7 @@ class MissionSurveyValidator(
         requireValid(answers.frequencies.size == answers.areas.size)
         answers.frequencies.forEach {
             requireValid(it.area != LivingArea.UNKNOWN)
-            requireNumeric(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it.area, it.count)
+            requireFrequencyRange(it.range, unitFor(it.area))
         }
     }
 
@@ -141,6 +141,25 @@ class MissionSurveyValidator(
             .singleOrNull { it.subjectOptionCode == subject.code }
         requireValid(rule != null && value in rule.minimum..rule.maximum)
     }
+
+    private fun requireFrequencyRange(
+        range: SurveyFrequencyRange,
+        unit: SurveyFrequencyUnit,
+    ) {
+        requireValid(
+            when (unit) {
+                SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS -> range is FourWeeklyFrequencyRange
+                SurveyFrequencyUnit.SUBSCRIPTION_COUNT -> range is SubscriptionCountRange
+                else -> false
+            },
+        )
+    }
+
+    private fun unitFor(type: HobbySpendingType): SurveyFrequencyUnit =
+        if (type == HobbySpendingType.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
+
+    private fun unitFor(area: LivingArea): SurveyFrequencyUnit =
+        if (area == LivingArea.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
 
     private fun <T, D> requireConditionalOptions(
         values: List<T>,

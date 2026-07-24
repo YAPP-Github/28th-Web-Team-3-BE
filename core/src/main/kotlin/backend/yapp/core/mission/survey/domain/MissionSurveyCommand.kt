@@ -38,7 +38,7 @@ data class HobbySurveyAnswers(
 
 data class HobbyFrequency(
     val spendingType: HobbySpendingType,
-    val count: Int,
+    val range: SurveyFrequencyRange,
 )
 
 data class LivingSurveyAnswers(
@@ -51,5 +51,5 @@ data class LivingSurveyAnswers(
 
 data class LivingFrequency(
     val area: LivingArea,
-    val count: Int,
+    val range: SurveyFrequencyRange,
 )

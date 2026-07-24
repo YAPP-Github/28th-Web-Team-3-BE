@@ -158,8 +158,8 @@ interface MissionSurveyApi {
                 "spendingTypes": ["SUBSCRIPTION", "GOODS"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 2},
-                  {"spendingType": "GOODS", "count": 3}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "TWO"},
+                  {"spendingType": "GOODS", "frequencyRange": "THREE_TO_FOUR"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_BEFORE_BUYING"]
               },
@@ -167,8 +167,8 @@ interface MissionSurveyApi {
                 "areas": ["SUBSCRIPTION", "ONLINE_SHOPPING"],
                 "monthlySpendingRange": "FROM_30K_TO_100K",
                 "frequencies": [
-                  {"area": "SUBSCRIPTION", "count": 3},
-                  {"area": "ONLINE_SHOPPING", "count": 4}
+                  {"area": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"area": "ONLINE_SHOPPING", "frequencyRange": "THREE_TO_FOUR"}
                 ],
                 "trigger": "DISCOUNT_OR_LIMITED_SALE",
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_24_HOURS"]
@@ -221,7 +221,7 @@ interface MissionSurveyApi {
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
                 "frequencies": [
-                  {"spendingType": "GOODS", "count": 2}
+                  {"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
@@ -235,8 +235,8 @@ interface MissionSurveyApi {
                 "spendingTypes": ["SUBSCRIPTION", "TICKET"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 2},
-                  {"spendingType": "TICKET", "count": 1}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "TWO"},
+                  {"spendingType": "TICKET", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS"]
               },
@@ -244,8 +244,8 @@ interface MissionSurveyApi {
                 "areas": ["SUBSCRIPTION", "CLOTHING"],
                 "monthlySpendingRange": "FROM_100K_TO_300K",
                 "frequencies": [
-                  {"area": "SUBSCRIPTION", "count": 3},
-                  {"area": "CLOTHING", "count": 2}
+                  {"area": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"area": "CLOTHING", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "trigger": "AD_OR_SOCIAL_MEDIA",
                 "savingMethods": ["WAIT_24_HOURS"]

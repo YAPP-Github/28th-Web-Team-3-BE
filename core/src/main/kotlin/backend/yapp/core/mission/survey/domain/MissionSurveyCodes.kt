@@ -17,20 +17,64 @@ enum class SurveyAnswerType(override val code: String) : MissionSurveyCode {
     NUMBER("NUMBER"),
     KEYED_NUMBER("KEYED_NUMBER"),
     FREQUENCY_RANGE("FREQUENCY_RANGE"),
+    KEYED_FREQUENCY_RANGE("KEYED_FREQUENCY_RANGE"),
+}
+
+interface SurveyFrequencyRange : MissionSurveyCode {
+    val label: String
+    val minimum: Int
+    val maximum: Int?
+    val calculationBaseline: Int
 }
 
 enum class WeeklyFrequencyRange(
     override val code: String,
-    val label: String,
-    val minimum: Int,
-    val maximum: Int?,
-    val calculationBaseline: Int,
-) : MissionSurveyCode {
+    override val label: String,
+    override val minimum: Int,
+    override val maximum: Int?,
+    override val calculationBaseline: Int,
+) : SurveyFrequencyRange {
     ONE_TO_TWO("ONE_TO_TWO", "1~2회", 1, 2, 1),
     THREE_TO_FOUR("THREE_TO_FOUR", "3~4회", 3, 4, 3),
     FIVE_TO_SIX("FIVE_TO_SIX", "5~6회", 5, 6, 5),
     SEVEN_OR_MORE("SEVEN_OR_MORE", "7회 이상", 7, null, 7),
 }
+
+enum class FourWeeklyFrequencyRange(
+    override val code: String,
+    override val label: String,
+    override val minimum: Int,
+    override val maximum: Int?,
+    override val calculationBaseline: Int,
+) : SurveyFrequencyRange {
+    ONE_TO_TWO("ONE_TO_TWO", "1~2회", 1, 2, 1),
+    THREE_TO_FOUR("THREE_TO_FOUR", "3~4회", 3, 4, 3),
+    FIVE_TO_SIX("FIVE_TO_SIX", "5~6회", 5, 6, 5),
+    SEVEN_OR_MORE("SEVEN_OR_MORE", "7회 이상", 7, null, 7),
+}
+
+enum class SubscriptionCountRange(
+    override val code: String,
+    override val label: String,
+    override val minimum: Int,
+    override val maximum: Int?,
+    override val calculationBaseline: Int,
+) : SurveyFrequencyRange {
+    ONE("ONE", "1개", 1, 1, 1),
+    TWO("TWO", "2개", 2, 2, 2),
+    THREE_OR_MORE("THREE_OR_MORE", "3개 이상", 3, null, 3),
+}
+
+fun surveyFrequencyRangeOf(
+    code: String,
+    unit: SurveyFrequencyUnit,
+): SurveyFrequencyRange =
+    when (unit) {
+        SurveyFrequencyUnit.TIMES_PER_WEEK -> missionSurveyCodeOf<WeeklyFrequencyRange>(code)
+        SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS -> missionSurveyCodeOf<FourWeeklyFrequencyRange>(code)
+        SurveyFrequencyUnit.SUBSCRIPTION_COUNT -> missionSurveyCodeOf<SubscriptionCountRange>(code)
+        SurveyFrequencyUnit.DAYS_PER_WEEK -> error("Unsupported frequency range unit: $unit")
+    }
 
 enum class SurveyFrequencyUnit(override val code: String) : MissionSurveyCode {
     TIMES_PER_WEEK("TIMES_PER_WEEK"),

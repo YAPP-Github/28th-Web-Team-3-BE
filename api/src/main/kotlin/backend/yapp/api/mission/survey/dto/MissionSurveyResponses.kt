@@ -78,7 +78,7 @@ data class HobbySurveyResponse(
                 otherHobby = answers.otherHobby,
                 spendingTypes = answers.spendingTypes.map { it.code },
                 monthlySpendingRange = answers.monthlySpendingRange?.code,
-                frequencies = answers.frequencies.map { HobbyFrequencyResponse(it.spendingType.code, it.count) },
+                frequencies = answers.frequencies.map { HobbyFrequencyResponse(it.spendingType.code, it.range.code) },
                 savingMethods = answers.savingMethods.map { it.code },
             )
     }
@@ -86,7 +86,7 @@ data class HobbySurveyResponse(
 
 data class HobbyFrequencyResponse(
     val spendingType: String,
-    val count: Int,
+    val frequencyRange: String,
 )
 
 data class LivingSurveyResponse(
@@ -101,7 +101,7 @@ data class LivingSurveyResponse(
             LivingSurveyResponse(
                 areas = answers.areas.map { it.code },
                 monthlySpendingRange = answers.monthlySpendingRange?.code,
-                frequencies = answers.frequencies.map { LivingFrequencyResponse(it.area.code, it.count) },
+                frequencies = answers.frequencies.map { LivingFrequencyResponse(it.area.code, it.range.code) },
                 trigger = answers.trigger.code,
                 savingMethods = answers.savingMethods.map { it.code },
             )
@@ -110,5 +110,5 @@ data class LivingSurveyResponse(
 
 data class LivingFrequencyResponse(
     val area: String,
-    val count: Int,
+    val frequencyRange: String,
 )
