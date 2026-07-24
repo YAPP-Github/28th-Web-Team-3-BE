@@ -62,6 +62,13 @@ class MissionLifecycleService(
     }
 
     @Transactional
+    fun deleteRecommended(guestUserId: Long, missionId: UUID) {
+        val mission = missionRepository.findByIdAndGuestUserId(missionId, guestUserId)
+            ?: throw BaseException(ErrorCode.MISSION_NOT_FOUND)
+        missionRepository.delete(mission)
+    }
+
+    @Transactional
     fun complete(guestUserId: Long, source: MissionSource, missionId: UUID): LifecycleMissionSnapshot {
         val now = clock.instant()
         return when (source) {

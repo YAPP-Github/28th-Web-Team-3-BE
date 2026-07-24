@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.multipart.support.MissingServletRequestPartException
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.NoHandlerFoundException
 
 @RestControllerAdvice
@@ -30,6 +31,10 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException::class)
     fun handleMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<ErrorResponseEntity> =
+        ErrorResponseEntity.toResponseEntity(ErrorCode.VALIDATION_FAILED)
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleMethodArgumentTypeMismatch(ex: MethodArgumentTypeMismatchException): ResponseEntity<ErrorResponseEntity> =
         ErrorResponseEntity.toResponseEntity(ErrorCode.VALIDATION_FAILED)
 
     @ExceptionHandler(MissingServletRequestPartException::class)

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -50,6 +51,16 @@ class MissionController(
             request.targetUnit,
         ),
     )
+
+    @DeleteMapping("/recommended/{missionId}")
+    @Operation(summary = "추천 미션 삭제")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteRecommended(
+        @AuthenticationPrincipal guestUserId: Long,
+        @PathVariable missionId: UUID,
+    ) {
+        service.deleteRecommended(guestUserId, missionId)
+    }
 
     @PatchMapping("/{source}/{missionId}/complete")
     @Operation(summary = "미션 완료")
