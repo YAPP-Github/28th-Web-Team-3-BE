@@ -60,4 +60,28 @@ interface MissionDraftRepository : JpaRepository<MissionDraft, UUID> {
 
 interface MissionRepository : JpaRepository<Mission, UUID> {
     fun findAllByJobIdOrderByCreatedAtAsc(jobId: UUID): List<Mission>
+    fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
+    fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): Mission?
+    fun findAllByStatusAndWeekEndsAtLessThanEqual(status: MissionStatus, cutoff: Instant): List<Mission>
+}
+
+interface ManualMissionRepository : JpaRepository<ManualMission, UUID> {
+    fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
+    fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): ManualMission?
+    fun findAllByStatusAndWeekEndsAtLessThanEqual(status: MissionStatus, cutoff: Instant): List<ManualMission>
+}
+
+interface MissionOutcomeEventRepository : JpaRepository<MissionOutcomeEvent, UUID> {
+    fun findAllByGuestUserIdOrderByOccurredAtDesc(guestUserId: Long): List<MissionOutcomeEvent>
+}
+
+interface MissionRecommendationSnapshotRepository : JpaRepository<MissionRecommendationSnapshot, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findFirstByGuestUserIdAndJobIdIsNullOrderByCreatedAtDesc(guestUserId: Long): MissionRecommendationSnapshot?
+    fun findByJobId(jobId: UUID): MissionRecommendationSnapshot?
+}
+
+interface MissionRecommendationCandidateTraceRepository :
+    JpaRepository<MissionRecommendationCandidateTrace, UUID> {
+    fun findAllBySnapshotId(snapshotId: UUID): List<MissionRecommendationCandidateTrace>
 }

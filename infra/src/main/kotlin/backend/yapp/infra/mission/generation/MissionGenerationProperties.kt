@@ -10,6 +10,35 @@ data class MissionGenerationProperties(
     val executor: ExecutorProperties = ExecutorProperties(),
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
     val openai: OpenAiProperties = OpenAiProperties(),
+    val recommendation: RecommendationProperties = RecommendationProperties(),
+)
+
+data class RecommendationProperties(
+    val provider: String = "personalized",
+    val semanticProvider: String = "keyword",
+    val algorithmVersion: String = "rule-v1",
+    val normalReduction: Int = 1,
+    val aggressiveReduction: Int = 2,
+    val normalReplacementCount: Int = 1,
+    val aggressiveReplacementCount: Int = 2,
+    val exactCooldownDays: Long = 56,
+    val familyCooldownDays: Long = 28,
+    val signalDecayDays: Long = 84,
+    val categoryConcentrationPenalty: Double = 0.04,
+    val archetypeConcentrationPenalty: Double = 0.08,
+    val recentCategoryExposurePenalty: Double = 0.03,
+    val explorationBonus: Double = 0.05,
+    val explorationRate: Double = 0.20,
+    val embedding: EmbeddingProperties = EmbeddingProperties(),
+)
+
+data class EmbeddingProperties(
+    val baseUrl: URI = URI.create("https://api.openai.com"),
+    val apiKey: String = "",
+    val model: String = "text-embedding-3-small",
+    val dimensions: Int = 256,
+    val connectTimeout: Duration = Duration.ofSeconds(3),
+    val requestTimeout: Duration = Duration.ofSeconds(10),
 )
 
 data class ExecutorProperties(

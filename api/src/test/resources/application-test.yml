@@ -21,5 +21,10 @@ jwt:
   refresh-token-ttl: PT24H
 
 mission:
+  lifecycle:
+    scheduler-enabled: false
   generation:
     provider: mock
+    recommendation:
+      provider: template
+      semantic-provider: keyword

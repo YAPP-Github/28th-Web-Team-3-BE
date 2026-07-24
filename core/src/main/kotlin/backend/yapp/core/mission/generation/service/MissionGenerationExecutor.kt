@@ -9,6 +9,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
+import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import java.time.Clock
 import java.time.Duration
@@ -26,8 +27,13 @@ class MissionGenerationExecutor(
     fun execute(jobId: UUID) {
         val work = workService.prepare(jobId) ?: return
         try {
-            check(work.candidates.isNotEmpty()) {
-                "Mission draft candidate policy returned no candidates"
+            if (work.candidates.isEmpty()) {
+                workService.complete(
+                    work = work,
+                    copiesByTemplateId = emptyMap(),
+                    generationSource = backend.yapp.core.mission.generation.port.MissionDraftGenerationSource.TEMPLATE_FALLBACK,
+                )
+                return
             }
             val result = contentGenerator.generate(
                 MissionDraftContentRequest(
@@ -53,6 +59,7 @@ class MissionGenerationWorkService(
     private val surveyRepository: MissionSurveyRepository,
     private val candidateProvider: MissionDraftCandidateProvider,
     private val draftRepository: MissionDraftRepository,
+    private val tracePort: MissionRecommendationTracePort,
     private val clock: Clock,
 ) {
     @Transactional
@@ -68,6 +75,7 @@ class MissionGenerationWorkService(
         val candidates = candidateProvider.candidates(job.guestUserId, categories)
             .groupBy { it.category }
             .flatMap { (_, categoryCandidates) -> categoryCandidates.take(MAX_DRAFTS_PER_CATEGORY) }
+        tracePort.linkToJob(job.guestUserId, job.id)
 
         return MissionGenerationWork(job.id, job.guestUserId, candidates)
     }
@@ -98,11 +106,13 @@ class MissionGenerationWorkService(
                 targetCount = candidate.targetCount,
                 targetUnit = candidate.targetUnit,
                 estimatedSavingsWon = candidate.estimatedSavingsWon,
+                savingsEstimateVersion = candidate.savingsEstimateVersion,
                 createdAt = now,
             )
         }
         draftRepository.saveAll(drafts)
         job.succeed(now, now.plus(DRAFT_TTL), generationSource)
+        tracePort.markShown(job.id, drafts.map { it.templateId }.toSet())
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

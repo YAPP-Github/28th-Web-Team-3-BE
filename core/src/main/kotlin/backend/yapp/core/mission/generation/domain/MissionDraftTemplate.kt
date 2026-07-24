@@ -30,6 +30,25 @@ class MissionDraftTemplate(
     val targetUnit: String,
     @Column(name = "estimated_savings_won", nullable = false)
     val estimatedSavingsWon: Int,
+    @Column(name = "target_code", nullable = false, length = 80)
+    val targetCode: String = "GENERAL",
+    @Column(name = "eligible_codes", nullable = false, length = 500)
+    val eligibleCodes: String = "",
+    @Column(name = "excluded_codes", nullable = false, length = 500)
+    val excludedCodes: String = "",
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_formula", nullable = false, length = 30)
+    val targetFormula: MissionTargetFormula = MissionTargetFormula.FIXED,
+    @Column(name = "cooldown_family", nullable = false, length = 80)
+    val cooldownFamily: String = actionCode,
+    @Column(name = "verification_type", nullable = false, length = 40)
+    val verificationType: String = "SELF_REPORT",
+    @Column(name = "average_savings_per_unit", nullable = false)
+    val averageSavingsPerUnit: Int = estimatedSavingsWon,
+    @Column(name = "savings_estimate_version", nullable = false, length = 40)
+    val savingsEstimateVersion: String = "V1",
+    @Column(name = "embedding_text", nullable = false, length = 1000)
+    val embeddingText: String = "$title $description",
     @Column(name = "sort_order", nullable = false)
     val sortOrder: Int,
     @Column(name = "active", nullable = false)
@@ -48,4 +67,12 @@ enum class MissionCategory {
 enum class MissionMetricType {
     COUNT,
     CHECK,
+}
+
+enum class MissionTargetFormula {
+    REDUCE_MAX,
+    REPLACE,
+    FIXED,
+    CHECK,
+    RECORD,
 }

@@ -22,6 +22,7 @@ data class MissionDraftCandidate(
     val targetCount: Int,
     val targetUnit: String,
     val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String = "V1",
 )
 
 data class MissionDraftContentRequest(
