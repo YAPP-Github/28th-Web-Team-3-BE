@@ -41,6 +41,10 @@ class MissionGenerationAcceptanceTest(
             .andExpect(jsonPath("$.categories[0].category").value("MEAL"))
             .andExpect(jsonPath("$.categories[0].drafts.length()").value(4))
             .andExpect(jsonPath("$.categories[0].drafts[0].savingsLabel").isNotEmpty)
+            .andExpect(jsonPath("$.categories[0].drafts[0].expenseEstimate.referenceExpenseWon").value(13000))
+            .andExpect(jsonPath("$.categories[0].drafts[0].expenseEstimate.alternativeExpenseWon").value(8000))
+            .andExpect(jsonPath("$.categories[0].drafts[0].expenseEstimate.estimatedSavingsPerUnitWon").value(5000))
+            .andExpect(jsonPath("$.categories[0].drafts[0].savingsDescription").isNotEmpty)
             .andReturn().response.contentAsString
 
         val draftIds: List<String> = JsonPath.read(
@@ -52,6 +56,8 @@ class MissionGenerationAcceptanceTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.missions.length()").value(2))
             .andExpect(jsonPath("$.missions[0].status").value("ACTIVE"))
+            .andExpect(jsonPath("$.missions[0].expenseEstimate.referenceExpenseWon").value(13000))
+            .andExpect(jsonPath("$.missions[0].savingsDescription").isNotEmpty)
             .andReturn().response.contentAsString
         val second = confirm(token, jobId, request)
             .andExpect(status().isOk)

@@ -10,6 +10,7 @@ import backend.yapp.core.mission.generation.domain.MissionRepository
 import backend.yapp.core.mission.generation.domain.MissionStatus
 import backend.yapp.core.mission.generation.domain.MissionOutcomeEvent
 import backend.yapp.core.mission.generation.domain.MissionOutcomeEventRepository
+import backend.yapp.core.mission.generation.port.MissionExpenseEstimate
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
@@ -180,13 +181,19 @@ class MissionLifecycleService(
 
     private fun Mission.toSnapshot() = LifecycleMissionSnapshot(
         id, MissionSource.RECOMMENDED, category, title, targetCount, targetUnit,
-        estimatedSavingsWon, savingsEstimateVersion, status, weekEndsAt, createdAt,
+        estimatedSavingsWon, savingsEstimateVersion, expenseEstimate(), savingsDescription, savingsCopyVersion, status, weekEndsAt, createdAt,
     )
 
     private fun ManualMission.toSnapshot() = LifecycleMissionSnapshot(
         id, MissionSource.MANUAL, category, missionText, targetCount, targetUnit,
-        0, "NOT_ESTIMATED", status, weekEndsAt, createdAt,
+        0, "NOT_ESTIMATED", null, null, null, status, weekEndsAt, createdAt,
     )
+
+    private fun Mission.expenseEstimate() = referenceExpenseWon?.let { reference ->
+        MissionExpenseEstimate(checkNotNull(referenceExpenseLabel), checkNotNull(alternativeExpenseLabel), reference,
+            checkNotNull(alternativeExpenseWon), checkNotNull(estimatedSavingsPerUnitWon), estimatedSavingsWon,
+            checkNotNull(expenseUnit), checkNotNull(estimateBasis), savingsEstimateVersion)
+    }
 
     companion object {
         private val SAFE_TAG_KEYWORDS = mapOf(
@@ -217,6 +224,9 @@ data class LifecycleMissionSnapshot(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
     val status: MissionStatus,
     val weekEndsAt: Instant,
     val createdAt: Instant,

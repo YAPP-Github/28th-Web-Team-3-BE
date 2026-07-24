@@ -4,6 +4,7 @@ import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionMetricType
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
+import backend.yapp.core.mission.generation.port.MissionExpenseEstimate
 import java.time.Instant
 import java.util.UUID
 
@@ -28,6 +29,9 @@ data class MissionDraftSnapshot(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
 )
 
 data class MissionSnapshot(
@@ -41,6 +45,9 @@ data class MissionSnapshot(
     val targetUnit: String,
     val estimatedSavingsWon: Int,
     val savingsEstimateVersion: String,
+    val expenseEstimate: MissionExpenseEstimate?,
+    val savingsDescription: String?,
+    val savingsCopyVersion: String?,
     val status: String,
 )
 

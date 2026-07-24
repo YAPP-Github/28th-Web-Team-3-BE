@@ -47,6 +47,18 @@ class MissionDraftTemplate(
     val averageSavingsPerUnit: Int = estimatedSavingsWon,
     @Column(name = "savings_estimate_version", nullable = false, length = 40)
     val savingsEstimateVersion: String = "V1",
+    @Column(name = "reference_expense_label", length = 80)
+    val referenceExpenseLabel: String? = null,
+    @Column(name = "alternative_expense_label", length = 80)
+    val alternativeExpenseLabel: String? = null,
+    @Column(name = "reference_expense_won")
+    val referenceExpenseWon: Int? = null,
+    @Column(name = "alternative_expense_won")
+    val alternativeExpenseWon: Int? = null,
+    @Column(name = "expense_unit", length = 20)
+    val expenseUnit: String? = null,
+    @Column(name = "estimate_basis", length = 40)
+    val estimateBasis: String? = null,
     @Column(name = "embedding_text", nullable = false, length = 1000)
     val embeddingText: String = "$title $description",
     @Column(name = "sort_order", nullable = false)
