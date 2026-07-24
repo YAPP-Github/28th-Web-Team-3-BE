@@ -33,6 +33,8 @@ class GoalAcceptanceTest(
             .andExpect(jsonPath("$.totalSavedManwon").value(1800))
             .andExpect(jsonPath("$.thisMonth.targetManwon").value(100))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(0))
+            .andExpect(jsonPath("$.thisMonth.dDay").isNumber)
+            .andExpect(jsonPath("$.thisMonth.dday").doesNotExist())
 
         // 저축액 입력은 이번 달 값을 덮어쓴다(누적 아님).
         setSaving(token, 30)
