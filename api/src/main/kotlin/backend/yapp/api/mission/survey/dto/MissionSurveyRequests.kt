@@ -26,8 +26,10 @@ import backend.yapp.core.mission.survey.domain.TransportPrimaryMode
 import backend.yapp.core.mission.survey.domain.TransportReason
 import backend.yapp.core.mission.survey.domain.TransportSurveyAnswers
 import backend.yapp.core.mission.survey.domain.TransportTarget
+import backend.yapp.core.mission.survey.domain.SurveyFrequencyUnit
 import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
 import backend.yapp.core.mission.survey.domain.missionSurveyCodeOf
+import backend.yapp.core.mission.survey.domain.surveyFrequencyRangeOf
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
 
@@ -331,14 +333,16 @@ data class HobbyFrequencyRequest(
     )
     val spendingType: String,
     @field:Schema(
-        description = "해당 지출의 빈도. SUBSCRIPTION은 구독 개수 0~20, 그 외는 4주 기준 결제 횟수 0~31.",
-        example = "2",
-        minimum = "0",
-        maximum = "31",
+        description = "해당 지출의 빈도 범위. SUBSCRIPTION은 1개·2개·3개 이상, 그 외는 4주 기준 1~2회·3~4회·5~6회·7회 이상.",
+        example = "THREE_TO_FOUR",
     )
-    val count: Int,
+    val frequencyRange: String,
 ) {
-    fun toDomain(): HobbyFrequency = HobbyFrequency(parseCode(spendingType), count)
+    fun toDomain(): HobbyFrequency {
+        val type = parseCode<HobbySpendingType>(spendingType)
+        val unit = if (type == HobbySpendingType.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
+        return HobbyFrequency(type, surveyFrequencyRangeOf(frequencyRange, unit))
+    }
 }
 
 data class LivingSurveyRequest(
@@ -446,14 +450,16 @@ data class LivingFrequencyRequest(
     )
     val area: String,
     @field:Schema(
-        description = "해당 영역의 빈도. SUBSCRIPTION은 구독 개수 0~20, 그 외는 4주 기준 소비 횟수 0~31.",
-        example = "2",
-        minimum = "0",
-        maximum = "31",
+        description = "해당 영역의 빈도 범위. SUBSCRIPTION은 1개·2개·3개 이상, 그 외는 4주 기준 1~2회·3~4회·5~6회·7회 이상.",
+        example = "THREE_TO_FOUR",
     )
-    val count: Int,
+    val frequencyRange: String,
 ) {
-    fun toDomain(): LivingFrequency = LivingFrequency(parseCode(area), count)
+    fun toDomain(): LivingFrequency {
+        val livingArea = parseCode<LivingArea>(area)
+        val unit = if (livingArea == LivingArea.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
+        return LivingFrequency(livingArea, surveyFrequencyRangeOf(frequencyRange, unit))
+    }
 }
 
 private inline fun <reified T> parseCode(value: String): T

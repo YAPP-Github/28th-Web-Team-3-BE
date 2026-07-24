@@ -32,12 +32,14 @@ import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveySnapshot
 import backend.yapp.core.mission.survey.domain.MissionSurveyValidator
 import backend.yapp.core.mission.survey.domain.SurveyFrequencyUnit
+import backend.yapp.core.mission.survey.domain.SurveyFrequencyRange
 import backend.yapp.core.mission.survey.domain.TransportExclusion
 import backend.yapp.core.mission.survey.domain.TransportPrimaryMode
 import backend.yapp.core.mission.survey.domain.TransportReason
 import backend.yapp.core.mission.survey.domain.TransportSurveyAnswers
 import backend.yapp.core.mission.survey.domain.TransportTarget
 import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
+import backend.yapp.core.mission.survey.domain.surveyFrequencyRangeOf
 import backend.yapp.core.mission.survey.domain.missionSurveyCodeOf
 import java.time.Clock
 import org.springframework.dao.DataIntegrityViolationException
@@ -153,8 +155,9 @@ class MissionSurveyService(
                 MissionSurveyCategory.HOBBY,
                 MissionSurveyQuestionCode.HOBBY_FREQUENCIES,
                 it.spendingType,
-                it.count,
+                it.range.calculationBaseline,
                 unitFor(it.spendingType),
+                it.range.code,
             )
         }
         options(
@@ -174,8 +177,9 @@ class MissionSurveyService(
                 MissionSurveyCategory.LIVING,
                 MissionSurveyQuestionCode.LIVING_FREQUENCIES,
                 it.area,
-                it.count,
+                it.range.calculationBaseline,
                 unitFor(it.area),
+                it.range.code,
             )
         }
         option(MissionSurveyCategory.LIVING, MissionSurveyQuestionCode.LIVING_TRIGGER, answers.trigger)
@@ -316,7 +320,7 @@ class MissionSurveyService(
                 spendingTypes.map {
                     HobbyFrequency(
                         it,
-                        reader.number(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it, unitFor(it)),
+                        reader.frequencyRange(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it, unitFor(it)),
                     )
                 }
             },
@@ -342,7 +346,7 @@ class MissionSurveyService(
                 areas.map {
                     LivingFrequency(
                         it,
-                        reader.number(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it, unitFor(it)),
+                        reader.frequencyRange(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it, unitFor(it)),
                     )
                 }
             },
@@ -422,7 +426,19 @@ class MissionSurveyService(
                     it.answerCode == subject.code
             }
             check(row.unitCode == SurveyFrequencyUnit.TIMES_PER_WEEK.code)
-            return missionSurveyCodeOf(checkNotNull(row.rangeCode))
+            return surveyFrequencyRangeOf(checkNotNull(row.rangeCode), SurveyFrequencyUnit.TIMES_PER_WEEK) as WeeklyFrequencyRange
+        }
+
+        fun frequencyRange(
+            question: MissionSurveyQuestionCode,
+            subject: MissionSurveyCode,
+            expectedUnit: SurveyFrequencyUnit,
+        ): SurveyFrequencyRange {
+            val row = rows.single {
+                it.questionCode == question.code && it.valueType == NUMBER_VALUE_TYPE && it.answerCode == subject.code
+            }
+            check(row.unitCode == expectedUnit.code)
+            return surveyFrequencyRangeOf(checkNotNull(row.rangeCode), expectedUnit)
         }
 
         fun text(
