@@ -17,6 +17,7 @@ import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionCatalog
 import backend.yapp.core.mission.survey.domain.MissionSurveyReplaceCommand
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveyValidator
+import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -174,7 +175,7 @@ class MissionSurveyServiceTest {
         MissionSurveyReplaceCommand(
             meal = MealSurveyAnswers(
                 target = MealTarget.DELIVERY,
-                weeklyFrequency = 3,
+                weeklyFrequency = WeeklyFrequencyRange.THREE_TO_FOUR,
                 alternatives = listOf(MealAlternative.COOK),
                 reason = MealReason.TIME_OR_ENERGY,
                 exclusions = listOf(MealExclusion.NONE),

@@ -5,6 +5,7 @@ import backend.yapp.core.mission.survey.domain.MissionSurveyConditionalOptionRul
 import backend.yapp.core.mission.survey.domain.MissionSurveyNumericRule
 import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionDefinition
 import backend.yapp.core.mission.survey.domain.MissionSurveyTextRule
+import backend.yapp.core.mission.survey.domain.MissionSurveyFrequencyRangeOption
 
 data class MissionSurveyQuestionsResponse(
     val categories: List<MissionSurveyCategoryQuestionsResponse>,
@@ -38,6 +39,7 @@ data class MissionSurveyQuestionResponse(
     val dependsOnQuestionCode: String?,
     val skipWhenOptionCodes: List<String>,
     val numericRules: List<MissionSurveyNumericRuleResponse>,
+    val frequencyRangeOptions: List<MissionSurveyFrequencyRangeOptionResponse>,
     val textRules: List<MissionSurveyTextRuleResponse>,
     val exclusiveOptionCodes: List<String>,
     val conditionalOptionRules: List<MissionSurveyConditionalOptionRuleResponse>,
@@ -55,12 +57,25 @@ data class MissionSurveyQuestionResponse(
                 dependsOnQuestionCode = question.dependsOnQuestionCode,
                 skipWhenOptionCodes = question.skipWhenOptionCodes,
                 numericRules = question.numericRules.map(MissionSurveyNumericRuleResponse::from),
+                frequencyRangeOptions = question.frequencyRangeOptions.map(MissionSurveyFrequencyRangeOptionResponse::from),
                 textRules = question.textRules.map(MissionSurveyTextRuleResponse::from),
                 exclusiveOptionCodes = question.exclusiveOptionCodes,
                 conditionalOptionRules = question.conditionalOptionRules
                     .map(MissionSurveyConditionalOptionRuleResponse::from),
                 impacts = question.impacts.map { it.code },
             )
+    }
+}
+
+data class MissionSurveyFrequencyRangeOptionResponse(
+    val code: String,
+    val label: String,
+    val minimum: Int,
+    val maximum: Int?,
+) {
+    companion object {
+        fun from(option: MissionSurveyFrequencyRangeOption): MissionSurveyFrequencyRangeOptionResponse =
+            MissionSurveyFrequencyRangeOptionResponse(option.code, option.label, option.minimum, option.maximum)
     }
 }
 

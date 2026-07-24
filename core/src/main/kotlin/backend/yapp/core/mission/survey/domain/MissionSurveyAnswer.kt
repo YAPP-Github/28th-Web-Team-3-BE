@@ -26,6 +26,8 @@ class MissionSurveyAnswer(
     val answerCode: String,
     @Column(name = "numeric_value")
     val numericValue: Int? = null,
+    @Column(name = "range_code", length = 60)
+    val rangeCode: String? = null,
     @Column(name = "text_value", length = 50)
     val textValue: String? = null,
     @Column(name = "unit_code", length = 30)

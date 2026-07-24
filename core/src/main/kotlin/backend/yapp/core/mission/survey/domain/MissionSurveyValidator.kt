@@ -35,8 +35,7 @@ class MissionSurveyValidator(
         if (answers.target == MealTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null && answers.reason == null)
         } else {
-            val weeklyFrequency = requireValue(answers.weeklyFrequency)
-            requireNumeric(MissionSurveyQuestionCode.MEAL_FREQUENCY, answers.target, weeklyFrequency)
+            requireValid(answers.weeklyFrequency != null)
             requireValid(answers.reason != null)
         }
     }
@@ -46,8 +45,7 @@ class MissionSurveyValidator(
         if (answers.target == TransportTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null)
         } else {
-            val weeklyFrequency = requireValue(answers.weeklyFrequency)
-            requireNumeric(MissionSurveyQuestionCode.TRANSPORT_FREQUENCY, answers.target, weeklyFrequency)
+            requireValid(answers.weeklyFrequency != null)
         }
     }
 

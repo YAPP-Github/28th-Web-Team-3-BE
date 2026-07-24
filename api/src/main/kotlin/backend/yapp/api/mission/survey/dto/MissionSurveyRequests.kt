@@ -26,6 +26,7 @@ import backend.yapp.core.mission.survey.domain.TransportPrimaryMode
 import backend.yapp.core.mission.survey.domain.TransportReason
 import backend.yapp.core.mission.survey.domain.TransportSurveyAnswers
 import backend.yapp.core.mission.survey.domain.TransportTarget
+import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
 import backend.yapp.core.mission.survey.domain.missionSurveyCodeOf
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
@@ -64,13 +65,12 @@ data class MealSurveyRequest(
     )
     val target: String,
     @field:Schema(
-        description = "target의 주간 이용 횟수. PAID_BEVERAGE는 0~14, 그 외 일반 target은 0~7. target이 UNKNOWN이면 생략하거나 null.",
-        example = "3",
-        minimum = "0",
-        maximum = "14",
+        description = "target의 주간 이용 빈도 범위. target이 UNKNOWN이면 생략하거나 null.",
+        example = "THREE_TO_FOUR",
+        allowableValues = ["ONE_TO_TWO", "THREE_TO_FOUR", "FIVE_TO_SIX", "SEVEN_OR_MORE"],
         nullable = true,
     )
-    val weeklyFrequency: Int? = null,
+    val weeklyFrequencyRange: String? = null,
     @field:ArraySchema(
         arraySchema = Schema(
             description = "실천 가능한 식사 대안. 1~7개 선택하며 NO_ALTERNATIVE는 다른 값과 함께 보낼 수 없다.",
@@ -128,7 +128,7 @@ data class MealSurveyRequest(
     fun toAnswers(): MealSurveyAnswers =
         MealSurveyAnswers(
             target = parseCode(target),
-            weeklyFrequency = weeklyFrequency,
+            weeklyFrequency = weeklyFrequencyRange?.let(::parseCode),
             alternatives = alternatives.map(::parseCode),
             reason = reason?.let(::parseCode),
             exclusions = exclusions.map(::parseCode),
@@ -163,13 +163,12 @@ data class TransportSurveyRequest(
     )
     val target: String,
     @field:Schema(
-        description = "target의 주간 이용 횟수(0~7). target이 UNKNOWN이면 생략하거나 null.",
-        example = "2",
-        minimum = "0",
-        maximum = "7",
+        description = "target의 주간 이용 빈도 범위. target이 UNKNOWN이면 생략하거나 null.",
+        example = "ONE_TO_TWO",
+        allowableValues = ["ONE_TO_TWO", "THREE_TO_FOUR", "FIVE_TO_SIX", "SEVEN_OR_MORE"],
         nullable = true,
     )
-    val weeklyFrequency: Int? = null,
+    val weeklyFrequencyRange: String? = null,
     @field:Schema(
         description = "해당 이동수단을 이용하는 주된 이유. target이 UNKNOWN이어도 필수다.",
         example = "TIME_PRESSURE",
@@ -208,7 +207,7 @@ data class TransportSurveyRequest(
         TransportSurveyAnswers(
             primaryMode = parseCode<TransportPrimaryMode>(primaryMode),
             target = parseCode<TransportTarget>(target),
-            weeklyFrequency = weeklyFrequency,
+            weeklyFrequency = weeklyFrequencyRange?.let(::parseCode),
             reason = parseCode<TransportReason>(reason),
             exclusions = exclusions.map(::parseCode),
         )

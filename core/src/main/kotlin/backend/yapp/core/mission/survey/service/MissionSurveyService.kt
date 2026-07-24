@@ -37,6 +37,7 @@ import backend.yapp.core.mission.survey.domain.TransportPrimaryMode
 import backend.yapp.core.mission.survey.domain.TransportReason
 import backend.yapp.core.mission.survey.domain.TransportSurveyAnswers
 import backend.yapp.core.mission.survey.domain.TransportTarget
+import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
 import backend.yapp.core.mission.survey.domain.missionSurveyCodeOf
 import java.time.Clock
 import org.springframework.dao.DataIntegrityViolationException
@@ -95,8 +96,9 @@ class MissionSurveyService(
                 MissionSurveyCategory.MEAL,
                 MissionSurveyQuestionCode.MEAL_FREQUENCY,
                 answers.target,
-                it,
+                it.calculationBaseline,
                 SurveyFrequencyUnit.TIMES_PER_WEEK,
+                it.code,
             )
         }
         options(MissionSurveyCategory.MEAL, MissionSurveyQuestionCode.MEAL_ALTERNATIVES, answers.alternatives)
@@ -116,8 +118,9 @@ class MissionSurveyService(
                 MissionSurveyCategory.TRANSPORT,
                 MissionSurveyQuestionCode.TRANSPORT_FREQUENCY,
                 answers.target,
-                it,
+                it.calculationBaseline,
                 SurveyFrequencyUnit.TIMES_PER_WEEK,
+                it.code,
             )
         }
         option(MissionSurveyCategory.TRANSPORT, MissionSurveyQuestionCode.TRANSPORT_REASON, answers.reason)
@@ -214,6 +217,7 @@ class MissionSurveyService(
         subject: MissionSurveyCode?,
         value: Int,
         unit: SurveyFrequencyUnit,
+        rangeCode: String? = null,
     ) {
         add(
             MissionSurveyAnswerValue(
@@ -222,6 +226,7 @@ class MissionSurveyService(
                 valueType = NUMBER_VALUE_TYPE,
                 answerCode = subject?.code ?: SELF_ANSWER_CODE,
                 numericValue = value,
+                rangeCode = rangeCode,
                 unitCode = unit.code,
             ),
         )
@@ -261,7 +266,7 @@ class MissionSurveyService(
             weeklyFrequency = if (target == MealTarget.UNKNOWN) {
                 null
             } else {
-                reader.number(MissionSurveyQuestionCode.MEAL_FREQUENCY, target, SurveyFrequencyUnit.TIMES_PER_WEEK)
+                reader.weeklyFrequency(MissionSurveyQuestionCode.MEAL_FREQUENCY, target)
             },
             alternatives = reader.many(MissionSurveyQuestionCode.MEAL_ALTERNATIVES),
             reason = if (target == MealTarget.UNKNOWN) null else reader.single(MissionSurveyQuestionCode.MEAL_REASON),
@@ -279,11 +284,7 @@ class MissionSurveyService(
             weeklyFrequency = if (target == TransportTarget.UNKNOWN) {
                 null
             } else {
-                reader.number(
-                    MissionSurveyQuestionCode.TRANSPORT_FREQUENCY,
-                    target,
-                    SurveyFrequencyUnit.TIMES_PER_WEEK,
-                )
+                reader.weeklyFrequency(MissionSurveyQuestionCode.TRANSPORT_FREQUENCY, target)
             },
             reason = reader.single(MissionSurveyQuestionCode.TRANSPORT_REASON),
             exclusions = reader.many(MissionSurveyQuestionCode.TRANSPORT_EXCLUSIONS),
@@ -357,6 +358,7 @@ class MissionSurveyService(
             valueType = valueType,
             answerCode = answerCode,
             numericValue = numericValue,
+            rangeCode = rangeCode,
             textValue = textValue,
             unitCode = unitCode,
         )
@@ -408,6 +410,19 @@ class MissionSurveyService(
             }
             check(row.unitCode == expectedUnit.code)
             return checkNotNull(row.numericValue)
+        }
+
+        fun weeklyFrequency(
+            question: MissionSurveyQuestionCode,
+            subject: MissionSurveyCode,
+        ): WeeklyFrequencyRange {
+            val row = rows.single {
+                it.questionCode == question.code &&
+                    it.valueType == NUMBER_VALUE_TYPE &&
+                    it.answerCode == subject.code
+            }
+            check(row.unitCode == SurveyFrequencyUnit.TIMES_PER_WEEK.code)
+            return missionSurveyCodeOf(checkNotNull(row.rangeCode))
         }
 
         fun text(
