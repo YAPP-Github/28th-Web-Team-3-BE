@@ -69,20 +69,10 @@ class MissionSurveyAcceptanceTest(
             )
             .andExpect(jsonPath("$.categories[0].questions[1].skipWhenOptionCodes[0]").value("UNKNOWN"))
             .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[0].subjectOptionCode")
-                    .value("DELIVERY"),
+                jsonPath("$.categories[0].questions[1].answerType").value("FREQUENCY_RANGE"),
             )
-            .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[0].unit")
-                    .value("TIMES_PER_WEEK"),
-            )
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[0].minimum").value(0))
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[0].maximum").value(7))
-            .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[2].subjectOptionCode")
-                    .value("PAID_BEVERAGE"),
-            )
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[2].maximum").value(14))
+            .andExpect(jsonPath("$.categories[0].questions[1].frequencyRangeOptions[0].code").value("ONE_TO_TWO"))
+            .andExpect(jsonPath("$.categories[0].questions[1].frequencyRangeOptions[3].code").value("SEVEN_OR_MORE"))
             .andExpect(
                 jsonPath("$.categories[0].questions[2].exclusiveOptionCodes[0]")
                     .value("NO_ALTERNATIVE"),
@@ -121,7 +111,7 @@ class MissionSurveyAcceptanceTest(
             )
 
         assertEquals(
-            (1..11).map(Int::toString),
+            (1..12).map(Int::toString),
             queryStrings(
                 """
                     SELECT version
@@ -140,7 +130,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 0,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "alternatives": ["PICKUP", "COOK"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -163,8 +153,8 @@ class MissionSurveyAcceptanceTest(
 
         val putJson = putSurvey(token, request)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.schemaVersion").value("V2"))
-            .andExpect(jsonPath("$.meal.weeklyFrequency").value(0))
+            .andExpect(jsonPath("$.schemaVersion").value("V3"))
+            .andExpect(jsonPath("$.meal.weeklyFrequencyRange").value("ONE_TO_TWO"))
             .andExpect(jsonPath("$.meal.alternatives[0]").value("COOK"))
             .andExpect(jsonPath("$.meal.alternatives[1]").value("PICKUP"))
             .andExpect(jsonPath("$.hobby.hobbies[0]").value("READING"))
@@ -190,6 +180,19 @@ class MissionSurveyAcceptanceTest(
                     WHERE survey.guest_user_id = ?
                       AND answer.question_code = 'HOBBY_TYPES'
                       AND answer.answer_code = 'OTHER'
+                """.trimIndent(),
+                guestUserId(token),
+            ),
+        )
+        assertEquals(
+            listOf("ONE_TO_TWO:1"),
+            queryStrings(
+                """
+                    SELECT answer.range_code || ':' || CAST(answer.numeric_value AS VARCHAR)
+                    FROM mission_survey_answer answer
+                    JOIN mission_survey survey ON survey.id = answer.mission_survey_id
+                    WHERE survey.guest_user_id = ?
+                      AND answer.question_code = 'MEAL_FREQUENCY'
                 """.trimIndent(),
                 guestUserId(token),
             ),
@@ -240,7 +243,7 @@ class MissionSurveyAcceptanceTest(
 
         putSurvey(
             token,
-            MEAL_REQUEST.replace("\"weeklyFrequency\": 3", "\"weeklyFrequency\": 8"),
+            MEAL_REQUEST.replace("\"weeklyFrequencyRange\": \"THREE_TO_FOUR\"", "\"weeklyFrequencyRange\": \"INVALID\""),
         ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.name").value("MISSION_SURVEY_INVALID"))
 
@@ -312,7 +315,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "UNKNOWN",
-                "weeklyFrequency": 0,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "alternatives": ["NO_ALTERNATIVE"],
                 "reason": null,
                 "exclusions": ["NONE"]
@@ -499,17 +502,25 @@ class MissionSurveyAcceptanceTest(
         assertEquals(31, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.maximum"))
         assertEquals(0, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.minimum"))
         assertEquals(31, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.minimum"))
-        assertEquals(7, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.minimum"))
-        assertEquals(14, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.maximum"))
+        assertTrue(
+            JsonPath.read<List<String>>(
+                document,
+                "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequencyRange.type",
+            ).contains("string"),
+        )
+        assertTrue(
+            JsonPath.read<List<String>>(
+                document,
+                "$.components.schemas.MealSurveyRequest.properties.weeklyFrequencyRange.type",
+            ).contains("string"),
+        )
         assertEquals(50, JsonPath.read(document, "$.components.schemas.HobbySurveyRequest.properties.otherHobby.maxLength"))
 
         val mealFrequencyDescription: String = JsonPath.read(
             document,
-            "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.description",
+            "$.components.schemas.MealSurveyRequest.properties.weeklyFrequencyRange.description",
         )
-        assertTrue(mealFrequencyDescription.contains("PAID_BEVERAGE는 0~14"))
+        assertTrue(mealFrequencyDescription.contains("주간 이용 빈도 범위"))
         val hobbyFrequencyDescription: String = JsonPath.read(
             document,
             "$.components.schemas.HobbySurveyRequest.properties.frequencies.description",
@@ -610,7 +621,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -625,7 +636,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -633,7 +644,7 @@ class MissionSurveyAcceptanceTest(
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },

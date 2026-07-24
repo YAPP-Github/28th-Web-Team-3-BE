@@ -27,7 +27,7 @@ data class MissionSurveyResponse(
 
 data class MealSurveyResponse(
     val target: String,
-    val weeklyFrequency: Int?,
+    val weeklyFrequencyRange: String?,
     val alternatives: List<String>,
     val reason: String?,
     val exclusions: List<String>,
@@ -36,7 +36,7 @@ data class MealSurveyResponse(
         fun from(answers: MealSurveyAnswers): MealSurveyResponse =
             MealSurveyResponse(
                 target = answers.target.code,
-                weeklyFrequency = answers.weeklyFrequency,
+                weeklyFrequencyRange = answers.weeklyFrequency?.code,
                 alternatives = answers.alternatives.map { it.code },
                 reason = answers.reason?.code,
                 exclusions = answers.exclusions.map { it.code },
@@ -47,7 +47,7 @@ data class MealSurveyResponse(
 data class TransportSurveyResponse(
     val primaryMode: String,
     val target: String,
-    val weeklyFrequency: Int?,
+    val weeklyFrequencyRange: String?,
     val reason: String,
     val exclusions: List<String>,
 ) {
@@ -56,7 +56,7 @@ data class TransportSurveyResponse(
             TransportSurveyResponse(
                 primaryMode = answers.primaryMode.code,
                 target = answers.target.code,
-                weeklyFrequency = answers.weeklyFrequency,
+                weeklyFrequencyRange = answers.weeklyFrequency?.code,
                 reason = answers.reason.code,
                 exclusions = answers.exclusions.map { it.code },
             )

@@ -5,7 +5,7 @@
 - 질문 조회: `GET /api/missions/surveys/questions?categories=MEAL&categories=HOBBY`
 - 설문 저장·교체: `PUT /api/missions/surveys`
 - 저장 설문 조회: `GET /api/missions/surveys`
-- 현재 설문 저장 스키마 버전: `V2`
+- 현재 설문 저장 스키마 버전: `V3`
 - 카테고리: `MEAL`, `TRANSPORT`, `HOBBY`, `LIVING` 중 중복 없이 1~4개
 - 질문 수: 카테고리별 5개, 총 20개
 - 주관식 입력: `HOBBY_TYPES`에서 `OTHER`를 선택했을 때의 `hobby.otherHobby` 한 곳
@@ -42,7 +42,7 @@
 | 순서 | 질문 | 클라이언트 필드 | 방식 | 선택지·범위 | 조건 |
 |---:|---|---|---|---|---|
 | 1 | `MEAL_TARGET`<br>식사비 중 가장 소비가 큰 부분이 어디인가요? | `meal.target: String` | 단일 선택 | `DELIVERY` 배달 음식<br>`DINING_OUT` 외식<br>`PAID_BEVERAGE` 카페·유료 음료<br>`CONVENIENCE_FOOD` 편의점 식사·간식<br>`DRINKING_GATHERING` 술자리·회식<br>`UNKNOWN` 아직 잘 모르겠어요 | 필수 |
-| 2 | `MEAL_FREQUENCY`<br>선택한 항목을 평소 한 주에 몇 번 이용하나요? | `meal.weeklyFrequency: Int?` | 숫자 | `PAID_BEVERAGE`: 주 0~14회<br>그 외 일반 target: 주 0~7회 | `target=UNKNOWN`이면 생략하고 `null` |
+| 2 | `MEAL_FREQUENCY`<br>선택한 항목을 평소 한 주에 몇 번 이용하나요? | `meal.weeklyFrequencyRange: String?` | 범위 선택 | `ONE_TO_TWO` 1~2회<br>`THREE_TO_FOUR` 3~4회<br>`FIVE_TO_SIX` 5~6회<br>`SEVEN_OR_MORE` 7회 이상 | `target=UNKNOWN`이면 생략하고 `null` |
 | 3 | `MEAL_ALTERNATIVES`<br>식사비를 줄일 때 사용할 수 있는 대안은 무엇인가요? | `meal.alternatives: List<String>` | 복수 선택 1~7개 | `COOK` 직접 요리<br>`PREPARE_MEAL` 도시락·간편식 준비<br>`PREPARE_BEVERAGE` 집이나 직장에서 음료 준비<br>`PICKUP` 배달 대신 포장<br>`USE_FRIDGE_FIRST` 냉장고 음식 먼저 사용<br>`BUY_PLANNED_INGREDIENTS` 계획한 식재료만 구매<br>`NO_ALTERNATIVE` 가능한 대안이 없음 | `NO_ALTERNATIVE` 단독 선택 |
 | 4 | `MEAL_REASON`<br>해당 소비가 발생하는 가장 큰 이유는 무엇인가요? | `meal.reason: String?` | 단일 선택 | `TIME_OR_ENERGY` 시간·체력 부족<br>`HABIT` 습관<br>`SOCIAL` 약속·사교 활동<br>`DISCOUNT_OR_NOTIFICATION` 할인·쿠폰·알림<br>`NO_COOKING_OR_STORAGE` 조리·보관 환경 부족<br>`ALTERNATIVE_INCONVENIENT` 다른 대안이 불편함 | `target=UNKNOWN`이면 생략하고 `null` |
 | 5 | `MEAL_EXCLUSIONS`<br>식사 미션에서 제외해야 할 상황이 있나요? | `meal.exclusions: List<String>` | 복수 선택 1~6개 | `HEALTH_OR_DIET` 건강·식단상 필요한 식사<br>`FIXED_MEAL` 회사·학교에서 정해진 식사<br>`NO_COOKING_ENVIRONMENT` 조리하기 어려운 환경<br>`UNAVOIDABLE_SCHEDULE` 피하기 어려운 회식·가족 일정<br>`NO_REDUCE_FOOD_AMOUNT` 식사량 자체를 줄이는 미션<br>`NONE` 없음 | `NONE` 단독 선택 |
@@ -53,7 +53,7 @@
 |---:|---|---|---|---|---|
 | 1 | `TRANSPORT_PRIMARY_MODE`<br>평소 이용하는 주된 이동수단은 무엇인가요? | `transport.primaryMode: String` | 단일 선택 | `PUBLIC_TRANSIT` 버스·지하철<br>`TAXI` 택시<br>`CAR` 자가용<br>`WALK_OR_BICYCLE` 도보·자전거<br>`SHARED_MOBILITY` 공유 이동수단<br>`VARIES` 상황에 따라 다름 | 필수 |
 | 2 | `TRANSPORT_TARGET`<br>교통비 중 가장 바꾸고 싶은 습관은 무엇인가요? | `transport.target: String` | 단일 선택 | `TAXI` 택시 이용<br>`SHORT_DISTANCE_PAID_MOVE` 가까운 거리의 차량·대중교통 이용<br>`CAR_DRIVING` 자가용 운행<br>`PARKING_OR_TOLL` 주차비·통행료<br>`RUSH_COST` 급하게 이동하면서 생기는 비용<br>`UNKNOWN` 아직 잘 모르겠어요 | 필수 |
-| 3 | `TRANSPORT_FREQUENCY`<br>선택한 이동을 평소 한 주에 몇 번 이용하나요? | `transport.weeklyFrequency: Int?` | 숫자 | 일반 target: 주 0~7회 | `target=UNKNOWN`이면 생략하고 `null` |
+| 3 | `TRANSPORT_FREQUENCY`<br>선택한 이동을 평소 한 주에 몇 번 이용하나요? | `transport.weeklyFrequencyRange: String?` | 범위 선택 | `ONE_TO_TWO` 1~2회<br>`THREE_TO_FOUR` 3~4회<br>`FIVE_TO_SIX` 5~6회<br>`SEVEN_OR_MORE` 7회 이상 | `target=UNKNOWN`이면 생략하고 `null` |
 | 4 | `TRANSPORT_REASON`<br>해당 이동수단을 이용하는 이유는 무엇인가요? | `transport.reason: String` | 단일 선택 | `LATE_NIGHT_OR_SAFETY` 심야·안전<br>`TIME_PRESSURE` 시간 부족·지각 우려<br>`WEATHER` 날씨<br>`LUGGAGE_OR_CARE` 짐·동행자·돌봄<br>`POOR_TRANSIT_CONNECTION` 대중교통 연결이 불편함<br>`WALKING_DIFFICULTY` 도보·자전거 이용이 어려움<br>`CONVENIENCE_OR_HABIT` 편리해서 또는 습관적으로 | `target=UNKNOWN`이어도 필수 |
 | 5 | `TRANSPORT_EXCLUSIONS`<br>다른 이동 방식으로 바꾸면 안 되는 상황이 있나요? | `transport.exclusions: List<String>` | 복수 선택 1~6개 | `LATE_NIGHT_DANGER` 심야·치안상 위험<br>`EXTREME_WEATHER` 폭우·폭염·폭설<br>`MOBILITY_CONSTRAINT` 건강·이동상 제약<br>`LUGGAGE_OR_CARE` 짐·아동·가족 돌봄<br>`NO_TRANSIT` 대중교통 미운행 시간·지역<br>`NONE` 없음 | `NONE` 단독 선택 |
 

@@ -16,6 +16,20 @@ enum class SurveyAnswerType(override val code: String) : MissionSurveyCode {
     MULTI_CHOICE("MULTI_CHOICE"),
     NUMBER("NUMBER"),
     KEYED_NUMBER("KEYED_NUMBER"),
+    FREQUENCY_RANGE("FREQUENCY_RANGE"),
+}
+
+enum class WeeklyFrequencyRange(
+    override val code: String,
+    val label: String,
+    val minimum: Int,
+    val maximum: Int?,
+    val calculationBaseline: Int,
+) : MissionSurveyCode {
+    ONE_TO_TWO("ONE_TO_TWO", "1~2회", 1, 2, 1),
+    THREE_TO_FOUR("THREE_TO_FOUR", "3~4회", 3, 4, 3),
+    FIVE_TO_SIX("FIVE_TO_SIX", "5~6회", 5, 6, 5),
+    SEVEN_OR_MORE("SEVEN_OR_MORE", "7회 이상", 7, null, 7),
 }
 
 enum class SurveyFrequencyUnit(override val code: String) : MissionSurveyCode {

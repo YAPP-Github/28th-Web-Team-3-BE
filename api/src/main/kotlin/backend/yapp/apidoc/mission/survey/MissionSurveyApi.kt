@@ -69,8 +69,8 @@ interface MissionSurveyApi {
             (4) 마지막에는 같은 code를 사용해 선택한 모든 카테고리 응답을 한 번의 PUT으로 제출한다.
 
             분기 규칙:
-            - meal.target이 UNKNOWN이면 weeklyFrequency와 reason을 생략하거나 null로 보낸다.
-            - transport.target이 UNKNOWN이면 weeklyFrequency만 생략하거나 null로 보내며 reason은 필수다.
+            - meal.target이 UNKNOWN이면 weeklyFrequencyRange와 reason을 생략하거나 null로 보낸다.
+            - transport.target이 UNKNOWN이면 weeklyFrequencyRange만 생략하거나 null로 보내며 reason은 필수다.
             - hobby.hobbies에 OTHER가 포함되면 otherHobby에 앞뒤 공백을 제외한 1~50자 텍스트를 보내고,
               OTHER가 없으면 otherHobby를 생략하거나 null로 보낸다.
             - hobby.spendingTypes가 [DO_NOT_REDUCE]이면 monthlySpendingRange를 생략하거나 null로,
@@ -141,7 +141,7 @@ interface MissionSurveyApi {
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -149,7 +149,7 @@ interface MissionSurveyApi {
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },
@@ -255,10 +255,10 @@ interface MissionSurveyApi {
 
         private const val SURVEY_EXAMPLE = """
             {
-              "schemaVersion": "V2",
+              "schemaVersion": "V3",
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -266,7 +266,7 @@ interface MissionSurveyApi {
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },
