@@ -2,29 +2,29 @@ spring:
   config:
     import: classpath:application-db.yml
   ai:
-    model:
-      chat: ${SPRING_AI_CHAT_MODEL:${MISSION_GENERATION_PROVIDER:mock}}
-      embedding: ${SPRING_AI_EMBEDDING_MODEL:${MISSION_SEMANTIC_PROVIDER:keyword}}
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
-      chat:
-        model: ${OPENAI_MODEL:gpt-5-mini}
-        reasoning-effort: ${OPENAI_REASONING_EFFORT:low}
-        max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:2000}
-        timeout: ${OPENAI_CHAT_TIMEOUT:PT20S}
-        max-retries: ${OPENAI_CHAT_MAX_RETRIES:1}
-      embedding:
-        model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
-        dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:256}
-        timeout: ${OPENAI_EMBEDDING_TIMEOUT:PT10S}
-        max-retries: ${OPENAI_EMBEDDING_MAX_RETRIES:1}
+    google:
+      genai:
+        api-key: ${GOOGLE_GENAI_API_KEY:}
+        project-id: ${GOOGLE_CLOUD_PROJECT:}
+        location: ${GOOGLE_CLOUD_LOCATION:}
+        chat:
+          model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
+          temperature: ${GEMINI_TEMPERATURE:0.2}
+          max-output-tokens: ${GEMINI_MAX_OUTPUT_TOKENS:2000}
+        embedding:
+          api-key: ${GOOGLE_GENAI_API_KEY:}
+          project-id: ${GOOGLE_CLOUD_PROJECT:}
+          location: ${GOOGLE_CLOUD_LOCATION:}
+          text:
+            model: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}
+            dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:256}
+            task-type: ${GEMINI_EMBEDDING_TASK_TYPE:SEMANTIC_SIMILARITY}
     retry:
       max-attempts: ${SPRING_AI_RETRY_MAX_ATTEMPTS:1}
       backoff:
-        initial-interval: ${OPENAI_RETRY_INITIAL_INTERVAL:PT0.5S}
-        multiplier: ${OPENAI_RETRY_MULTIPLIER:2}
-        max-interval: ${OPENAI_RETRY_MAX_INTERVAL:PT2S}
+        initial-interval: ${SPRING_AI_RETRY_INITIAL_INTERVAL:PT0.5S}
+        multiplier: ${SPRING_AI_RETRY_MULTIPLIER:2}
+        max-interval: ${SPRING_AI_RETRY_MAX_INTERVAL:PT2S}
 
 server:
   port: 8080
@@ -60,7 +60,7 @@ mission:
   lifecycle:
     scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:true}
   generation:
-    provider: ${MISSION_GENERATION_PROVIDER:mock}
+    ai-activation: off
     stale-running-timeout: PT10M
     recovery-interval-millis: 60000
     prompt:
@@ -80,7 +80,6 @@ mission:
       queue-capacity: 50
     recommendation:
       provider: ${MISSION_RECOMMENDATION_PROVIDER:personalized}
-      semantic-provider: ${MISSION_SEMANTIC_PROVIDER:keyword}
       algorithm-version: rule-v1
       normal-reduction: 1
       aggressive-reduction: 2
@@ -95,4 +94,4 @@ mission:
       exploration-bonus: 0.05
       exploration-rate: 0.20
       embedding:
-        model-version: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}:${OPENAI_EMBEDDING_DIMENSIONS:256}
+        model-version: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}:${GEMINI_EMBEDDING_DIMENSIONS:256}

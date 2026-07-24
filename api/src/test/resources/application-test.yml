@@ -24,7 +24,6 @@ mission:
   lifecycle:
     scheduler-enabled: false
   generation:
-    provider: mock
+    ai-activation: off
     recommendation:
       provider: template
-      semantic-provider: keyword

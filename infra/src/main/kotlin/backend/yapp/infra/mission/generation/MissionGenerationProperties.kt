@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("mission.generation")
 data class MissionGenerationProperties(
-    val provider: String = "mock",
+    val aiActivation: String = "off",
     val executor: ExecutorProperties = ExecutorProperties(),
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
     val prompt: MissionPromptProperties = MissionPromptProperties(),
@@ -21,7 +21,6 @@ data class MissionPromptProperties(
 
 data class RecommendationProperties(
     val provider: String = "personalized",
-    val semanticProvider: String = "keyword",
     val algorithmVersion: String = "rule-v1",
     val normalReduction: Int = 1,
     val aggressiveReduction: Int = 2,

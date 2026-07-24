@@ -1,0 +1,2 @@
+org.springframework.boot.EnvironmentPostProcessor=\
+backend.yapp.infra.mission.generation.MissionAiActivationEnvironmentPostProcessor

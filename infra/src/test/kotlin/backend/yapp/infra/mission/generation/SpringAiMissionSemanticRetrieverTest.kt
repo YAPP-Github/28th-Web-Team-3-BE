@@ -23,7 +23,7 @@ class SpringAiMissionSemanticRetrieverTest {
                 }
             }
         }
-        val retriever = SpringAiMissionSemanticRetriever(client, "test-model:2")
+        val retriever = SpringAiMissionSemanticRetriever(client, "google-genai", "test-model:2")
 
         val result = retriever.retrieve(
             MissionSemanticRetrievalRequest(
@@ -34,7 +34,7 @@ class SpringAiMissionSemanticRetrieverTest {
 
         assertEquals(8, result.scores.size)
         assertEquals((1L..8L).toSet(), result.scores.keys)
-        assertEquals("openai", result.provider)
+        assertEquals("google-genai", result.provider)
         assertEquals("test-model:2", result.modelVersion)
     }
 
@@ -47,7 +47,7 @@ class SpringAiMissionSemanticRetrieverTest {
                 if ("택시" in input) floatArrayOf(1.0f, 0.0f) else floatArrayOf(0.0f, 1.0f)
             }
         }
-        val retriever = SpringAiMissionSemanticRetriever(client, "test-model:2")
+        val retriever = SpringAiMissionSemanticRetriever(client, "google-genai", "test-model:2")
         val request = MissionSemanticRetrievalRequest(
             query = "택시 줄이기",
             candidates = listOf(

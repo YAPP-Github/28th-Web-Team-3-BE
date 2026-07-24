@@ -24,7 +24,7 @@ class SpringAiMissionDraftContentGenerator(
             if (request.candidates.isEmpty()) {
                 return@runCatching MissionDraftContentResult(
                     copies = emptyList(),
-                    source = MissionDraftGenerationSource.OPENAI,
+                    source = MissionDraftGenerationSource.AI,
                 )
             }
             val response = client.generate(
@@ -35,7 +35,7 @@ class SpringAiMissionDraftContentGenerator(
             )
             MissionDraftContentResult(
                 copies = validateResponse(response, request.candidates),
-                source = MissionDraftGenerationSource.OPENAI,
+                source = MissionDraftGenerationSource.AI,
             )
         }.getOrElse {
             MissionDraftContentResult(

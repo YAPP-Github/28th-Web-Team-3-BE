@@ -32,7 +32,7 @@ class SpringAiMissionDraftContentGeneratorTest {
 
         val result = generator.generate(request())
 
-        assertEquals(MissionDraftGenerationSource.OPENAI, result.source)
+        assertEquals(MissionDraftGenerationSource.AI, result.source)
         assertEquals("생성 제목", result.copies.single().title)
         assertEquals("SYSTEM CONSTRAINT", captured.get().systemInstruction)
         assertContains(captured.get().userInstruction, "USER CONSTRAINT")

@@ -17,8 +17,8 @@ class MissionAiInfrastructureConfig {
     @Bean
     @ConditionalOnProperty(
         prefix = "mission.generation",
-        name = ["provider"],
-        havingValue = "mock",
+        name = ["ai-activation"],
+        havingValue = "off",
         matchIfMissing = true,
     )
     fun templateMissionDraftContentGenerator(): MissionDraftContentGenerator =
@@ -27,18 +27,18 @@ class MissionAiInfrastructureConfig {
     @Bean
     @ConditionalOnProperty(
         prefix = "mission.generation",
-        name = ["provider"],
-        havingValue = "openai",
+        name = ["ai-activation"],
+        havingValue = "on",
     )
-    fun openAiMissionDraftContentGenerator(
+    fun aiMissionDraftContentGenerator(
         chatClientBuilder: ChatClient.Builder,
         objectMapper: ObjectMapper,
         properties: MissionGenerationProperties,
-        @Value("\${spring.ai.openai.api-key:}") apiKey: String,
+        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
+        @Value("\${spring.ai.google.genai.project-id:}") projectId: String,
+        @Value("\${spring.ai.google.genai.location:}") location: String,
     ): MissionDraftContentGenerator {
-        require(apiKey.isNotBlank()) {
-            "OPENAI_API_KEY is required when mission.generation.provider=openai"
-        }
+        validateGoogleGenAiAuthentication(apiKey, projectId, location)
         return SpringAiMissionDraftContentGenerator(
             client = ChatClientMissionDraftAiClient(chatClientBuilder.build()),
             objectMapper = objectMapper,
@@ -48,33 +48,51 @@ class MissionAiInfrastructureConfig {
 
     @Bean
     @ConditionalOnProperty(
-        prefix = "mission.generation.recommendation",
-        name = ["semantic-provider"],
-        havingValue = "keyword",
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "off",
         matchIfMissing = true,
     )
     fun keywordMissionSemanticRetriever(): MissionSemanticRetriever = KeywordMissionSemanticRetriever()
 
     @Bean
     @ConditionalOnProperty(
-        prefix = "mission.generation.recommendation",
-        name = ["semantic-provider"],
-        havingValue = "openai",
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "on",
     )
-    fun openAiMissionSemanticRetriever(
+    fun aiMissionSemanticRetriever(
         embeddingModel: EmbeddingModel,
         properties: MissionGenerationProperties,
-        @Value("\${spring.ai.openai.api-key:}") apiKey: String,
+        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
+        @Value("\${spring.ai.google.genai.project-id:}") projectId: String,
+        @Value("\${spring.ai.google.genai.location:}") location: String,
     ): MissionSemanticRetriever {
-        require(apiKey.isNotBlank()) {
-            "OPENAI_API_KEY is required when mission semantic provider is openai"
-        }
+        validateGoogleGenAiAuthentication(apiKey, projectId, location)
         return FallbackMissionSemanticRetriever(
             primary = SpringAiMissionSemanticRetriever(
                 client = SpringAiMissionEmbeddingClient(embeddingModel),
+                provider = GOOGLE_GENAI_PROVIDER,
                 modelVersion = properties.recommendation.embedding.modelVersion,
             ),
             fallback = KeywordMissionSemanticRetriever(),
         )
+    }
+
+    private fun validateGoogleGenAiAuthentication(
+        apiKey: String,
+        projectId: String,
+        location: String,
+    ) {
+        if (apiKey.isNotBlank()) {
+            return
+        }
+        require(projectId.isNotBlank() && location.isNotBlank()) {
+            "AI_ACTIVATION=on requires GOOGLE_GENAI_API_KEY or both GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION"
+        }
+    }
+
+    companion object {
+        private const val GOOGLE_GENAI_PROVIDER = "google-genai"
     }
 }

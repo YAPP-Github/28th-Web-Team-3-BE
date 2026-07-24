@@ -10,13 +10,14 @@ import org.springframework.ai.embedding.EmbeddingModel
 
 class SpringAiMissionSemanticRetriever(
     private val client: MissionEmbeddingClient,
+    private val provider: String,
     private val modelVersion: String,
 ) : MissionSemanticRetriever {
     private val templateCache = ConcurrentHashMap<String, Map<Long, FloatArray>>()
 
     override fun retrieve(request: MissionSemanticRetrievalRequest): MissionSemanticRetrievalResult {
         if (request.candidates.isEmpty()) {
-            return MissionSemanticRetrievalResult(emptyMap(), PROVIDER, modelVersion)
+            return MissionSemanticRetrievalResult(emptyMap(), provider, modelVersion)
         }
         val cacheKey = cacheKey(request)
         val templateVectors = templateCache.computeIfAbsent(cacheKey) {
@@ -34,7 +35,7 @@ class SpringAiMissionSemanticRetriever(
             .associate { it.toPair() }
         return MissionSemanticRetrievalResult(
             scores = scores,
-            provider = PROVIDER,
+            provider = provider,
             modelVersion = modelVersion,
         )
     }
@@ -57,7 +58,6 @@ class SpringAiMissionSemanticRetriever(
 
     companion object {
         private const val MAX_RESULTS = 8
-        private const val PROVIDER = "openai"
     }
 }
 

@@ -18,7 +18,7 @@ class MissionAiInfrastructureConfigTest {
         .withUserConfiguration(MissionAiInfrastructureConfig::class.java)
 
     @Test
-    fun `starts without API key with mock and keyword defaults`() {
+    fun `off uses template and keyword without AI model beans`() {
         contextRunner.run { context ->
             assertNull(context.startupFailure)
             assertIs<TemplateMissionDraftContentGenerator>(
@@ -27,66 +27,92 @@ class MissionAiInfrastructureConfigTest {
             assertIs<KeywordMissionSemanticRetriever>(
                 context.getBean(MissionSemanticRetriever::class.java),
             )
+            assertNull(context.getBeanProvider(ChatClient.Builder::class.java).ifAvailable)
+            assertNull(context.getBeanProvider(EmbeddingModel::class.java).ifAvailable)
         }
     }
 
     @Test
-    fun `fails fast when openai content provider has no API key`() {
-        contextRunner
-            .withPropertyValues("mission.generation.provider=openai")
-            .withBean(ChatClient.Builder::class.java, {
-                ChatClient.builder(Mockito.mock(ChatModel::class.java))
-            })
-            .withBean(ObjectMapper::class.java, { ObjectMapper() })
+    fun `on fails fast without Google GenAI authentication`() {
+        aiContextRunner()
+            .withPropertyValues("mission.generation.ai-activation=on")
             .run { context ->
                 assertNotNull(context.startupFailure)
             }
     }
 
     @Test
-    fun `fails fast when openai semantic provider has no API key`() {
-        contextRunner
-            .withPropertyValues("mission.generation.recommendation.semantic-provider=openai")
-            .withBean(EmbeddingModel::class.java, {
-                Mockito.mock(EmbeddingModel::class.java)
-            })
-            .run { context ->
-                assertNotNull(context.startupFailure)
-            }
-    }
-
-    @Test
-    fun `creates Spring AI content adapter when openai key and model are configured`() {
-        contextRunner
+    fun `on fails fast with incomplete Vertex configuration`() {
+        aiContextRunner()
             .withPropertyValues(
-                "mission.generation.provider=openai",
-                "spring.ai.openai.api-key=test-key",
+                "mission.generation.ai-activation=on",
+                "spring.ai.google.genai.project-id=test-project",
             )
-            .withBean(ChatClient.Builder::class.java, {
-                ChatClient.builder(Mockito.mock(ChatModel::class.java))
-            })
-            .withBean(ObjectMapper::class.java, { ObjectMapper() })
             .run { context ->
+                assertNotNull(context.startupFailure)
+            }
+    }
+
+    @Test
+    fun `on creates both adapters with Gemini Developer API key`() {
+        aiContextRunner()
+            .withPropertyValues(
+                "mission.generation.ai-activation=on",
+                "spring.ai.google.genai.api-key=test-key",
+            )
+            .run { context ->
+                assertNull(context.startupFailure)
+                assertIs<SpringAiMissionDraftContentGenerator>(
+                    context.getBean(MissionDraftContentGenerator::class.java),
+                )
+                assertIs<FallbackMissionSemanticRetriever>(
+                    context.getBean(MissionSemanticRetriever::class.java),
+                )
+            }
+    }
+
+    @Test
+    fun `on creates both adapters with Vertex project and location`() {
+        aiContextRunner()
+            .withPropertyValues(
+                "mission.generation.ai-activation=on",
+                "spring.ai.google.genai.project-id=test-project",
+                "spring.ai.google.genai.location=asia-northeast3",
+            )
+            .run { context ->
+                assertNull(context.startupFailure)
+                assertIs<SpringAiMissionDraftContentGenerator>(
+                    context.getBean(MissionDraftContentGenerator::class.java),
+                )
+                assertIs<FallbackMissionSemanticRetriever>(
+                    context.getBean(MissionSemanticRetriever::class.java),
+                )
+            }
+    }
+
+    @Test
+    fun `API key takes precedence over incomplete Vertex values`() {
+        aiContextRunner()
+            .withPropertyValues(
+                "mission.generation.ai-activation=on",
+                "spring.ai.google.genai.api-key=test-key",
+                "spring.ai.google.genai.project-id=ignored-project",
+            )
+            .run { context ->
+                assertNull(context.startupFailure)
                 assertIs<SpringAiMissionDraftContentGenerator>(
                     context.getBean(MissionDraftContentGenerator::class.java),
                 )
             }
     }
 
-    @Test
-    fun `creates fallback semantic adapter when openai key and embedding model are configured`() {
+    private fun aiContextRunner(): ApplicationContextRunner =
         contextRunner
-            .withPropertyValues(
-                "mission.generation.recommendation.semantic-provider=openai",
-                "spring.ai.openai.api-key=test-key",
-            )
+            .withBean(ChatClient.Builder::class.java, {
+                ChatClient.builder(Mockito.mock(ChatModel::class.java))
+            })
             .withBean(EmbeddingModel::class.java, {
                 Mockito.mock(EmbeddingModel::class.java)
             })
-            .run { context ->
-                assertIs<FallbackMissionSemanticRetriever>(
-                    context.getBean(MissionSemanticRetriever::class.java),
-                )
-            }
-    }
+            .withBean(ObjectMapper::class.java, { ObjectMapper() })
 }
