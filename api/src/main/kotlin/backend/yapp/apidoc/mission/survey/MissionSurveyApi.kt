@@ -71,6 +71,8 @@ interface MissionSurveyApi {
             분기 규칙:
             - meal.target이 UNKNOWN이면 weeklyFrequency와 reason을 생략하거나 null로 보낸다.
             - transport.target이 UNKNOWN이면 weeklyFrequency만 생략하거나 null로 보내며 reason은 필수다.
+            - hobby.hobbies에 OTHER가 포함되면 otherHobby에 앞뒤 공백을 제외한 1~50자 텍스트를 보내고,
+              OTHER가 없으면 otherHobby를 생략하거나 null로 보낸다.
             - hobby.spendingTypes가 [DO_NOT_REDUCE]이면 monthlySpendingRange를 생략하거나 null로,
               frequencies를 빈 배열로, savingMethods를 [NO_HOBBY_MISSION]으로 보낸다.
             - 일반 취미 분기에서 NO_HOBBY_MISSION은 다른 savingMethods와 함께 보낼 수 없다.
@@ -107,6 +109,11 @@ interface MissionSurveyApi {
                         name = "hobbyDoNotReduce",
                         summary = "취미 DO_NOT_REDUCE 분기",
                         value = HOBBY_DO_NOT_REDUCE_REQUEST_EXAMPLE,
+                    ),
+                    ExampleObject(
+                        name = "hobbyOther",
+                        summary = "기타 취미 주관식 입력",
+                        value = HOBBY_OTHER_REQUEST_EXAMPLE,
                     ),
                     ExampleObject(
                         name = "keyedFrequencies",
@@ -206,6 +213,21 @@ interface MissionSurveyApi {
             }
         """
 
+        private const val HOBBY_OTHER_REQUEST_EXAMPLE = """
+            {
+              "hobby": {
+                "hobbies": ["READING", "OTHER"],
+                "otherHobby": "보드게임",
+                "spendingTypes": ["GOODS"],
+                "monthlySpendingRange": "UNDER_50K",
+                "frequencies": [
+                  {"spendingType": "GOODS", "count": 2}
+                ],
+                "savingMethods": ["WAIT_BEFORE_BUYING"]
+              }
+            }
+        """
+
         private const val KEYED_FREQUENCIES_REQUEST_EXAMPLE = """
             {
               "hobby": {
@@ -233,7 +255,7 @@ interface MissionSurveyApi {
 
         private const val SURVEY_EXAMPLE = """
             {
-              "schemaVersion": "V1",
+              "schemaVersion": "V2",
               "meal": {
                 "target": "DELIVERY",
                 "weeklyFrequency": 3,
@@ -272,6 +294,7 @@ interface MissionSurveyApi {
                     "minimum": 0,
                     "maximum": 7
                   }],
+                  "textRules": [],
                   "exclusiveOptionCodes": [],
                   "conditionalOptionRules": [],
                   "impacts": ["BASELINE_FREQUENCY"]

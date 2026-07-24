@@ -2,6 +2,10 @@ package backend.yapp.core.mission.survey.service
 
 import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
+import backend.yapp.core.mission.survey.domain.HobbySavingMethod
+import backend.yapp.core.mission.survey.domain.HobbySpendingRange
+import backend.yapp.core.mission.survey.domain.HobbySpendingType
+import backend.yapp.core.mission.survey.domain.HobbyType
 import backend.yapp.core.mission.survey.domain.MealAlternative
 import backend.yapp.core.mission.survey.domain.MealExclusion
 import backend.yapp.core.mission.survey.domain.MealReason
@@ -104,6 +108,50 @@ class MissionSurveyServiceTest {
         verify(repository).saveAndFlush(survey)
         assertEquals(validCommand().meal, result.meal)
     }
+
+    @Test
+    fun `legacy OTHER hobby without text remains readable`() {
+        val repository = mock(MissionSurveyRepository::class.java)
+        val survey = MissionSurvey(guestUserId = GUEST_USER_ID, id = 1L)
+        survey.addAnswers(
+            listOf(
+                optionValue("HOBBY_TYPES", HobbyType.OTHER.code),
+                optionValue("HOBBY_SPENDING_TYPES", HobbySpendingType.GOODS.code),
+                optionValue("HOBBY_MONTHLY_SPENDING", HobbySpendingRange.UNDER_50K.code),
+                MissionSurveyAnswerValue(
+                    categoryCode = "HOBBY",
+                    questionCode = "HOBBY_FREQUENCIES",
+                    valueType = "NUMBER",
+                    answerCode = HobbySpendingType.GOODS.code,
+                    numericValue = 1,
+                    unitCode = "TIMES_PER_FOUR_WEEKS",
+                ),
+                optionValue("HOBBY_SAVING_METHODS", HobbySavingMethod.WAIT_BEFORE_BUYING.code),
+            ),
+            Instant.EPOCH,
+        )
+        `when`(repository.findByGuestUserId(GUEST_USER_ID)).thenReturn(survey)
+        val service = MissionSurveyService(
+            repository = repository,
+            validator = MissionSurveyValidator(MissionSurveyQuestionCatalog()),
+            questionCatalog = MissionSurveyQuestionCatalog(),
+        )
+
+        val result = service.get(GUEST_USER_ID)
+
+        assertEquals(listOf(HobbyType.OTHER), result.hobby?.hobbies)
+        assertEquals(null, result.hobby?.otherHobby)
+    }
+
+    private fun optionValue(
+        questionCode: String,
+        answerCode: String,
+    ) = MissionSurveyAnswerValue(
+        categoryCode = "HOBBY",
+        questionCode = questionCode,
+        valueType = "OPTION",
+        answerCode = answerCode,
+    )
 
     private fun assertConflict(repositoryFailure: RuntimeException) {
         val repository = mock(MissionSurveyRepository::class.java)

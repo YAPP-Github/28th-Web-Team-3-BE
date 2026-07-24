@@ -26,6 +26,8 @@ class MissionSurveyAnswer(
     val answerCode: String,
     @Column(name = "numeric_value")
     val numericValue: Int? = null,
+    @Column(name = "text_value", length = 50)
+    val textValue: String? = null,
     @Column(name = "unit_code", length = 30)
     val unitCode: String? = null,
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

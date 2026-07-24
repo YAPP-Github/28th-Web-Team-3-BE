@@ -235,6 +235,13 @@ data class HobbySurveyRequest(
         uniqueItems = true,
     )
     val hobbies: List<String>,
+    @field:Schema(
+        description = "hobbies에 OTHER가 포함되면 필수인 기타 취미명. 앞뒤 공백을 제거한 1~50자 문자열이며, OTHER가 없으면 생략하거나 null로 보낸다.",
+        example = "보드게임",
+        maxLength = 50,
+        nullable = true,
+    )
+    val otherHobby: String? = null,
     @field:ArraySchema(
         arraySchema = Schema(
             description = "줄이고 싶은 취미 지출 유형. 중복 없이 1~2개 선택하며 DO_NOT_REDUCE는 단독으로만 보낸다.",
@@ -301,6 +308,7 @@ data class HobbySurveyRequest(
     fun toAnswers(): HobbySurveyAnswers =
         HobbySurveyAnswers(
             hobbies = hobbies.map(::parseCode),
+            otherHobby = otherHobby?.trim(),
             spendingTypes = spendingTypes.map(::parseCode),
             monthlySpendingRange = monthlySpendingRange?.let(::parseCode),
             frequencies = frequencies.map(HobbyFrequencyRequest::toDomain),

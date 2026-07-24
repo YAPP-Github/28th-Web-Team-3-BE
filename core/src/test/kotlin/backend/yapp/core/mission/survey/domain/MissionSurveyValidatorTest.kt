@@ -147,6 +147,51 @@ class MissionSurveyValidatorTest {
     }
 
     @Test
+    fun `OTHER hobby requires normalized text within the configured length`() {
+        validator.validate(
+            MissionSurveyReplaceCommand(
+                hobby = validHobby(
+                    hobbies = listOf(HobbyType.READING, HobbyType.OTHER),
+                    otherHobby = "보드게임",
+                ),
+            ),
+        )
+        validator.validate(
+            MissionSurveyReplaceCommand(
+                hobby = validHobby(
+                    hobbies = listOf(HobbyType.OTHER),
+                    otherHobby = "가".repeat(HobbySurveyAnswers.MAX_OTHER_HOBBY_LENGTH),
+                ),
+            ),
+        )
+
+        listOf(
+            validHobby(hobbies = listOf(HobbyType.OTHER), otherHobby = null),
+            validHobby(hobbies = listOf(HobbyType.OTHER), otherHobby = ""),
+            validHobby(hobbies = listOf(HobbyType.OTHER), otherHobby = " 보드게임 "),
+            validHobby(
+                hobbies = listOf(HobbyType.OTHER),
+                otherHobby = "가".repeat(HobbySurveyAnswers.MAX_OTHER_HOBBY_LENGTH + 1),
+            ),
+            validHobby(hobbies = listOf(HobbyType.READING), otherHobby = "보드게임"),
+        ).forEach { hobby ->
+            assertInvalid(MissionSurveyReplaceCommand(hobby = hobby))
+        }
+    }
+
+    @Test
+    fun `stored legacy OTHER hobby may omit text`() {
+        validator.validateStored(
+            MissionSurveyReplaceCommand(
+                hobby = validHobby(
+                    hobbies = listOf(HobbyType.OTHER),
+                    otherHobby = null,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `UNKNOWN living branch is exclusive and omits spending follow-ups`() {
         validator.validate(
             MissionSurveyReplaceCommand(
@@ -321,16 +366,19 @@ class MissionSurveyValidatorTest {
     )
 
     private fun validHobby(
+        hobbies: List<HobbyType> = listOf(HobbyType.READING),
+        otherHobby: String? = null,
         spendingTypes: List<HobbySpendingType> = listOf(HobbySpendingType.GOODS),
         monthlySpendingRange: HobbySpendingRange? = HobbySpendingRange.UNDER_50K,
         frequencies: List<HobbyFrequency> = listOf(HobbyFrequency(HobbySpendingType.GOODS, 1)),
         savingMethods: List<HobbySavingMethod> = listOf(HobbySavingMethod.WAIT_BEFORE_BUYING),
     ) = HobbySurveyAnswers(
-        hobbies = listOf(HobbyType.READING),
+        hobbies = hobbies,
         spendingTypes = spendingTypes,
         monthlySpendingRange = monthlySpendingRange,
         frequencies = frequencies,
         savingMethods = savingMethods,
+        otherHobby = otherHobby,
     )
 
     private fun validLiving(

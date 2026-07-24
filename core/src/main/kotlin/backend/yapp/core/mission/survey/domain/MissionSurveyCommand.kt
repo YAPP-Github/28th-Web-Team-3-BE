@@ -29,7 +29,12 @@ data class HobbySurveyAnswers(
     val monthlySpendingRange: HobbySpendingRange?,
     val frequencies: List<HobbyFrequency>,
     val savingMethods: List<HobbySavingMethod>,
-)
+    val otherHobby: String? = null,
+) {
+    companion object {
+        const val MAX_OTHER_HOBBY_LENGTH = 50
+    }
+}
 
 data class HobbyFrequency(
     val spendingType: HobbySpendingType,

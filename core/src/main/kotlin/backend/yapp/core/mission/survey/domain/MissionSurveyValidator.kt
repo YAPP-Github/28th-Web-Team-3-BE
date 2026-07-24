@@ -9,11 +9,22 @@ class MissionSurveyValidator(
     private val questionCatalog: MissionSurveyQuestionCatalog,
 ) {
     fun validate(command: MissionSurveyReplaceCommand) {
+        validate(command, allowLegacyMissingOtherHobby = false)
+    }
+
+    fun validateStored(command: MissionSurveyReplaceCommand) {
+        validate(command, allowLegacyMissingOtherHobby = true)
+    }
+
+    private fun validate(
+        command: MissionSurveyReplaceCommand,
+        allowLegacyMissingOtherHobby: Boolean,
+    ) {
         val categoryCount = listOf(command.meal, command.transport, command.hobby, command.living).count { it != null }
         requireValid(categoryCount in 1..4)
         command.meal?.let(::validateMeal)
         command.transport?.let(::validateTransport)
-        command.hobby?.let(::validateHobby)
+        command.hobby?.let { validateHobby(it, allowLegacyMissingOtherHobby) }
         command.living?.let(::validateLiving)
     }
 
@@ -40,10 +51,14 @@ class MissionSurveyValidator(
         }
     }
 
-    private fun validateHobby(answers: HobbySurveyAnswers) {
+    private fun validateHobby(
+        answers: HobbySurveyAnswers,
+        allowLegacyMissingOtherHobby: Boolean,
+    ) {
         requireSelections(answers.hobbies, MissionSurveyQuestionCode.HOBBY_TYPES)
         requireSelections(answers.spendingTypes, MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES)
         requireSelections(answers.savingMethods, MissionSurveyQuestionCode.HOBBY_SAVING_METHODS)
+        requireOtherHobby(answers, allowLegacyMissingOtherHobby)
         requireConditionalOptions(
             answers.savingMethods,
             MissionSurveyQuestionCode.HOBBY_SAVING_METHODS,
@@ -64,6 +79,28 @@ class MissionSurveyValidator(
             requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
             requireNumeric(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it.spendingType, it.count)
         }
+    }
+
+    private fun requireOtherHobby(
+        answers: HobbySurveyAnswers,
+        allowLegacyMissingOtherHobby: Boolean,
+    ) {
+        val textRule = questionCatalog.question(MissionSurveyQuestionCode.HOBBY_TYPES).textRules
+            .single { it.subjectOptionCode == HobbyType.OTHER.code }
+        val hasOther = HobbyType.OTHER in answers.hobbies
+        val otherHobby = answers.otherHobby
+
+        if (!hasOther) {
+            requireValid(otherHobby == null)
+            return
+        }
+        if (allowLegacyMissingOtherHobby && otherHobby == null) return
+
+        requireValid(
+            otherHobby != null &&
+                otherHobby == otherHobby.trim() &&
+                otherHobby.length in textRule.minimumLength..textRule.maximumLength,
+        )
     }
 
     private fun validateLiving(answers: LivingSurveyAnswers) {
