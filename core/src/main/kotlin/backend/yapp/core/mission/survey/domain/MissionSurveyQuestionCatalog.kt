@@ -90,7 +90,7 @@ class MissionSurveyQuestionCatalog {
             options(
                 MealTarget.DELIVERY to "배달 음식",
                 MealTarget.DINING_OUT to "외식",
-                MealTarget.PAID_BEVERAGE to "카페·유료 음료",
+                MealTarget.PAID_BEVERAGE to "카페, 음료",
                 MealTarget.CONVENIENCE_FOOD to "편의점 식사·간식",
                 MealTarget.DRINKING_GATHERING to "술자리·회식",
                 MealTarget.UNKNOWN to "아직 잘 모르겠어요",
