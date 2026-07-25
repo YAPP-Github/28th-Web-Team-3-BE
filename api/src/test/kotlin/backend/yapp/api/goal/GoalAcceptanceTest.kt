@@ -26,11 +26,11 @@ class GoalAcceptanceTest(
     fun `goal status is derived from onboarding and this month saving is overwritten`() {
         val token = completeOnboarding()
 
-        // 최초 조회: 온보딩 확정값으로 목표 지연 생성. base = 순자산(1800), 이번달 목표 = 월저축(100), 목표액 = 100*1.15*24 = 2760
+        // 최초 조회: 온보딩 확정값으로 목표 지연 생성. 이번달 목표 = 월저축(100), 목표액 = 100*1.15*24 = 2760
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(2760))
-            .andExpect(jsonPath("$.totalSavedManwon").value(1800))
+            .andExpect(jsonPath("$.totalSavedManwon").value(0))
             .andExpect(jsonPath("$.thisMonth.targetManwon").value(100))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(0))
             .andExpect(jsonPath("$.thisMonth.dDay").isNumber)
@@ -41,7 +41,7 @@ class GoalAcceptanceTest(
         mockMvc.perform(put("/api/goal/savings").header("Authorization", "Bearer $token")
             .contentType(MediaType.APPLICATION_JSON).content("""{"savedAmountManwon":20}"""))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.totalSavedManwon").value(1820)) // 1800 + 20 (덮어쓰기)
+            .andExpect(jsonPath("$.totalSavedManwon").value(20))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(20))
 
         // 목표 금액/기간 수정
@@ -49,7 +49,7 @@ class GoalAcceptanceTest(
             .contentType(MediaType.APPLICATION_JSON).content("""{"targetAmountManwon":5000,"periodMonths":36}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(5000))
-            .andExpect(jsonPath("$.totalSavedManwon").value(1820))
+            .andExpect(jsonPath("$.totalSavedManwon").value(20))
     }
 
     @Test
