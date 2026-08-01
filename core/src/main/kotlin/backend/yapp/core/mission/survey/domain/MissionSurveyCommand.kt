@@ -9,7 +9,7 @@ data class MissionSurveyReplaceCommand(
 
 data class MealSurveyAnswers(
     val target: MealTarget,
-    val weeklyFrequency: Int?,
+    val weeklyFrequency: WeeklyFrequencyRange?,
     val alternatives: List<MealAlternative>,
     val reason: MealReason?,
     val exclusions: List<MealExclusion>,
@@ -18,7 +18,7 @@ data class MealSurveyAnswers(
 data class TransportSurveyAnswers(
     val primaryMode: TransportPrimaryMode,
     val target: TransportTarget,
-    val weeklyFrequency: Int?,
+    val weeklyFrequency: WeeklyFrequencyRange?,
     val reason: TransportReason,
     val exclusions: List<TransportExclusion>,
 )
@@ -38,7 +38,7 @@ data class HobbySurveyAnswers(
 
 data class HobbyFrequency(
     val spendingType: HobbySpendingType,
-    val count: Int,
+    val range: SurveyFrequencyRange,
 )
 
 data class LivingSurveyAnswers(
@@ -51,5 +51,5 @@ data class LivingSurveyAnswers(
 
 data class LivingFrequency(
     val area: LivingArea,
-    val count: Int,
+    val range: SurveyFrequencyRange,
 )

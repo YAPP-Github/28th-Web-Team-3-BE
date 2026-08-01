@@ -14,6 +14,8 @@ data class MissionSurveyQuestionDefinition(
     val dependsOnQuestionCode: String? = null,
     val skipWhenOptionCodes: List<String> = emptyList(),
     val numericRules: List<MissionSurveyNumericRule> = emptyList(),
+    val frequencyRangeOptions: List<MissionSurveyFrequencyRangeOption> = emptyList(),
+    val frequencyRangeRules: List<MissionSurveyFrequencyRangeRule> = emptyList(),
     val textRules: List<MissionSurveyTextRule> = emptyList(),
     val exclusiveOptionCodes: List<String> = emptyList(),
     val conditionalOptionRules: List<MissionSurveyConditionalOptionRule> = emptyList(),
@@ -30,6 +32,19 @@ data class MissionSurveyNumericRule(
     val unit: SurveyFrequencyUnit,
     val minimum: Int,
     val maximum: Int,
+)
+
+data class MissionSurveyFrequencyRangeOption(
+    val code: String,
+    val label: String,
+    val minimum: Int,
+    val maximum: Int?,
+)
+
+data class MissionSurveyFrequencyRangeRule(
+    val subjectOptionCode: String,
+    val unit: SurveyFrequencyUnit,
+    val options: List<MissionSurveyFrequencyRangeOption>,
 )
 
 data class MissionSurveyTextRule(
@@ -90,26 +105,18 @@ class MissionSurveyQuestionCatalog {
             options(
                 MealTarget.DELIVERY to "배달 음식",
                 MealTarget.DINING_OUT to "외식",
-                MealTarget.PAID_BEVERAGE to "카페·유료 음료",
+                MealTarget.PAID_BEVERAGE to "카페, 음료",
                 MealTarget.CONVENIENCE_FOOD to "편의점 식사·간식",
                 MealTarget.DRINKING_GATHERING to "술자리·회식",
                 MealTarget.UNKNOWN to "아직 잘 모르겠어요",
             ),
             impacts = listOf(MissionSurveyImpact.MISSION_FILTER, MissionSurveyImpact.REDUCTION_TARGET),
         ),
-        number(
+        frequencyRange(
             MissionSurveyQuestionCode.MEAL_FREQUENCY,
             "선택한 항목을 평소 한 주에 몇 번 이용하나요?",
             MissionSurveyQuestionCode.MEAL_TARGET,
             skipWhen = listOf(MealTarget.UNKNOWN),
-            rules = MealTarget.entries.filterNot { it == MealTarget.UNKNOWN }.map {
-                MissionSurveyNumericRule(
-                    it.code,
-                    SurveyFrequencyUnit.TIMES_PER_WEEK,
-                    0,
-                    if (it == MealTarget.PAID_BEVERAGE) 14 else 7,
-                )
-            },
             impacts = listOf(MissionSurveyImpact.BASELINE_FREQUENCY),
         ),
         multiChoice(
@@ -163,7 +170,7 @@ class MissionSurveyQuestionCatalog {
     private fun transportQuestions(): List<MissionSurveyQuestionDefinition> = listOf(
         choice(
             MissionSurveyQuestionCode.TRANSPORT_PRIMARY_MODE,
-            "평소 이용하는 주된 이동수단은 무엇인가요?",
+            "가장 지출이 큰 이동수단은 무엇인가요?",
             options(
                 TransportPrimaryMode.PUBLIC_TRANSIT to "버스·지하철",
                 TransportPrimaryMode.TAXI to "택시",
@@ -187,14 +194,11 @@ class MissionSurveyQuestionCatalog {
             ),
             impacts = listOf(MissionSurveyImpact.REDUCTION_TARGET),
         ),
-        number(
+        frequencyRange(
             MissionSurveyQuestionCode.TRANSPORT_FREQUENCY,
             "선택한 이동을 평소 한 주에 몇 번 이용하나요?",
             MissionSurveyQuestionCode.TRANSPORT_TARGET,
             skipWhen = listOf(TransportTarget.UNKNOWN),
-            rules = TransportTarget.entries.filterNot { it == TransportTarget.UNKNOWN }.map {
-                MissionSurveyNumericRule(it.code, SurveyFrequencyUnit.TIMES_PER_WEEK, 0, 7)
-            },
             impacts = listOf(MissionSurveyImpact.BASELINE_FREQUENCY),
         ),
         choice(
@@ -255,7 +259,7 @@ class MissionSurveyQuestionCatalog {
         ),
         multiChoice(
             MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES,
-            "취미비는 주로 어디에 사용하나요?",
+            "취미비 중 지출이 가장 큰 부분이 어디인가요?",
             options(
                 HobbySpendingType.GOODS to "용품·굿즈",
                 HobbySpendingType.DIGITAL_CONTENT to "게임·디지털 콘텐츠",
@@ -284,23 +288,13 @@ class MissionSurveyQuestionCatalog {
             skipWhen = listOf(HobbySpendingType.DO_NOT_REDUCE),
             impacts = listOf(MissionSurveyImpact.MISSION_FILTER),
         ),
-        keyedNumber(
+        keyedFrequencyRange(
             MissionSurveyQuestionCode.HOBBY_FREQUENCIES,
             "선택한 항목에 평소 얼마나 자주 결제하나요?",
             MissionSurveyQuestionCode.HOBBY_SPENDING_TYPES,
             skipWhen = listOf(HobbySpendingType.DO_NOT_REDUCE),
-            rules = HobbySpendingType.entries.filterNot { it == HobbySpendingType.DO_NOT_REDUCE }.map {
-                MissionSurveyNumericRule(
-                    it.code,
-                    if (it == HobbySpendingType.SUBSCRIPTION) {
-                        SurveyFrequencyUnit.SUBSCRIPTION_COUNT
-                    } else {
-                        SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
-                    },
-                    0,
-                    if (it == HobbySpendingType.SUBSCRIPTION) 20 else 31,
-                )
-            },
+            rules = HobbySpendingType.entries.filterNot { it == HobbySpendingType.DO_NOT_REDUCE }
+                .map { frequencyRangeRule(it, it == HobbySpendingType.SUBSCRIPTION) },
             impacts = listOf(MissionSurveyImpact.BASELINE_FREQUENCY),
         ),
         multiChoice(
@@ -331,7 +325,7 @@ class MissionSurveyQuestionCatalog {
     private fun livingQuestions(): List<MissionSurveyQuestionDefinition> = listOf(
         multiChoice(
             MissionSurveyQuestionCode.LIVING_AREAS,
-            "생활비 중 가장 먼저 바꾸고 싶은 영역은 무엇인가요?",
+            "생활비 중 가장 지출이 큰 영역은 무엇인가요?",
             options(
                 LivingArea.SUBSCRIPTION to "정기구독",
                 LivingArea.ONLINE_SHOPPING to "온라인 쇼핑",
@@ -360,23 +354,13 @@ class MissionSurveyQuestionCatalog {
             skipWhen = listOf(LivingArea.UNKNOWN),
             impacts = listOf(MissionSurveyImpact.MISSION_FILTER),
         ),
-        keyedNumber(
+        keyedFrequencyRange(
             MissionSurveyQuestionCode.LIVING_FREQUENCIES,
             "해당 소비는 얼마나 자주 발생하나요?",
             MissionSurveyQuestionCode.LIVING_AREAS,
             skipWhen = listOf(LivingArea.UNKNOWN),
-            rules = LivingArea.entries.filterNot { it == LivingArea.UNKNOWN }.map {
-                MissionSurveyNumericRule(
-                    it.code,
-                    if (it == LivingArea.SUBSCRIPTION) {
-                        SurveyFrequencyUnit.SUBSCRIPTION_COUNT
-                    } else {
-                        SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
-                    },
-                    0,
-                    if (it == LivingArea.SUBSCRIPTION) 20 else 31,
-                )
-            },
+            rules = LivingArea.entries.filterNot { it == LivingArea.UNKNOWN }
+                .map { frequencyRangeRule(it, it == LivingArea.SUBSCRIPTION) },
             impacts = listOf(MissionSurveyImpact.BASELINE_FREQUENCY),
         ),
         choice(
@@ -465,6 +449,25 @@ class MissionSurveyQuestionCatalog {
     ): MissionSurveyQuestionDefinition =
         numeric(code, prompt, SurveyAnswerType.NUMBER, dependsOn, skipWhen, rules, impacts)
 
+    private fun frequencyRange(
+        code: MissionSurveyQuestionCode,
+        prompt: String,
+        dependsOn: MissionSurveyQuestionCode,
+        skipWhen: List<MissionSurveyCode>,
+        impacts: List<MissionSurveyImpact>,
+    ): MissionSurveyQuestionDefinition =
+        MissionSurveyQuestionDefinition(
+            code = code.code,
+            prompt = prompt,
+            answerType = SurveyAnswerType.FREQUENCY_RANGE,
+            dependsOnQuestionCode = dependsOn.code,
+            skipWhenOptionCodes = skipWhen.map(MissionSurveyCode::code),
+            frequencyRangeOptions = WeeklyFrequencyRange.entries.map {
+                MissionSurveyFrequencyRangeOption(it.code, it.label, it.minimum, it.maximum)
+            },
+            impacts = impacts,
+        )
+
     private fun keyedNumber(
         code: MissionSurveyQuestionCode,
         prompt: String,
@@ -474,6 +477,41 @@ class MissionSurveyQuestionCatalog {
         impacts: List<MissionSurveyImpact>,
     ): MissionSurveyQuestionDefinition =
         numeric(code, prompt, SurveyAnswerType.KEYED_NUMBER, dependsOn, skipWhen, rules, impacts)
+
+    private fun keyedFrequencyRange(
+        code: MissionSurveyQuestionCode,
+        prompt: String,
+        dependsOn: MissionSurveyQuestionCode,
+        skipWhen: List<MissionSurveyCode>,
+        rules: List<MissionSurveyFrequencyRangeRule>,
+        impacts: List<MissionSurveyImpact>,
+    ): MissionSurveyQuestionDefinition =
+        MissionSurveyQuestionDefinition(
+            code = code.code,
+            prompt = prompt,
+            answerType = SurveyAnswerType.KEYED_FREQUENCY_RANGE,
+            dependsOnQuestionCode = dependsOn.code,
+            skipWhenOptionCodes = skipWhen.map(MissionSurveyCode::code),
+            frequencyRangeRules = rules,
+            impacts = impacts,
+        )
+
+    private fun frequencyRangeRule(
+        subject: MissionSurveyCode,
+        subscription: Boolean,
+    ): MissionSurveyFrequencyRangeRule =
+        MissionSurveyFrequencyRangeRule(
+            subjectOptionCode = subject.code,
+            unit = if (subscription) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS,
+            options = if (subscription) {
+                SubscriptionCountRange.entries.map(::rangeOption)
+            } else {
+                FourWeeklyFrequencyRange.entries.map(::rangeOption)
+            },
+        )
+
+    private fun rangeOption(range: SurveyFrequencyRange): MissionSurveyFrequencyRangeOption =
+        MissionSurveyFrequencyRangeOption(range.code, range.label, range.minimum, range.maximum)
 
     private fun numeric(
         code: MissionSurveyQuestionCode,

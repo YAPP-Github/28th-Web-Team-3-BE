@@ -69,31 +69,29 @@ class MissionSurveyAcceptanceTest(
             )
             .andExpect(jsonPath("$.categories[0].questions[1].skipWhenOptionCodes[0]").value("UNKNOWN"))
             .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[0].subjectOptionCode")
-                    .value("DELIVERY"),
+                jsonPath("$.categories[0].questions[1].answerType").value("FREQUENCY_RANGE"),
             )
-            .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[0].unit")
-                    .value("TIMES_PER_WEEK"),
-            )
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[0].minimum").value(0))
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[0].maximum").value(7))
-            .andExpect(
-                jsonPath("$.categories[0].questions[1].numericRules[2].subjectOptionCode")
-                    .value("PAID_BEVERAGE"),
-            )
-            .andExpect(jsonPath("$.categories[0].questions[1].numericRules[2].maximum").value(14))
+            .andExpect(jsonPath("$.categories[0].questions[1].frequencyRangeOptions[0].code").value("ONE_TO_TWO"))
+            .andExpect(jsonPath("$.categories[0].questions[1].frequencyRangeOptions[3].code").value("SEVEN_OR_MORE"))
             .andExpect(
                 jsonPath("$.categories[0].questions[2].exclusiveOptionCodes[0]")
                     .value("NO_ALTERNATIVE"),
             )
             .andExpect(
-                jsonPath("$.categories[1].questions[2].numericRules[0].unit")
+                jsonPath("$.categories[1].questions[2].answerType")
+                    .value("KEYED_FREQUENCY_RANGE"),
+            )
+            .andExpect(
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[0].unit")
                     .value("SUBSCRIPTION_COUNT"),
             )
             .andExpect(
-                jsonPath("$.categories[1].questions[2].numericRules[1].unit")
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[1].unit")
                     .value("TIMES_PER_FOUR_WEEKS"),
+            )
+            .andExpect(
+                jsonPath("$.categories[1].questions[2].frequencyRangeRules[0].options[2].code")
+                    .value("THREE_OR_MORE"),
             )
 
         mockMvc.perform(
@@ -104,6 +102,19 @@ class MissionSurveyAcceptanceTest(
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].subjectOptionCode").value("OTHER"))
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].minimumLength").value(1))
             .andExpect(jsonPath("$.categories[0].questions[0].textRules[0].maximumLength").value(50))
+            .andExpect(jsonPath("$.categories[0].questions[3].answerType").value("KEYED_FREQUENCY_RANGE"))
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[2].unit")
+                    .value("SUBSCRIPTION_COUNT"),
+            )
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[2].options[0].code")
+                    .value("ONE"),
+            )
+            .andExpect(
+                jsonPath("$.categories[0].questions[3].frequencyRangeRules[0].unit")
+                    .value("TIMES_PER_FOUR_WEEKS"),
+            )
             .andExpect(
                 jsonPath(
                     "$.categories[0].questions[4].conditionalOptionRules[0].dependsOnQuestionCode",
@@ -121,7 +132,7 @@ class MissionSurveyAcceptanceTest(
             )
 
         assertEquals(
-            (1..11).map(Int::toString),
+            (1..13).map(Int::toString),
             queryStrings(
                 """
                     SELECT version
@@ -140,7 +151,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 0,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "alternatives": ["PICKUP", "COOK"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -152,8 +163,8 @@ class MissionSurveyAcceptanceTest(
                 "spendingTypes": ["SUBSCRIPTION", "GOODS"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 20},
-                  {"spendingType": "GOODS", "count": 31}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"spendingType": "GOODS", "frequencyRange": "SEVEN_OR_MORE"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_BEFORE_BUYING"]
               },
@@ -163,8 +174,8 @@ class MissionSurveyAcceptanceTest(
 
         val putJson = putSurvey(token, request)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.schemaVersion").value("V2"))
-            .andExpect(jsonPath("$.meal.weeklyFrequency").value(0))
+            .andExpect(jsonPath("$.schemaVersion").value("V3"))
+            .andExpect(jsonPath("$.meal.weeklyFrequencyRange").value("ONE_TO_TWO"))
             .andExpect(jsonPath("$.meal.alternatives[0]").value("COOK"))
             .andExpect(jsonPath("$.meal.alternatives[1]").value("PICKUP"))
             .andExpect(jsonPath("$.hobby.hobbies[0]").value("READING"))
@@ -190,6 +201,19 @@ class MissionSurveyAcceptanceTest(
                     WHERE survey.guest_user_id = ?
                       AND answer.question_code = 'HOBBY_TYPES'
                       AND answer.answer_code = 'OTHER'
+                """.trimIndent(),
+                guestUserId(token),
+            ),
+        )
+        assertEquals(
+            listOf("ONE_TO_TWO:1"),
+            queryStrings(
+                """
+                    SELECT answer.range_code || ':' || CAST(answer.numeric_value AS VARCHAR)
+                    FROM mission_survey_answer answer
+                    JOIN mission_survey survey ON survey.id = answer.mission_survey_id
+                    WHERE survey.guest_user_id = ?
+                      AND answer.question_code = 'MEAL_FREQUENCY'
                 """.trimIndent(),
                 guestUserId(token),
             ),
@@ -240,7 +264,7 @@ class MissionSurveyAcceptanceTest(
 
         putSurvey(
             token,
-            MEAL_REQUEST.replace("\"weeklyFrequency\": 3", "\"weeklyFrequency\": 8"),
+            MEAL_REQUEST.replace("\"weeklyFrequencyRange\": \"THREE_TO_FOUR\"", "\"weeklyFrequencyRange\": \"INVALID\""),
         ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.name").value("MISSION_SURVEY_INVALID"))
 
@@ -312,7 +336,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "UNKNOWN",
-                "weeklyFrequency": 0,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "alternatives": ["NO_ALTERNATIVE"],
                 "reason": null,
                 "exclusions": ["NONE"]
@@ -325,7 +349,7 @@ class MissionSurveyAcceptanceTest(
                 "hobbies": ["READING"],
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "SUBSCRIPTION", "count": 1}],
+                "frequencies": [{"spendingType": "SUBSCRIPTION", "frequencyRange": "ONE"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -347,7 +371,7 @@ class MissionSurveyAcceptanceTest(
                 "hobbies": ["OTHER"],
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "frequencies": [{"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -359,7 +383,7 @@ class MissionSurveyAcceptanceTest(
                 "otherHobby": "보드게임",
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
-                "frequencies": [{"spendingType": "GOODS", "count": 1}],
+                "frequencies": [{"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
             }
@@ -495,21 +519,33 @@ class MissionSurveyAcceptanceTest(
             assertEquals(question.maxSelections, JsonPath.read(document, "$path.maxItems"), "${questionCode.code} maxItems")
         }
 
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.minimum"))
-        assertEquals(31, JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.count.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.minimum"))
-        assertEquals(31, JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.count.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.minimum"))
-        assertEquals(7, JsonPath.read(document, "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequency.maximum"))
-        assertEquals(0, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.minimum"))
-        assertEquals(14, JsonPath.read(document, "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.maximum"))
+        assertEquals(
+            "string",
+            JsonPath.read(document, "$.components.schemas.HobbyFrequencyRequest.properties.frequencyRange.type"),
+        )
+        assertEquals(
+            "string",
+            JsonPath.read(document, "$.components.schemas.LivingFrequencyRequest.properties.frequencyRange.type"),
+        )
+        assertTrue(
+            JsonPath.read<List<String>>(
+                document,
+                "$.components.schemas.TransportSurveyRequest.properties.weeklyFrequencyRange.type",
+            ).contains("string"),
+        )
+        assertTrue(
+            JsonPath.read<List<String>>(
+                document,
+                "$.components.schemas.MealSurveyRequest.properties.weeklyFrequencyRange.type",
+            ).contains("string"),
+        )
         assertEquals(50, JsonPath.read(document, "$.components.schemas.HobbySurveyRequest.properties.otherHobby.maxLength"))
 
         val mealFrequencyDescription: String = JsonPath.read(
             document,
-            "$.components.schemas.MealSurveyRequest.properties.weeklyFrequency.description",
+            "$.components.schemas.MealSurveyRequest.properties.weeklyFrequencyRange.description",
         )
-        assertTrue(mealFrequencyDescription.contains("PAID_BEVERAGE는 0~14"))
+        assertTrue(mealFrequencyDescription.contains("주간 이용 빈도 범위"))
         val hobbyFrequencyDescription: String = JsonPath.read(
             document,
             "$.components.schemas.HobbySurveyRequest.properties.frequencies.description",
@@ -520,11 +556,11 @@ class MissionSurveyAcceptanceTest(
             "$.components.schemas.HobbySurveyRequest.properties.otherHobby.description",
         )
         assertTrue(otherHobbyDescription.contains("OTHER가 포함되면 필수"))
-        val livingCountDescription: String = JsonPath.read(
+        val livingFrequencyDescription: String = JsonPath.read(
             document,
-            "$.components.schemas.LivingFrequencyRequest.properties.count.description",
+            "$.components.schemas.LivingFrequencyRequest.properties.frequencyRange.description",
         )
-        assertTrue(livingCountDescription.contains("SUBSCRIPTION은 구독 개수 0~20"))
+        assertTrue(livingFrequencyDescription.contains("SUBSCRIPTION은 1개·2개·3개 이상"))
     }
 
     private fun putSurvey(token: String, body: String): ResultActions =
@@ -610,7 +646,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -625,7 +661,7 @@ class MissionSurveyAcceptanceTest(
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -633,7 +669,7 @@ class MissionSurveyAcceptanceTest(
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },

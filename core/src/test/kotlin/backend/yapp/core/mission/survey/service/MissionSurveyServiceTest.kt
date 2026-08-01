@@ -6,6 +6,7 @@ import backend.yapp.core.mission.survey.domain.HobbySavingMethod
 import backend.yapp.core.mission.survey.domain.HobbySpendingRange
 import backend.yapp.core.mission.survey.domain.HobbySpendingType
 import backend.yapp.core.mission.survey.domain.HobbyType
+import backend.yapp.core.mission.survey.domain.FourWeeklyFrequencyRange
 import backend.yapp.core.mission.survey.domain.MealAlternative
 import backend.yapp.core.mission.survey.domain.MealExclusion
 import backend.yapp.core.mission.survey.domain.MealReason
@@ -17,6 +18,7 @@ import backend.yapp.core.mission.survey.domain.MissionSurveyQuestionCatalog
 import backend.yapp.core.mission.survey.domain.MissionSurveyReplaceCommand
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveyValidator
+import backend.yapp.core.mission.survey.domain.WeeklyFrequencyRange
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -124,6 +126,7 @@ class MissionSurveyServiceTest {
                     valueType = "NUMBER",
                     answerCode = HobbySpendingType.GOODS.code,
                     numericValue = 1,
+                    rangeCode = FourWeeklyFrequencyRange.ONE_TO_TWO.code,
                     unitCode = "TIMES_PER_FOUR_WEEKS",
                 ),
                 optionValue("HOBBY_SAVING_METHODS", HobbySavingMethod.WAIT_BEFORE_BUYING.code),
@@ -174,7 +177,7 @@ class MissionSurveyServiceTest {
         MissionSurveyReplaceCommand(
             meal = MealSurveyAnswers(
                 target = MealTarget.DELIVERY,
-                weeklyFrequency = 3,
+                weeklyFrequency = WeeklyFrequencyRange.THREE_TO_FOUR,
                 alternatives = listOf(MealAlternative.COOK),
                 reason = MealReason.TIME_OR_ENERGY,
                 exclusions = listOf(MealExclusion.NONE),

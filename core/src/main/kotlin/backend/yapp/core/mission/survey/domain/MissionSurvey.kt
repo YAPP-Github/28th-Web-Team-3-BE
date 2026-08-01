@@ -47,6 +47,7 @@ class MissionSurvey(
                 valueType = value.valueType,
                 answerCode = value.answerCode,
                 numericValue = value.numericValue,
+                rangeCode = value.rangeCode,
                 textValue = value.textValue,
                 unitCode = value.unitCode,
             )
@@ -61,6 +62,7 @@ data class MissionSurveyAnswerValue(
     val valueType: String,
     val answerCode: String,
     val numericValue: Int? = null,
+    val rangeCode: String? = null,
     val textValue: String? = null,
     val unitCode: String? = null,
 )

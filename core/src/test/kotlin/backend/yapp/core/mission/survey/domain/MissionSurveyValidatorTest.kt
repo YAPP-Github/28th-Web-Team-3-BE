@@ -53,7 +53,7 @@ class MissionSurveyValidatorTest {
             MissionSurveyReplaceCommand(
                 meal = validMeal(
                     target = MealTarget.UNKNOWN,
-                    weeklyFrequency = 0,
+                    weeklyFrequency = WeeklyFrequencyRange.ONE_TO_TWO,
                     reason = null,
                 ),
             ),
@@ -79,7 +79,10 @@ class MissionSurveyValidatorTest {
 
         assertInvalid(
             MissionSurveyReplaceCommand(
-                transport = validTransport(target = TransportTarget.UNKNOWN, weeklyFrequency = 0),
+                transport = validTransport(
+                    target = TransportTarget.UNKNOWN,
+                    weeklyFrequency = WeeklyFrequencyRange.ONE_TO_TWO,
+                ),
             ),
         )
         assertInvalid(
@@ -224,38 +227,26 @@ class MissionSurveyValidatorTest {
     }
 
     @Test
-    fun `meal frequency accepts zero and exact bounds`() {
+    fun `meal frequency accepts every configured range`() {
         listOf(
-            validMeal(target = MealTarget.DELIVERY, weeklyFrequency = 0),
-            validMeal(target = MealTarget.DELIVERY, weeklyFrequency = 7),
-            validMeal(target = MealTarget.PAID_BEVERAGE, weeklyFrequency = 14),
+            validMeal(weeklyFrequency = WeeklyFrequencyRange.ONE_TO_TWO),
+            validMeal(weeklyFrequency = WeeklyFrequencyRange.THREE_TO_FOUR),
+            validMeal(weeklyFrequency = WeeklyFrequencyRange.FIVE_TO_SIX),
+            validMeal(weeklyFrequency = WeeklyFrequencyRange.SEVEN_OR_MORE),
         ).forEach { meal ->
             validator.validate(MissionSurveyReplaceCommand(meal = meal))
         }
     }
 
     @Test
-    fun `meal and transport frequencies outside their branches are rejected`() {
-        listOf(
-            MissionSurveyReplaceCommand(meal = validMeal(weeklyFrequency = -1)),
-            MissionSurveyReplaceCommand(meal = validMeal(weeklyFrequency = 8)),
-            MissionSurveyReplaceCommand(
-                meal = validMeal(target = MealTarget.PAID_BEVERAGE, weeklyFrequency = 15),
-            ),
-            MissionSurveyReplaceCommand(transport = validTransport(weeklyFrequency = -1)),
-            MissionSurveyReplaceCommand(transport = validTransport(weeklyFrequency = 8)),
-        ).forEach(::assertInvalid)
-    }
-
-    @Test
-    fun `hobby keyed frequencies accept exact keys zero and both bounds`() {
+    fun `hobby keyed frequency ranges accept matching normal and subscription ranges`() {
         validator.validate(
             MissionSurveyReplaceCommand(
                 hobby = validHobby(
                     spendingTypes = listOf(HobbySpendingType.GOODS, HobbySpendingType.SUBSCRIPTION),
                     frequencies = listOf(
-                        HobbyFrequency(HobbySpendingType.SUBSCRIPTION, 20),
-                        HobbyFrequency(HobbySpendingType.GOODS, 0),
+                        HobbyFrequency(HobbySpendingType.SUBSCRIPTION, SubscriptionCountRange.THREE_OR_MORE),
+                        HobbyFrequency(HobbySpendingType.GOODS, FourWeeklyFrequencyRange.ONE_TO_TWO),
                     ),
                 ),
             ),
@@ -264,22 +255,22 @@ class MissionSurveyValidatorTest {
             MissionSurveyReplaceCommand(
                 hobby = validHobby(
                     spendingTypes = listOf(HobbySpendingType.GOODS),
-                    frequencies = listOf(HobbyFrequency(HobbySpendingType.GOODS, 31)),
+                    frequencies = listOf(HobbyFrequency(HobbySpendingType.GOODS, FourWeeklyFrequencyRange.SEVEN_OR_MORE)),
                 ),
             ),
         )
     }
 
     @Test
-    fun `hobby keyed frequencies reject missing duplicate extra and out-of-range keys`() {
+    fun `hobby keyed frequency ranges reject missing duplicate extra and mismatched ranges`() {
         listOf(
             emptyList(),
             listOf(
-                HobbyFrequency(HobbySpendingType.GOODS, 1),
-                HobbyFrequency(HobbySpendingType.GOODS, 2),
+                HobbyFrequency(HobbySpendingType.GOODS, FourWeeklyFrequencyRange.ONE_TO_TWO),
+                HobbyFrequency(HobbySpendingType.GOODS, FourWeeklyFrequencyRange.THREE_TO_FOUR),
             ),
-            listOf(HobbyFrequency(HobbySpendingType.SUBSCRIPTION, 1)),
-            listOf(HobbyFrequency(HobbySpendingType.GOODS, 32)),
+            listOf(HobbyFrequency(HobbySpendingType.SUBSCRIPTION, SubscriptionCountRange.ONE)),
+            listOf(HobbyFrequency(HobbySpendingType.GOODS, SubscriptionCountRange.ONE)),
         ).forEach { frequencies ->
             assertInvalid(
                 MissionSurveyReplaceCommand(
@@ -294,33 +285,33 @@ class MissionSurveyValidatorTest {
             MissionSurveyReplaceCommand(
                 hobby = validHobby(
                     spendingTypes = listOf(HobbySpendingType.SUBSCRIPTION),
-                    frequencies = listOf(HobbyFrequency(HobbySpendingType.SUBSCRIPTION, 21)),
+                    frequencies = listOf(HobbyFrequency(HobbySpendingType.SUBSCRIPTION, FourWeeklyFrequencyRange.ONE_TO_TWO)),
                 ),
             ),
         )
     }
 
     @Test
-    fun `living keyed frequencies accept exact keys and reject mismatches and ranges`() {
+    fun `living keyed frequency ranges accept matching normal and subscription ranges`() {
         validator.validate(
             MissionSurveyReplaceCommand(
                 living = validLiving(
                     areas = listOf(LivingArea.SUBSCRIPTION, LivingArea.ONLINE_SHOPPING),
                     frequencies = listOf(
-                        LivingFrequency(LivingArea.ONLINE_SHOPPING, 31),
-                        LivingFrequency(LivingArea.SUBSCRIPTION, 0),
+                        LivingFrequency(LivingArea.ONLINE_SHOPPING, FourWeeklyFrequencyRange.SEVEN_OR_MORE),
+                        LivingFrequency(LivingArea.SUBSCRIPTION, SubscriptionCountRange.ONE),
                     ),
                 ),
             ),
         )
 
         listOf(
-            listOf(LivingFrequency(LivingArea.SUBSCRIPTION, 1)),
+            listOf(LivingFrequency(LivingArea.SUBSCRIPTION, SubscriptionCountRange.ONE)),
             listOf(
-                LivingFrequency(LivingArea.ONLINE_SHOPPING, 1),
-                LivingFrequency(LivingArea.ONLINE_SHOPPING, 2),
+                LivingFrequency(LivingArea.ONLINE_SHOPPING, FourWeeklyFrequencyRange.ONE_TO_TWO),
+                LivingFrequency(LivingArea.ONLINE_SHOPPING, FourWeeklyFrequencyRange.THREE_TO_FOUR),
             ),
-            listOf(LivingFrequency(LivingArea.ONLINE_SHOPPING, 32)),
+            listOf(LivingFrequency(LivingArea.ONLINE_SHOPPING, SubscriptionCountRange.ONE)),
         ).forEach { frequencies ->
             assertInvalid(
                 MissionSurveyReplaceCommand(
@@ -335,7 +326,7 @@ class MissionSurveyValidatorTest {
             MissionSurveyReplaceCommand(
                 living = validLiving(
                     areas = listOf(LivingArea.SUBSCRIPTION),
-                    frequencies = listOf(LivingFrequency(LivingArea.SUBSCRIPTION, 21)),
+                    frequencies = listOf(LivingFrequency(LivingArea.SUBSCRIPTION, FourWeeklyFrequencyRange.ONE_TO_TWO)),
                 ),
             ),
         )
@@ -348,7 +339,7 @@ class MissionSurveyValidatorTest {
 
     private fun validMeal(
         target: MealTarget = MealTarget.DELIVERY,
-        weeklyFrequency: Int? = 3,
+        weeklyFrequency: WeeklyFrequencyRange? = WeeklyFrequencyRange.THREE_TO_FOUR,
         alternatives: List<MealAlternative> = listOf(MealAlternative.COOK),
         reason: MealReason? = MealReason.TIME_OR_ENERGY,
         exclusions: List<MealExclusion> = listOf(MealExclusion.NONE),
@@ -356,7 +347,7 @@ class MissionSurveyValidatorTest {
 
     private fun validTransport(
         target: TransportTarget = TransportTarget.TAXI,
-        weeklyFrequency: Int? = 2,
+        weeklyFrequency: WeeklyFrequencyRange? = WeeklyFrequencyRange.ONE_TO_TWO,
     ) = TransportSurveyAnswers(
         primaryMode = TransportPrimaryMode.TAXI,
         target = target,
@@ -370,7 +361,7 @@ class MissionSurveyValidatorTest {
         otherHobby: String? = null,
         spendingTypes: List<HobbySpendingType> = listOf(HobbySpendingType.GOODS),
         monthlySpendingRange: HobbySpendingRange? = HobbySpendingRange.UNDER_50K,
-        frequencies: List<HobbyFrequency> = listOf(HobbyFrequency(HobbySpendingType.GOODS, 1)),
+        frequencies: List<HobbyFrequency> = listOf(HobbyFrequency(HobbySpendingType.GOODS, FourWeeklyFrequencyRange.ONE_TO_TWO)),
         savingMethods: List<HobbySavingMethod> = listOf(HobbySavingMethod.WAIT_BEFORE_BUYING),
     ) = HobbySurveyAnswers(
         hobbies = hobbies,
@@ -384,7 +375,7 @@ class MissionSurveyValidatorTest {
     private fun validLiving(
         areas: List<LivingArea> = listOf(LivingArea.ONLINE_SHOPPING),
         monthlySpendingRange: LivingSpendingRange? = LivingSpendingRange.UNDER_30K,
-        frequencies: List<LivingFrequency> = listOf(LivingFrequency(LivingArea.ONLINE_SHOPPING, 1)),
+        frequencies: List<LivingFrequency> = listOf(LivingFrequency(LivingArea.ONLINE_SHOPPING, FourWeeklyFrequencyRange.ONE_TO_TWO)),
     ) = LivingSurveyAnswers(
         areas = areas,
         monthlySpendingRange = monthlySpendingRange,

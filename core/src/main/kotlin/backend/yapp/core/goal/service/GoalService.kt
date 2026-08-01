@@ -27,7 +27,7 @@ class GoalService(
     fun status(guestUserId: Long): GoalStatus = computeStatus(getOrCreateGoal(guestUserId))
 
     /**
-     * "현재 저축액 입력": 이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액은 온보딩 순자산 + 월별 합으로 재계산된다.
+     * "현재 저축액 입력": 이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액은 월별 합으로 재계산된다.
      */
     @Transactional
     fun setThisMonthSaving(guestUserId: Long, savedAmountManwon: Int): GoalStatus {
@@ -82,7 +82,7 @@ class GoalService(
         val monthEndExclusive = today.withDayOfMonth(1).plusMonths(1)
         val lastDayOfMonth = monthEndExclusive.minusDays(1)
 
-        val totalSaved = goal.baseAmountManwon + monthlySavingRepository.sumSavedByGuestUserId(goal.guestUserId).toInt()
+        val totalSaved = monthlySavingRepository.sumSavedByGuestUserId(goal.guestUserId).toInt()
         val thisMonthSaved = monthlySavingRepository
             .findByGuestUserIdAndYearMonth(goal.guestUserId, currentYearMonth())
             ?.savedAmountManwon ?: 0

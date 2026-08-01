@@ -69,8 +69,8 @@ interface MissionSurveyApi {
             (4) 마지막에는 같은 code를 사용해 선택한 모든 카테고리 응답을 한 번의 PUT으로 제출한다.
 
             분기 규칙:
-            - meal.target이 UNKNOWN이면 weeklyFrequency와 reason을 생략하거나 null로 보낸다.
-            - transport.target이 UNKNOWN이면 weeklyFrequency만 생략하거나 null로 보내며 reason은 필수다.
+            - meal.target이 UNKNOWN이면 weeklyFrequencyRange와 reason을 생략하거나 null로 보낸다.
+            - transport.target이 UNKNOWN이면 weeklyFrequencyRange만 생략하거나 null로 보내며 reason은 필수다.
             - hobby.hobbies에 OTHER가 포함되면 otherHobby에 앞뒤 공백을 제외한 1~50자 텍스트를 보내고,
               OTHER가 없으면 otherHobby를 생략하거나 null로 보낸다.
             - hobby.spendingTypes가 [DO_NOT_REDUCE]이면 monthlySpendingRange를 생략하거나 null로,
@@ -141,7 +141,7 @@ interface MissionSurveyApi {
             {
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -149,7 +149,7 @@ interface MissionSurveyApi {
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },
@@ -158,8 +158,8 @@ interface MissionSurveyApi {
                 "spendingTypes": ["SUBSCRIPTION", "GOODS"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 2},
-                  {"spendingType": "GOODS", "count": 3}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "TWO"},
+                  {"spendingType": "GOODS", "frequencyRange": "THREE_TO_FOUR"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_BEFORE_BUYING"]
               },
@@ -167,8 +167,8 @@ interface MissionSurveyApi {
                 "areas": ["SUBSCRIPTION", "ONLINE_SHOPPING"],
                 "monthlySpendingRange": "FROM_30K_TO_100K",
                 "frequencies": [
-                  {"area": "SUBSCRIPTION", "count": 3},
-                  {"area": "ONLINE_SHOPPING", "count": 4}
+                  {"area": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"area": "ONLINE_SHOPPING", "frequencyRange": "THREE_TO_FOUR"}
                 ],
                 "trigger": "DISCOUNT_OR_LIMITED_SALE",
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS", "WAIT_24_HOURS"]
@@ -221,7 +221,7 @@ interface MissionSurveyApi {
                 "spendingTypes": ["GOODS"],
                 "monthlySpendingRange": "UNDER_50K",
                 "frequencies": [
-                  {"spendingType": "GOODS", "count": 2}
+                  {"spendingType": "GOODS", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "savingMethods": ["WAIT_BEFORE_BUYING"]
               }
@@ -235,8 +235,8 @@ interface MissionSurveyApi {
                 "spendingTypes": ["SUBSCRIPTION", "TICKET"],
                 "monthlySpendingRange": "FROM_50K_TO_150K",
                 "frequencies": [
-                  {"spendingType": "SUBSCRIPTION", "count": 2},
-                  {"spendingType": "TICKET", "count": 1}
+                  {"spendingType": "SUBSCRIPTION", "frequencyRange": "TWO"},
+                  {"spendingType": "TICKET", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "savingMethods": ["REVIEW_SUBSCRIPTIONS"]
               },
@@ -244,8 +244,8 @@ interface MissionSurveyApi {
                 "areas": ["SUBSCRIPTION", "CLOTHING"],
                 "monthlySpendingRange": "FROM_100K_TO_300K",
                 "frequencies": [
-                  {"area": "SUBSCRIPTION", "count": 3},
-                  {"area": "CLOTHING", "count": 2}
+                  {"area": "SUBSCRIPTION", "frequencyRange": "THREE_OR_MORE"},
+                  {"area": "CLOTHING", "frequencyRange": "ONE_TO_TWO"}
                 ],
                 "trigger": "AD_OR_SOCIAL_MEDIA",
                 "savingMethods": ["WAIT_24_HOURS"]
@@ -255,10 +255,10 @@ interface MissionSurveyApi {
 
         private const val SURVEY_EXAMPLE = """
             {
-              "schemaVersion": "V2",
+              "schemaVersion": "V3",
               "meal": {
                 "target": "DELIVERY",
-                "weeklyFrequency": 3,
+                "weeklyFrequencyRange": "THREE_TO_FOUR",
                 "alternatives": ["COOK", "PICKUP"],
                 "reason": "TIME_OR_ENERGY",
                 "exclusions": ["NONE"]
@@ -266,7 +266,7 @@ interface MissionSurveyApi {
               "transport": {
                 "primaryMode": "TAXI",
                 "target": "TAXI",
-                "weeklyFrequency": 2,
+                "weeklyFrequencyRange": "ONE_TO_TWO",
                 "reason": "TIME_PRESSURE",
                 "exclusions": ["NONE"]
               },

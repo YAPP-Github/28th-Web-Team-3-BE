@@ -35,8 +35,7 @@ class MissionSurveyValidator(
         if (answers.target == MealTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null && answers.reason == null)
         } else {
-            val weeklyFrequency = requireValue(answers.weeklyFrequency)
-            requireNumeric(MissionSurveyQuestionCode.MEAL_FREQUENCY, answers.target, weeklyFrequency)
+            requireValid(answers.weeklyFrequency != null)
             requireValid(answers.reason != null)
         }
     }
@@ -46,8 +45,7 @@ class MissionSurveyValidator(
         if (answers.target == TransportTarget.UNKNOWN) {
             requireValid(answers.weeklyFrequency == null)
         } else {
-            val weeklyFrequency = requireValue(answers.weeklyFrequency)
-            requireNumeric(MissionSurveyQuestionCode.TRANSPORT_FREQUENCY, answers.target, weeklyFrequency)
+            requireValid(answers.weeklyFrequency != null)
         }
     }
 
@@ -77,7 +75,7 @@ class MissionSurveyValidator(
         requireValid(answers.frequencies.size == answers.spendingTypes.size)
         answers.frequencies.forEach {
             requireValid(it.spendingType != HobbySpendingType.DO_NOT_REDUCE)
-            requireNumeric(MissionSurveyQuestionCode.HOBBY_FREQUENCIES, it.spendingType, it.count)
+            requireFrequencyRange(it.range, unitFor(it.spendingType))
         }
     }
 
@@ -118,7 +116,7 @@ class MissionSurveyValidator(
         requireValid(answers.frequencies.size == answers.areas.size)
         answers.frequencies.forEach {
             requireValid(it.area != LivingArea.UNKNOWN)
-            requireNumeric(MissionSurveyQuestionCode.LIVING_FREQUENCIES, it.area, it.count)
+            requireFrequencyRange(it.range, unitFor(it.area))
         }
     }
 
@@ -143,6 +141,25 @@ class MissionSurveyValidator(
             .singleOrNull { it.subjectOptionCode == subject.code }
         requireValid(rule != null && value in rule.minimum..rule.maximum)
     }
+
+    private fun requireFrequencyRange(
+        range: SurveyFrequencyRange,
+        unit: SurveyFrequencyUnit,
+    ) {
+        requireValid(
+            when (unit) {
+                SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS -> range is FourWeeklyFrequencyRange
+                SurveyFrequencyUnit.SUBSCRIPTION_COUNT -> range is SubscriptionCountRange
+                else -> false
+            },
+        )
+    }
+
+    private fun unitFor(type: HobbySpendingType): SurveyFrequencyUnit =
+        if (type == HobbySpendingType.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
+
+    private fun unitFor(area: LivingArea): SurveyFrequencyUnit =
+        if (area == LivingArea.SUBSCRIPTION) SurveyFrequencyUnit.SUBSCRIPTION_COUNT else SurveyFrequencyUnit.TIMES_PER_FOUR_WEEKS
 
     private fun <T, D> requireConditionalOptions(
         values: List<T>,
