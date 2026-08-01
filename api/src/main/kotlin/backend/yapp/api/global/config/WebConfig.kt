@@ -13,12 +13,11 @@ class WebConfig(
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/**")
             .allowedOriginPatterns(
-                "https://localhost:3000",
-                "http://localhost:3000",
-                "http://localhost:8080",
-                deploymentUrl,
-                "https://28th-web-team-3-fe-web-dev.vercel.app",
-                "https://28th-web-team-3-fe-web.vercel.app",
+                // TODO: Restrict this to trusted frontend origins after testing.
+                "*",
+                // deploymentUrl,
+                // "https://28th-web-team-3-fe-web-dev.vercel.app",
+                // "https://28th-web-team-3-fe-web.vercel.app",
             )
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")

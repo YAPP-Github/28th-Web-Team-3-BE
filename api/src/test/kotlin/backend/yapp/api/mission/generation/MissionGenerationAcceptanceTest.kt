@@ -68,6 +68,30 @@ class MissionGenerationAcceptanceTest(
     }
 
     @Test
+    fun `generation confirms more than four drafts across categories`() {
+        val token = issueReadyGuest()
+        val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
+        insertTransportSurveyAnswer(guestUserId)
+        val jobId = requestJob(token)
+        awaitSucceeded(token, jobId)
+
+        val draftsJson = mockMvc.perform(
+            get("$GENERATION_PATH/$jobId/drafts")
+                .header("Authorization", "Bearer $token"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.categories.length()").value(2))
+            .andExpect(jsonPath("$.categories[0].drafts.length()").value(4))
+            .andExpect(jsonPath("$.categories[1].drafts.length()").value(4))
+            .andReturn().response.contentAsString
+        val draftIds: List<String> = JsonPath.read(draftsJson, "$.categories[*].drafts[*].id")
+        val request = draftIds.take(5).joinToString(",") { "\"$it\"" }
+
+        confirm(token, jobId, "{\"selectedDraftIds\":[$request]}")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.missions.length()").value(5))
+    }
+
+    @Test
     fun `generation validates prerequisites ownership and selection size`() {
         val incompleteToken = issueGuestToken()
         mockMvc.perform(
@@ -212,6 +236,30 @@ class MissionGenerationAcceptanceTest(
                     INSERT INTO mission_survey_answer
                         (mission_survey_id, category_code, question_code, value_type, answer_code)
                     VALUES (?, 'MEAL', 'MEAL_TARGET', 'OPTION', 'DELIVERY')
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, surveyId)
+                statement.executeUpdate()
+            }
+        }
+    }
+
+    private fun insertTransportSurveyAnswer(guestUserId: Long) {
+        dataSource.connection.use { connection ->
+            val surveyId = connection.prepareStatement(
+                "SELECT id FROM mission_survey WHERE guest_user_id = ?",
+            ).use { statement ->
+                statement.setLong(1, guestUserId)
+                statement.executeQuery().use { result ->
+                    check(result.next())
+                    result.getLong(1)
+                }
+            }
+            connection.prepareStatement(
+                """
+                    INSERT INTO mission_survey_answer
+                        (mission_survey_id, category_code, question_code, value_type, answer_code)
+                    VALUES (?, 'TRANSPORT', 'TRANSPORT_TARGET', 'OPTION', 'TAXI')
                 """.trimIndent(),
             ).use { statement ->
                 statement.setLong(1, surveyId)

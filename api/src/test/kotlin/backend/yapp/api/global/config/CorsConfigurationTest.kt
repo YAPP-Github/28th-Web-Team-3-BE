@@ -18,12 +18,15 @@ class CorsConfigurationTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
-    fun `localhost frontend preflight request is allowed`() {
+    fun `any frontend origin preflight request is allowed with credentials`() {
+        val origin = "https://temporary-test.example.com"
+
         mockMvc.perform(
             options("/api/goal")
-                .header(HttpHeaders.ORIGIN, "http://localhost:3000")
+                .header(HttpHeaders.ORIGIN, origin)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"),
         ).andExpect(status().isOk)
-            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
     }
 }
