@@ -126,10 +126,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gcloud iam service-accounts describe "mission-tasks-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
-            --project "${GCP_PROJECT_ID}" >/dev/null
-          gcloud iam service-accounts describe "mission-scheduler-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
-            --project "${GCP_PROJECT_ID}" >/dev/null
           if gcloud tasks queues describe "${MISSION_QUEUE}" --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" >/dev/null 2>&1; then
             queue_command=update
           else
