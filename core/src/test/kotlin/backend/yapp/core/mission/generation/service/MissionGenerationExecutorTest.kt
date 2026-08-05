@@ -7,6 +7,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
 import java.util.UUID
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.verify
@@ -35,7 +36,7 @@ class MissionGenerationExecutorTest {
                 ),
             ),
         )
-        `when`(workService.prepare(jobId)).thenReturn(work)
+        `when`(workService.prepare(jobId)).thenReturn(MissionGenerationPreparation.Claimed(work))
         `when`(
             generator.generate(
                 MissionDraftContentRequest(
@@ -46,10 +47,11 @@ class MissionGenerationExecutorTest {
             ),
         ).thenThrow(IllegalStateException("provider failed"))
 
-        MissionGenerationExecutor(workService, generator).execute(jobId)
+        assertFailsWith<IllegalStateException> {
+            MissionGenerationExecutor(workService, generator).execute(jobId)
+        }
 
         verify(workService).prepare(jobId)
-        verify(workService).fail(jobId, "MISSION_GENERATION_EXECUTION_FAILED")
         verifyNoMoreInteractions(workService)
     }
 }

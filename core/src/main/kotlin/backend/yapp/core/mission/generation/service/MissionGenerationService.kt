@@ -6,6 +6,8 @@ import backend.yapp.core.mission.generation.domain.ConfirmationResult
 import backend.yapp.core.mission.generation.domain.Mission
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJob
+import backend.yapp.core.mission.generation.domain.MissionGenerationOutbox
+import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionRepository
@@ -20,7 +22,6 @@ import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.UUID
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -31,8 +32,8 @@ class MissionGenerationService(
     private val missionRepository: MissionRepository,
     private val onboardingProfileRepository: OnboardingProfileRepository,
     private val surveyRepository: MissionSurveyRepository,
-    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
+    private val outboxRepository: MissionGenerationOutboxRepository,
 ) {
     @Transactional
     fun request(guestUserId: Long): MissionGenerationJobSnapshot {
@@ -59,7 +60,14 @@ class MissionGenerationService(
                 createdAt = now,
             ),
         )
-        eventPublisher.publishEvent(MissionGenerationRequestedEvent(job.id))
+        outboxRepository.save(
+            MissionGenerationOutbox(
+                id = UUID.randomUUID(),
+                jobId = job.id,
+                nextAttemptAt = now,
+                createdAt = now,
+            ),
+        )
         return job.toSnapshot()
     }
 

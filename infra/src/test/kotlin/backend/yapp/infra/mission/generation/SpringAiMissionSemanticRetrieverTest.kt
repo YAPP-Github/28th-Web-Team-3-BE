@@ -39,10 +39,12 @@ class SpringAiMissionSemanticRetrieverTest {
     }
 
     @Test
-    fun `caches catalog embeddings and embeds only query after first request`() {
+    fun `embeds catalog in bounded batches for every request`() {
         val calls = AtomicInteger()
+        val batchSizes = mutableListOf<Int>()
         val client = MissionEmbeddingClient { inputs ->
             calls.incrementAndGet()
+            batchSizes += inputs.size
             inputs.map { input ->
                 if ("택시" in input) floatArrayOf(1.0f, 0.0f) else floatArrayOf(0.0f, 1.0f)
             }
@@ -50,23 +52,15 @@ class SpringAiMissionSemanticRetrieverTest {
         val retriever = SpringAiMissionSemanticRetriever(client, "google-genai", "test-model:2")
         val request = MissionSemanticRetrievalRequest(
             query = "택시 줄이기",
-            candidates = listOf(
-                MissionSemanticDocument(1, "택시를 대중교통으로 대체"),
-                MissionSemanticDocument(2, "취미 구독 점검"),
-            ),
+            candidates = (1L..33L).map { id ->
+                MissionSemanticDocument(id, if (id == 1L) "택시를 대중교통으로 대체" else "취미 구독 점검 $id")
+            },
         )
 
         val first = retriever.retrieve(request)
         val second = retriever.retrieve(request)
-        retriever.retrieve(
-            request.copy(
-                candidates = request.candidates.map {
-                    if (it.templateId == 2L) it.copy(text = "변경된 취미 구독 문서") else it
-                },
-            ),
-        )
-
-        assertEquals(5, calls.get())
+        assertEquals(8, calls.get())
+        assertEquals(listOf(1, 16, 16, 1, 1, 16, 16, 1), batchSizes)
         assertTrue(first.scores.getValue(1) > first.scores.getOrDefault(2, 0.0))
         assertEquals(first.scores, second.scores)
     }

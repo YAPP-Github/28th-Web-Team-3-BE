@@ -43,5 +43,3 @@ data class MissionSnapshot(
     val savingsEstimateVersion: String,
     val status: String,
 )
-
-data class MissionGenerationRequestedEvent(val jobId: UUID)

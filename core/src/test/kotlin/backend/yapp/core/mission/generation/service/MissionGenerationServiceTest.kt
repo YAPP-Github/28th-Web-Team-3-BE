@@ -4,6 +4,7 @@ import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJob
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
+import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
 import backend.yapp.core.mission.generation.domain.MissionRepository
 import backend.yapp.core.mission.survey.domain.MissionSurvey
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
@@ -20,7 +21,6 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.context.ApplicationEventPublisher
 
 class MissionGenerationServiceTest {
     private val now = Instant.parse("2026-07-23T00:00:00Z")
@@ -51,8 +51,8 @@ class MissionGenerationServiceTest {
         verify(fixture.jobRepository, never()).saveAndFlush(
             org.mockito.ArgumentMatchers.any(MissionGenerationJob::class.java),
         )
-        verify(fixture.eventPublisher, never()).publishEvent(
-            org.mockito.ArgumentMatchers.any(MissionGenerationRequestedEvent::class.java),
+        verify(fixture.outboxRepository, never()).save(
+            org.mockito.ArgumentMatchers.any(),
         )
     }
 
@@ -62,22 +62,22 @@ class MissionGenerationServiceTest {
         val surveyRepository = mock(MissionSurveyRepository::class.java)
         val draftRepository = mock(MissionDraftRepository::class.java)
         val missionRepository = mock(MissionRepository::class.java)
-        val eventPublisher = mock(ApplicationEventPublisher::class.java)
+        val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)
         val service = MissionGenerationService(
             jobRepository = jobRepository,
             draftRepository = draftRepository,
             missionRepository = missionRepository,
             onboardingProfileRepository = onboardingRepository,
             surveyRepository = surveyRepository,
-            eventPublisher = eventPublisher,
             clock = Clock.fixed(now, ZoneOffset.UTC),
+            outboxRepository = outboxRepository,
         )
         return Fixture(
             service,
             jobRepository,
             onboardingRepository,
             surveyRepository,
-            eventPublisher,
+            outboxRepository,
         )
     }
 
@@ -86,7 +86,7 @@ class MissionGenerationServiceTest {
         val jobRepository: MissionGenerationJobRepository,
         val onboardingRepository: OnboardingProfileRepository,
         val surveyRepository: MissionSurveyRepository,
-        val eventPublisher: ApplicationEventPublisher,
+        val outboxRepository: MissionGenerationOutboxRepository,
     )
 
     companion object {

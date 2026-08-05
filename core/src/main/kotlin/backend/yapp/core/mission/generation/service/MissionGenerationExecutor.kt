@@ -4,7 +4,6 @@ import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionDraft
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
-import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
@@ -13,10 +12,8 @@ import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import java.time.Clock
 import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -24,32 +21,33 @@ class MissionGenerationExecutor(
     private val workService: MissionGenerationWorkService,
     private val contentGenerator: MissionDraftContentGenerator,
 ) {
-    fun execute(jobId: UUID) {
-        val work = workService.prepare(jobId) ?: return
-        try {
-            if (work.candidates.isEmpty()) {
-                workService.complete(
-                    work = work,
-                    copiesByTemplateId = emptyMap(),
-                    generationSource = backend.yapp.core.mission.generation.port.MissionDraftGenerationSource.TEMPLATE_FALLBACK,
-                )
-                return
-            }
-            val result = contentGenerator.generate(
-                MissionDraftContentRequest(
-                    jobId = work.jobId,
-                    guestUserId = work.guestUserId,
-                    candidates = work.candidates,
-                ),
-            )
+    fun execute(jobId: UUID): MissionGenerationExecutionResult {
+        val work = when (val preparation = workService.prepare(jobId)) {
+            is MissionGenerationPreparation.Claimed -> preparation.work
+            MissionGenerationPreparation.ActiveLease -> return MissionGenerationExecutionResult.ACTIVE_LEASE
+            MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
+        }
+        if (work.candidates.isEmpty()) {
             workService.complete(
                 work = work,
-                copiesByTemplateId = result.copies.associateBy { it.templateId },
-                generationSource = result.source,
+                copiesByTemplateId = emptyMap(),
+                generationSource = backend.yapp.core.mission.generation.port.MissionDraftGenerationSource.TEMPLATE_FALLBACK,
             )
-        } catch (ex: Exception) {
-            workService.fail(jobId, "MISSION_GENERATION_EXECUTION_FAILED")
+            return MissionGenerationExecutionResult.COMPLETED
         }
+        val result = contentGenerator.generate(
+            MissionDraftContentRequest(
+                jobId = work.jobId,
+                guestUserId = work.guestUserId,
+                candidates = work.candidates,
+            ),
+        )
+        workService.complete(
+            work = work,
+            copiesByTemplateId = result.copies.associateBy { it.templateId },
+            generationSource = result.source,
+        )
+        return MissionGenerationExecutionResult.COMPLETED
     }
 }
 
@@ -63,9 +61,16 @@ class MissionGenerationWorkService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun prepare(jobId: UUID): MissionGenerationWork? {
-        val job = jobRepository.findByIdForUpdate(jobId) ?: return null
-        if (!job.start(clock.instant())) return null
+    fun prepare(jobId: UUID): MissionGenerationPreparation {
+        val job = jobRepository.findByIdForUpdate(jobId) ?: return MissionGenerationPreparation.Skipped
+        val now = clock.instant()
+        if (job.status == backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus.RUNNING &&
+            job.leaseExpiresAt?.isAfter(now) == true
+        ) {
+            return MissionGenerationPreparation.ActiveLease
+        }
+        val leaseToken = UUID.randomUUID()
+        if (!job.claim(now, leaseToken, DEFAULT_LEASE_DURATION)) return MissionGenerationPreparation.Skipped
 
         val survey = surveyRepository.findByGuestUserId(job.guestUserId)
             ?: error("Mission survey disappeared before generation")
@@ -77,7 +82,9 @@ class MissionGenerationWorkService(
             .flatMap { (_, categoryCandidates) -> categoryCandidates.take(MAX_DRAFTS_PER_CATEGORY) }
         tracePort.linkToJob(job.guestUserId, job.id)
 
-        return MissionGenerationWork(job.id, job.guestUserId, candidates)
+        return MissionGenerationPreparation.Claimed(
+            MissionGenerationWork(job.id, job.guestUserId, candidates, leaseToken),
+        )
     }
 
     @Transactional
@@ -87,7 +94,7 @@ class MissionGenerationWorkService(
         generationSource: backend.yapp.core.mission.generation.port.MissionDraftGenerationSource,
     ) {
         val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
-        if (job.status != MissionGenerationJobStatus.RUNNING) return
+        if (!job.ownsLease(work.leaseToken, clock.instant())) return
 
         val now = clock.instant()
         val drafts = work.candidates.map { candidate ->
@@ -115,27 +122,8 @@ class MissionGenerationWorkService(
         tracePort.markShown(job.id, drafts.map { it.templateId }.toSet())
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun fail(jobId: UUID, failureCode: String) {
-        jobRepository.findByIdForUpdate(jobId)?.fail(failureCode, clock.instant())
-    }
-
-    @Transactional
-    fun failStaleActive(cutoff: Instant): Int {
-        val now = clock.instant()
-        return jobRepository.failStaleActive(
-            activeStatuses = listOf(
-                MissionGenerationJobStatus.PENDING,
-                MissionGenerationJobStatus.RUNNING,
-            ),
-            failed = MissionGenerationJobStatus.FAILED,
-            failureCode = "MISSION_GENERATION_INTERRUPTED",
-            cutoff = cutoff,
-            now = now,
-        )
-    }
-
     companion object {
+        private val DEFAULT_LEASE_DURATION: Duration = Duration.ofMinutes(10)
         private const val MAX_DRAFTS_PER_CATEGORY = 4
         private const val MAX_TITLE_LENGTH = 120
         private const val MAX_DESCRIPTION_LENGTH = 500
@@ -147,4 +135,17 @@ data class MissionGenerationWork(
     val jobId: UUID,
     val guestUserId: Long,
     val candidates: List<MissionDraftCandidate>,
+    val leaseToken: UUID = UUID.randomUUID(),
 )
+
+sealed interface MissionGenerationPreparation {
+    data class Claimed(val work: MissionGenerationWork) : MissionGenerationPreparation
+    data object ActiveLease : MissionGenerationPreparation
+    data object Skipped : MissionGenerationPreparation
+}
+
+enum class MissionGenerationExecutionResult {
+    COMPLETED,
+    ACTIVE_LEASE,
+    SKIPPED,
+}

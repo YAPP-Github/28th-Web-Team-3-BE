@@ -72,6 +72,9 @@ jobs:
       WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
       DEPLOY_SERVICE_ACCOUNT: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
       SERVER_URL: ${{ vars.SERVER_URL }}
+      MISSION_WORKER_SERVICE: mission-generation-worker
+      MISSION_DISPATCHER_SERVICE: mission-generation-dispatcher
+      MISSION_QUEUE: mission-generation
 
     steps:
       - name: Checkout
@@ -119,7 +122,97 @@ jobs:
           docker build --tag "${IMAGE_URI}" .
           docker push "${IMAGE_URI}"
 
-      - name: Deploy to Cloud Run
+      - name: Verify and update mission queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud iam service-accounts describe "mission-tasks-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+            --project "${GCP_PROJECT_ID}" >/dev/null
+          gcloud iam service-accounts describe "mission-scheduler-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
+            --project "${GCP_PROJECT_ID}" >/dev/null
+          if gcloud tasks queues describe "${MISSION_QUEUE}" --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" >/dev/null 2>&1; then
+            queue_command=update
+          else
+            queue_command=create
+          fi
+          gcloud tasks queues "${queue_command}" "${MISSION_QUEUE}" \
+              --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
+              --max-attempts 5 --max-concurrent-dispatches 1 --max-dispatches-per-second 1 \
+              --min-backoff 10s --max-backoff 300s --quiet
+          gcloud tasks queues add-iam-policy-binding "${MISSION_QUEUE}" \
+            --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
+            --member "serviceAccount:${RUNTIME_SERVICE_ACCOUNT}" \
+            --role roles/cloudtasks.enqueuer --quiet
+          enqueuer_role="$(gcloud tasks queues get-iam-policy "${MISSION_QUEUE}" \
+            --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
+            --flatten 'bindings[].members' \
+            --filter "bindings.role=roles/cloudtasks.enqueuer AND bindings.members=serviceAccount:${RUNTIME_SERVICE_ACCOUNT}" \
+            --format 'value(bindings.role)')"
+          test "${enqueuer_role}" = roles/cloudtasks.enqueuer
+
+      - name: Deploy mission worker
+        env:
+          IMAGE_URI: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
+        run: |
+          gcloud run deploy "${MISSION_WORKER_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${IMAGE_URI}" \
+            --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
+            --memory "1Gi" \
+            --concurrency 1 \
+            --timeout 600 \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-worker,AI_ACTIVATION=on,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
+            --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest,SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_GENAI_API_KEY=GOOGLE_GENAI_API_KEY:latest" \
+            --no-allow-unauthenticated \
+            --quiet
+
+      - name: Deploy mission dispatcher
+        env:
+          IMAGE_URI: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          worker_url="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format 'value(status.url)')"
+          tasks_invoker="mission-tasks-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+          gcloud run deploy "${MISSION_DISPATCHER_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${IMAGE_URI}" \
+            --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
+            --memory "512Mi" \
+            --concurrency 1 \
+            --timeout 300 \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-dispatcher,AI_ACTIVATION=off,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,MISSION_GENERATION_DELIVERY_ENABLED=true,MISSION_GENERATION_DELIVERY_PROJECT_ID=${GCP_PROJECT_ID},MISSION_GENERATION_DELIVERY_LOCATION=${GCP_REGION},MISSION_GENERATION_DELIVERY_QUEUE=${MISSION_QUEUE},MISSION_GENERATION_WORKER_URL=${worker_url},MISSION_GENERATION_TASKS_OIDC_SERVICE_ACCOUNT=${tasks_invoker},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
+            --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest,SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
+            --no-allow-unauthenticated \
+            --quiet
+          gcloud run services add-iam-policy-binding "${MISSION_WORKER_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+            --member "serviceAccount:${tasks_invoker}" --role roles/run.invoker --quiet
+
+      - name: Configure mission dispatcher schedule
+        shell: bash
+        run: |
+          set -euo pipefail
+          dispatcher_url="$(gcloud run services describe "${MISSION_DISPATCHER_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format 'value(status.url)')"
+          scheduler_invoker="mission-scheduler-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+          gcloud run services add-iam-policy-binding "${MISSION_DISPATCHER_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+            --member "serviceAccount:${scheduler_invoker}" --role roles/run.invoker --quiet
+          if gcloud scheduler jobs describe mission-generation-dispatch --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+            gcloud scheduler jobs update http mission-generation-dispatch \
+              --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" --schedule '* * * * *' \
+              --uri "${dispatcher_url}/internal/mission-generation/dispatch" --http-method POST \
+              --oidc-service-account-email "${scheduler_invoker}" --oidc-token-audience "${dispatcher_url}" --quiet
+          else
+            gcloud scheduler jobs create http mission-generation-dispatch \
+              --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" --schedule '* * * * *' \
+              --uri "${dispatcher_url}/internal/mission-generation/dispatch" --http-method POST \
+              --oidc-service-account-email "${scheduler_invoker}" --oidc-token-audience "${dispatcher_url}" --quiet
+          fi
+
+      - name: Deploy public API to Cloud Run
         env:
           IMAGE_URI: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPOSITORY }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
         run: |
@@ -128,8 +221,9 @@ jobs:
             --region "${GCP_REGION}" \
             --image "${IMAGE_URI}" \
             --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
-            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,AI_ACTIVATION=on,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GOOGLE_CLOUD_LOCATION=${GCP_REGION},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
+            --memory "1Gi" \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=api,AI_ACTIVATION=off,MISSION_GENERATION_DELIVERY_ENABLED=false,JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest" \
-            --set-secrets "SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_GENAI_API_KEY=GOOGLE_GENAI_API_KEY:latest" \
+            --set-secrets "SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
             --allow-unauthenticated \
             --quiet

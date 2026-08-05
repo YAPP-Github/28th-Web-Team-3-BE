@@ -34,6 +34,14 @@ interface MissionGenerationJobRepository : JpaRepository<MissionGenerationJob, U
     @Query("select job from MissionGenerationJob job where job.id = :id")
     fun findByIdForUpdate(@Param("id") id: UUID): MissionGenerationJob?
 
+    @Query(
+        value = "select * from mission_generation_job where status = 'RUNNING' " +
+            "and (lease_expires_at is null or lease_expires_at <= :now) " +
+            "order by updated_at asc limit 100 for update skip locked",
+        nativeQuery = true,
+    )
+    fun findRecoverableRunning(@Param("now") now: Instant): List<MissionGenerationJob>
+
     @Modifying
     @Query(
         "update MissionGenerationJob job set job.status = :failed, job.failureCode = :failureCode, " +
@@ -48,6 +56,24 @@ interface MissionGenerationJobRepository : JpaRepository<MissionGenerationJob, U
         @Param("cutoff") cutoff: Instant,
         @Param("now") now: Instant,
     ): Int
+}
+
+interface MissionGenerationOutboxRepository : JpaRepository<MissionGenerationOutbox, UUID> {
+    fun findByJobIdAndGeneration(jobId: UUID, generation: Int): MissionGenerationOutbox?
+
+    @Query(
+        value = "select * from mission_generation_outbox " +
+            "where status in ('CREATED', 'CLAIMED') and next_attempt_at <= :now " +
+            "order by created_at asc limit 100 for update skip locked",
+        nativeQuery = true,
+    )
+    fun findDueForUpdate(@Param("now") now: Instant): List<MissionGenerationOutbox>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select outbox from MissionGenerationOutbox outbox where outbox.id = :id")
+    fun findByIdForUpdate(@Param("id") id: UUID): MissionGenerationOutbox?
+
+    fun findTopByJobIdOrderByGenerationDesc(jobId: UUID): MissionGenerationOutbox?
 }
 
 interface MissionDraftTemplateRepository : JpaRepository<MissionDraftTemplate, Long> {

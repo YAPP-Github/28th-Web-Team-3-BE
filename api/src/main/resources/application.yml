@@ -5,16 +5,12 @@ spring:
     google:
       genai:
         api-key: ${GOOGLE_GENAI_API_KEY:}
-        project-id: ${GOOGLE_CLOUD_PROJECT:}
-        location: ${GOOGLE_CLOUD_LOCATION:}
         chat:
           model: ${GEMINI_CHAT_MODEL:gemini-3.1-flash-lite}
           temperature: ${GEMINI_TEMPERATURE:0.2}
           max-output-tokens: ${GEMINI_MAX_OUTPUT_TOKENS:2000}
         embedding:
           api-key: ${GOOGLE_GENAI_API_KEY:}
-          project-id: ${GOOGLE_CLOUD_PROJECT:}
-          location: ${GOOGLE_CLOUD_LOCATION:}
           text:
             model: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}
             dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:256}
@@ -38,6 +34,7 @@ springdoc:
     path: /v3/api-docs
 
 app:
+  role: ${APP_ROLE:api}
   server:
     deployment-url: ${SERVER_URL}
 
@@ -63,6 +60,13 @@ mission:
     ai-activation: off
     stale-running-timeout: PT10M
     recovery-interval-millis: 60000
+    delivery:
+      enabled: ${MISSION_GENERATION_DELIVERY_ENABLED:false}
+      project-id: ${MISSION_GENERATION_DELIVERY_PROJECT_ID:}
+      location: ${MISSION_GENERATION_DELIVERY_LOCATION:asia-northeast3}
+      queue: ${MISSION_GENERATION_DELIVERY_QUEUE:mission-generation}
+      worker-url: ${MISSION_GENERATION_WORKER_URL:}
+      oidc-service-account: ${MISSION_GENERATION_TASKS_OIDC_SERVICE_ACCOUNT:}
     prompt:
       version: ${MISSION_PROMPT_VERSION:mission-copy-v1}
       system-instruction: >-
@@ -74,10 +78,6 @@ mission:
       user-instruction: >-
         모든 후보를 정확히 한 번씩 반환하세요.
         입력에 없는 후보를 추가하거나 누락하지 말고 title과 description에 목표 횟수나 절약액을 새로 만들지 마세요.
-    executor:
-      core-pool-size: 2
-      max-pool-size: 4
-      queue-capacity: 50
     recommendation:
       provider: ${MISSION_RECOMMENDATION_PROVIDER:personalized}
       algorithm-version: rule-v1

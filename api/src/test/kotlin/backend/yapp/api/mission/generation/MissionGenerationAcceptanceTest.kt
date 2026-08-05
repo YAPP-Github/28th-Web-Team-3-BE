@@ -1,5 +1,7 @@
 package backend.yapp.api.mission.generation
 
+import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
+import backend.yapp.core.mission.generation.service.MissionGenerationDeliveryTransactions
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
 import java.sql.Statement
@@ -26,11 +28,24 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 class MissionGenerationAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val dataSource: DataSource,
+    @Autowired private val missionGenerationExecutor: MissionGenerationExecutor,
+    @Autowired private val deliveryTransactions: MissionGenerationDeliveryTransactions,
 ) {
+    @Test
+    fun `dispatcher atomically claims a due outbox row`() {
+        val token = issueReadyGuest()
+        val jobId = requestJob(token)
+
+        val claimed = deliveryTransactions.claimDue()
+
+        assertTrue(claimed.any { it.jobId == UUID.fromString(jobId) })
+    }
+
     @Test
     fun `generation flow returns drafts and confirms selected missions idempotently`() {
         val token = issueReadyGuest()
         val jobId = requestJob(token)
+        missionGenerationExecutor.execute(UUID.fromString(jobId))
         awaitSucceeded(token, jobId)
 
         val draftJson = mockMvc.perform(
@@ -73,6 +88,7 @@ class MissionGenerationAcceptanceTest(
         val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
         insertTransportSurveyAnswer(guestUserId)
         val jobId = requestJob(token)
+        missionGenerationExecutor.execute(UUID.fromString(jobId))
         awaitSucceeded(token, jobId)
 
         val draftsJson = mockMvc.perform(
@@ -103,6 +119,7 @@ class MissionGenerationAcceptanceTest(
         val ownerToken = issueReadyGuest()
         val otherToken = issueReadyGuest()
         val jobId = requestJob(ownerToken)
+        missionGenerationExecutor.execute(UUID.fromString(jobId))
         awaitSucceeded(ownerToken, jobId)
 
         mockMvc.perform(
