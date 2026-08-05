@@ -61,9 +61,8 @@ class PersonalizedMissionDraftCandidateProvider(
             .eachCount()
         val manualMissions = manualMissionRepository.findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId)
             .filter { it.createdAt >= now.minus(Duration.ofDays(settings.signalDecayDays)) }
-        val manualTags = manualMissions
-            .flatMap { it.structuredTags.split(',') }
-            .filter(String::isNotBlank)
+        val manualCategories = manualMissions
+            .map { it.category.name }
             .toSet()
         val outcomeTimes = outcomeEventRepository.findAllByGuestUserIdOrderByOccurredAtDesc(guestUserId)
             .associate { it.missionId to it.occurredAt }
@@ -81,7 +80,7 @@ class PersonalizedMissionDraftCandidateProvider(
         val semanticResult = runCatching {
             semanticRetriever.retrieve(
                 MissionSemanticRetrievalRequest(
-                    query = (answerCodes + manualTags).sorted().joinToString(" "),
+                    query = (answerCodes + manualCategories).sorted().joinToString(" "),
                     candidates = eligibleTemplates.map { MissionSemanticDocument(it.id, it.embeddingText) },
                 ),
             )
@@ -99,7 +98,6 @@ class PersonalizedMissionDraftCandidateProvider(
                     retrieved = template.id in semanticScores,
                     preferenceSignal = template.preferenceSignal(
                         recentMissions,
-                        manualMissions,
                         outcomeTimes,
                         familyByAction,
                         now,
@@ -282,7 +280,6 @@ class PersonalizedMissionDraftCandidateProvider(
 
     private fun MissionDraftTemplate.preferenceSignal(
         recentMissions: List<backend.yapp.core.mission.generation.domain.Mission>,
-        manualMissions: List<backend.yapp.core.mission.generation.domain.ManualMission>,
         outcomeTimes: Map<java.util.UUID, Instant>,
         familyByAction: Map<String, String>,
         now: Instant,
@@ -301,21 +298,7 @@ class PersonalizedMissionDraftCandidateProvider(
                 value * decay(outcomeTimes[mission.id] ?: mission.completedAt ?: mission.createdAt, now)
             }
         }
-        val templateSignals = eligibleCodes.codes() + targetCode
-        val manualSignal = manualMissions.sumOf { mission ->
-            val tags = mission.structuredTags.split(',').toSet()
-            if ((tags intersect templateSignals).isEmpty()) {
-                0.0
-            } else {
-                val value = when (mission.status) {
-                    MissionStatus.COMPLETED -> 0.12
-                    MissionStatus.INCOMPLETE -> -0.02
-                    MissionStatus.ACTIVE -> 0.04
-                }
-                value * decay(outcomeTimes[mission.id] ?: mission.completedAt ?: mission.createdAt, now)
-            }
-        }
-        return (recommendedSignal + manualSignal).coerceIn(-0.20, 0.30)
+        return recommendedSignal.coerceIn(-0.20, 0.30)
     }
 
     private fun weeklyContextSnapshot(
@@ -333,7 +316,7 @@ class PersonalizedMissionDraftCandidateProvider(
             "${it.actionCode}:${it.status}:${outcomeTimes[it.id] ?: it.completedAt ?: it.createdAt}"
         }}",
         "manual=${manualMissions.joinToString(",") {
-            "${it.structuredTags}:${it.status}:${outcomeTimes[it.id] ?: it.completedAt ?: it.createdAt}"
+            "${it.category.name}:${it.status}:${outcomeTimes[it.id] ?: it.completedAt ?: it.createdAt}"
         }}",
     ).joinToString("|").take(4000)
 

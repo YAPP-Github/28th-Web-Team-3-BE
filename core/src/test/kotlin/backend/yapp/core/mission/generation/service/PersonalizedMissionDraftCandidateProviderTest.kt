@@ -189,7 +189,7 @@ class PersonalizedMissionDraftCandidateProviderTest {
     }
 
     @Test
-    fun `weekly context stores structured manual tags without raw manual text`() {
+    fun `weekly context stores manual category without raw manual text`() {
         val trace = RecordingTracePort()
         val rawText = "개인 메모 원문은 추천 추적에 남기지 않는다"
         val manualMission = ManualMission(
@@ -197,9 +197,6 @@ class PersonalizedMissionDraftCandidateProviderTest {
             guestUserId = 1,
             category = MissionCategory.MEAL,
             missionText = rawText,
-            structuredTags = "DELIVERY",
-            targetCount = 1,
-            targetUnit = "TIMES_PER_WEEK",
             weekEndsAt = now.plusSeconds(86400),
             createdAt = now.minusSeconds(3600),
         )
@@ -212,7 +209,7 @@ class PersonalizedMissionDraftCandidateProviderTest {
         ).candidates(1, setOf(MissionCategory.MEAL))
 
         assertFalse(rawText in trace.weeklyContextSnapshot)
-        assertTrue("manual=DELIVERY:ACTIVE:" in trace.weeklyContextSnapshot)
+        assertTrue("manual=MEAL:ACTIVE:" in trace.weeklyContextSnapshot)
     }
 
     private fun provider(

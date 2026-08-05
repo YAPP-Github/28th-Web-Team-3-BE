@@ -47,8 +47,6 @@ class MissionController(
             guestUserId,
             request.category,
             request.text,
-            request.targetCount,
-            request.targetUnit,
         ),
     )
 
