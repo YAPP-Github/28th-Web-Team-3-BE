@@ -189,26 +189,14 @@ jobs:
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --member "serviceAccount:${tasks_invoker}" --role roles/run.invoker --quiet
 
-      - name: Configure mission dispatcher schedule
+      - name: Configure mission dispatcher invoker
         shell: bash
         run: |
           set -euo pipefail
-          dispatcher_url="$(gcloud run services describe "${MISSION_DISPATCHER_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format 'value(status.url)')"
           scheduler_invoker="mission-scheduler-invoker@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
           gcloud run services add-iam-policy-binding "${MISSION_DISPATCHER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --member "serviceAccount:${scheduler_invoker}" --role roles/run.invoker --quiet
-          if gcloud scheduler jobs describe mission-generation-dispatch --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
-            gcloud scheduler jobs update http mission-generation-dispatch \
-              --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" --schedule '* * * * *' \
-              --uri "${dispatcher_url}/internal/mission-generation/dispatch" --http-method POST \
-              --oidc-service-account-email "${scheduler_invoker}" --oidc-token-audience "${dispatcher_url}" --quiet
-          else
-            gcloud scheduler jobs create http mission-generation-dispatch \
-              --location "${GCP_REGION}" --project "${GCP_PROJECT_ID}" --schedule '* * * * *' \
-              --uri "${dispatcher_url}/internal/mission-generation/dispatch" --http-method POST \
-              --oidc-service-account-email "${scheduler_invoker}" --oidc-token-audience "${dispatcher_url}" --quiet
-          fi
 
       - name: Deploy public API to Cloud Run
         env:
