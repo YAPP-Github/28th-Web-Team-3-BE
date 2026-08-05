@@ -5,6 +5,8 @@ import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import backend.yapp.infra.mission.generation.FallbackMissionSemanticRetriever
 import backend.yapp.infra.mission.generation.KeywordMissionSemanticRetriever
 import backend.yapp.infra.mission.generation.MissionAiInfrastructureConfig
+import backend.yapp.infra.mission.generation.MissionDraftGenerationTelemetry
+import backend.yapp.infra.mission.generation.MicrometerMissionDraftGenerationTelemetry
 import backend.yapp.infra.mission.generation.SpringAiMissionDraftContentGenerator
 import backend.yapp.infra.mission.generation.TemplateMissionDraftContentGenerator
 import kotlin.test.Test
@@ -66,6 +68,18 @@ class MissionAiApplicationConfigurationTest {
             )
             assertNull(context.getBeanProvider(modelClass(CHAT_MODEL_CLASS)).ifAvailable)
             assertNull(context.getBeanProvider(modelClass(EMBEDDING_MODEL_CLASS)).ifAvailable)
+        }
+    }
+
+    @Test
+    fun `auto configured application provides Micrometer telemetry`() {
+        runAutoConfiguredApplication(
+            "AI_ACTIVATION=off",
+            "GOOGLE_GENAI_API_KEY=",
+        ) { context ->
+            assertIs<MicrometerMissionDraftGenerationTelemetry>(
+                context.getBean(MissionDraftGenerationTelemetry::class.java),
+            )
         }
     }
 
