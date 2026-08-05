@@ -4,7 +4,6 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepositor
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionGenerationOutbox
 import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
-import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxStatus
 import backend.yapp.core.mission.generation.port.MissionGenerationTaskPublisher
 import java.time.Clock
 import java.time.Duration
@@ -17,10 +16,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class MissionGenerationDispatchService(
     private val transactions: MissionGenerationDeliveryTransactions,
+    private val leaseRecovery: MissionGenerationLeaseRecoveryService,
     private val publisher: MissionGenerationTaskPublisher,
 ) {
     fun dispatch(): MissionGenerationDispatchResult {
-        val recovery = transactions.reconcileExpiredLeases()
+        val recovery = leaseRecovery.reconcileExpiredLeases()
         var published = 0
         var failed = 0
         transactions.claimDue().forEach { task ->
@@ -39,7 +39,6 @@ class MissionGenerationDispatchService(
 
 @Service
 class MissionGenerationDeliveryTransactions(
-    private val jobRepository: MissionGenerationJobRepository,
     private val outboxRepository: MissionGenerationOutboxRepository,
     private val clock: Clock,
 ) {
@@ -64,13 +63,24 @@ class MissionGenerationDeliveryTransactions(
         outboxRepository.findByIdForUpdate(id)?.retry(claimToken, error, clock.instant(), OUTBOX_RETRY_DELAY)
     }
 
-    @Transactional
+    companion object {
+        private val OUTBOX_CLAIM_TIMEOUT = Duration.ofMinutes(2)
+        private val OUTBOX_RETRY_DELAY = Duration.ofSeconds(10)
+    }
+}
+
+@Service
+class MissionGenerationLeaseRecoveryService(
+    private val jobRepository: MissionGenerationJobRepository,
+    private val transaction: MissionGenerationLeaseRecoveryTransaction,
+    private val clock: Clock,
+) {
     fun reconcileExpiredLeases(): MissionGenerationRecoveryResult {
         val now = clock.instant()
         var requeued = 0
         var failed = 0
-        jobRepository.findRecoverableRunning(now).forEach { candidate ->
-            when (reconcile(candidate.id, now)) {
+        jobRepository.findRecoverableRunningIds(now).forEach { jobId ->
+            when (runCatching { transaction.reconcile(jobId, now) }.getOrDefault(RecoveryAction.NONE)) {
                 RecoveryAction.REQUEUED -> requeued++
                 RecoveryAction.FAILED -> failed++
                 RecoveryAction.NONE -> Unit
@@ -78,7 +88,13 @@ class MissionGenerationDeliveryTransactions(
         }
         return MissionGenerationRecoveryResult(requeued, failed)
     }
+}
 
+@Service
+class MissionGenerationLeaseRecoveryTransaction(
+    private val jobRepository: MissionGenerationJobRepository,
+    private val outboxRepository: MissionGenerationOutboxRepository,
+) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun reconcile(jobId: UUID, now: Instant): RecoveryAction {
         val job = jobRepository.findByIdForUpdate(jobId) ?: return RecoveryAction.NONE
@@ -102,8 +118,6 @@ class MissionGenerationDeliveryTransactions(
 
     companion object {
         private const val MAX_ATTEMPTS = 5
-        private val OUTBOX_CLAIM_TIMEOUT = Duration.ofMinutes(2)
-        private val OUTBOX_RETRY_DELAY = Duration.ofSeconds(10)
     }
 }
 

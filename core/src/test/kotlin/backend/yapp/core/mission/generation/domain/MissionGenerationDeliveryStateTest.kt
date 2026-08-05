@@ -44,6 +44,38 @@ class MissionGenerationDeliveryStateTest {
     }
 
     @Test
+    fun `execution failure releases owned lease for an immediate retry`() {
+        val job = MissionGenerationJob(UUID.randomUUID(), 1L, createdAt = now)
+        val token = UUID.randomUUID()
+        assertTrue(job.claim(now, token, Duration.ofMinutes(10)))
+
+        assertTrue(job.releaseOrFail(token, now.plusSeconds(1), 5))
+
+        assertEquals(MissionGenerationJobStatus.PENDING, job.status)
+        assertNull(job.leaseToken)
+        assertNull(job.leaseExpiresAt)
+    }
+
+    @Test
+    fun `execution failure on final attempt becomes terminal`() {
+        val token = UUID.randomUUID()
+        val job = MissionGenerationJob(
+            id = UUID.randomUUID(),
+            guestUserId = 1L,
+            status = MissionGenerationJobStatus.RUNNING,
+            createdAt = now,
+            attemptCount = 5,
+            leaseToken = token,
+            leaseExpiresAt = now.plusSeconds(60),
+        )
+
+        assertTrue(job.releaseOrFail(token, now, 5))
+
+        assertEquals(MissionGenerationJobStatus.FAILED, job.status)
+        assertEquals("MISSION_GENERATION_RETRY_EXHAUSTED", job.failureCode)
+    }
+
+    @Test
     fun `claimed outbox is retried after timeout and records one published task name`() {
         val outbox = MissionGenerationOutbox(UUID.randomUUID(), UUID.randomUUID(), nextAttemptAt = now, createdAt = now)
         val first = UUID.randomUUID()

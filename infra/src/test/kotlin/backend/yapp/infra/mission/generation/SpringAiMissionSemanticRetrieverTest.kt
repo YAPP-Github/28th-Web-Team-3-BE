@@ -39,6 +39,24 @@ class SpringAiMissionSemanticRetrieverTest {
     }
 
     @Test
+    fun `tie scores keep the lowest template ids in deterministic order`() {
+        val client = MissionEmbeddingClient { inputs ->
+            inputs.map { floatArrayOf(1.0f, 0.0f) }
+        }
+        val retriever = SpringAiMissionSemanticRetriever(client, "google-genai", "test-model:2")
+        val request = MissionSemanticRetrievalRequest(
+            query = "query",
+            candidates = (10L downTo 1L).map { MissionSemanticDocument(it, "document-$it") },
+        )
+
+        val first = retriever.retrieve(request)
+        val second = retriever.retrieve(request)
+
+        assertEquals((1L..8L).toList(), first.scores.keys.toList())
+        assertEquals(first.scores, second.scores)
+    }
+
+    @Test
     fun `embeds catalog in bounded batches for every request`() {
         val calls = AtomicInteger()
         val batchSizes = mutableListOf<Int>()

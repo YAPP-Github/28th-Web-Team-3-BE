@@ -4,16 +4,20 @@ import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionDraft
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
+import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
+import backend.yapp.core.mission.generation.port.MissionDraftCopy
+import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -27,27 +31,32 @@ class MissionGenerationExecutor(
             MissionGenerationPreparation.ActiveLease -> return MissionGenerationExecutionResult.ACTIVE_LEASE
             MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
         }
-        if (work.candidates.isEmpty()) {
+        try {
+            if (work.candidates.isEmpty()) {
+                workService.complete(
+                    work = work,
+                    copiesByTemplateId = emptyMap(),
+                    generationSource = MissionDraftGenerationSource.TEMPLATE_FALLBACK,
+                )
+                return MissionGenerationExecutionResult.COMPLETED
+            }
+            val result = contentGenerator.generate(
+                MissionDraftContentRequest(
+                    jobId = work.jobId,
+                    guestUserId = work.guestUserId,
+                    candidates = work.candidates,
+                ),
+            )
             workService.complete(
                 work = work,
-                copiesByTemplateId = emptyMap(),
-                generationSource = backend.yapp.core.mission.generation.port.MissionDraftGenerationSource.TEMPLATE_FALLBACK,
+                copiesByTemplateId = result.copies.associateBy { it.templateId },
+                generationSource = result.source,
             )
             return MissionGenerationExecutionResult.COMPLETED
+        } catch (exception: Exception) {
+            workService.releaseOrFail(work)
+            throw exception
         }
-        val result = contentGenerator.generate(
-            MissionDraftContentRequest(
-                jobId = work.jobId,
-                guestUserId = work.guestUserId,
-                candidates = work.candidates,
-            ),
-        )
-        workService.complete(
-            work = work,
-            copiesByTemplateId = result.copies.associateBy { it.templateId },
-            generationSource = result.source,
-        )
-        return MissionGenerationExecutionResult.COMPLETED
     }
 }
 
@@ -64,7 +73,7 @@ class MissionGenerationWorkService(
     fun prepare(jobId: UUID): MissionGenerationPreparation {
         val job = jobRepository.findByIdForUpdate(jobId) ?: return MissionGenerationPreparation.Skipped
         val now = clock.instant()
-        if (job.status == backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus.RUNNING &&
+        if (job.status == MissionGenerationJobStatus.RUNNING &&
             job.leaseExpiresAt?.isAfter(now) == true
         ) {
             return MissionGenerationPreparation.ActiveLease
@@ -90,8 +99,8 @@ class MissionGenerationWorkService(
     @Transactional
     fun complete(
         work: MissionGenerationWork,
-        copiesByTemplateId: Map<Long, backend.yapp.core.mission.generation.port.MissionDraftCopy>,
-        generationSource: backend.yapp.core.mission.generation.port.MissionDraftGenerationSource,
+        copiesByTemplateId: Map<Long, MissionDraftCopy>,
+        generationSource: MissionDraftGenerationSource,
     ) {
         val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
         if (!job.ownsLease(work.leaseToken, clock.instant())) return
@@ -122,11 +131,18 @@ class MissionGenerationWorkService(
         tracePort.markShown(job.id, drafts.map { it.templateId }.toSet())
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun releaseOrFail(work: MissionGenerationWork) {
+        jobRepository.findByIdForUpdate(work.jobId)
+            ?.releaseOrFail(work.leaseToken, clock.instant(), MAX_ATTEMPTS)
+    }
+
     companion object {
         private val DEFAULT_LEASE_DURATION: Duration = Duration.ofMinutes(10)
         private const val MAX_DRAFTS_PER_CATEGORY = 4
         private const val MAX_TITLE_LENGTH = 120
         private const val MAX_DESCRIPTION_LENGTH = 500
+        private const val MAX_ATTEMPTS = 5
         private val DRAFT_TTL: Duration = Duration.ofHours(24)
     }
 }
@@ -135,7 +151,7 @@ data class MissionGenerationWork(
     val jobId: UUID,
     val guestUserId: Long,
     val candidates: List<MissionDraftCandidate>,
-    val leaseToken: UUID = UUID.randomUUID(),
+    val leaseToken: UUID,
 )
 
 sealed interface MissionGenerationPreparation {

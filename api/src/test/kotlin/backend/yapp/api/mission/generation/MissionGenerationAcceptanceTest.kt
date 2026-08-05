@@ -37,8 +37,10 @@ class MissionGenerationAcceptanceTest(
         val jobId = requestJob(token)
 
         val claimed = deliveryTransactions.claimDue()
+        val reclaimed = deliveryTransactions.claimDue()
 
         assertTrue(claimed.any { it.jobId == UUID.fromString(jobId) })
+        assertTrue(reclaimed.none { it.jobId == UUID.fromString(jobId) })
     }
 
     @Test

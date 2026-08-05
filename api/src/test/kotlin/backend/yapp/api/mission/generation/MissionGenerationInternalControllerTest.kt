@@ -31,4 +31,15 @@ class MissionGenerationInternalControllerTest {
 
         assertEquals(204, response.statusCode.value())
     }
+
+    @Test
+    fun `skipped execution is acknowledged without retry`() {
+        val executor = mock(MissionGenerationExecutor::class.java)
+        val jobId = UUID.randomUUID()
+        `when`(executor.execute(jobId)).thenReturn(MissionGenerationExecutionResult.SKIPPED)
+
+        val response = MissionGenerationWorkerController(executor).execute(jobId)
+
+        assertEquals(204, response.statusCode.value())
+    }
 }

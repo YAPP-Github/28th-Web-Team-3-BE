@@ -30,6 +30,10 @@ class SecurityConfig(
     private val objectMapper: ObjectMapper,
     @Value("\${app.role:api}") private val appRole: String,
 ) {
+    init {
+        require(appRole in SUPPORTED_APP_ROLES) { "Unsupported app.role: $appRole" }
+    }
+
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         val entryPoint = { _: HttpServletRequest, response: HttpServletResponse, _: org.springframework.security.core.AuthenticationException ->
@@ -48,7 +52,7 @@ class SecurityConfig(
                     "mission-dispatcher" -> authorization
                         .requestMatchers(HttpMethod.POST, "/internal/mission-generation/dispatch").permitAll()
                         .anyRequest().denyAll()
-                    else -> authorization
+                    "api" -> authorization
                         .requestMatchers("/internal/**").denyAll()
                         .requestMatchers(
                             HttpMethod.POST,
@@ -57,12 +61,16 @@ class SecurityConfig(
                         ).permitAll()
                         .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated()
+                    else -> error("Unsupported app.role: $appRole")
                 }
             }
             .addFilterBefore(BearerTokenFilter(guestAuthService, objectMapper, appRole), UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }
 
+    companion object {
+        private val SUPPORTED_APP_ROLES = setOf("api", "mission-worker", "mission-dispatcher")
+    }
 }
 
 private class BearerTokenFilter(
@@ -72,8 +80,10 @@ private class BearerTokenFilter(
 ) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
         appRole != "api" || request.requestURI.startsWith("/internal/") ||
-            request.method == org.springframework.http.HttpMethod.POST.name() &&
-            request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
+            (
+                request.method == HttpMethod.POST.name() &&
+                    request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
+            )
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authorization = request.getHeader("Authorization")

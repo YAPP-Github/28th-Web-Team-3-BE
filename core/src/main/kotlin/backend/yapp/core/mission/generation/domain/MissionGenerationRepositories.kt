@@ -35,12 +35,12 @@ interface MissionGenerationJobRepository : JpaRepository<MissionGenerationJob, U
     fun findByIdForUpdate(@Param("id") id: UUID): MissionGenerationJob?
 
     @Query(
-        value = "select * from mission_generation_job where status = 'RUNNING' " +
+        value = "select id from mission_generation_job where status = 'RUNNING' " +
             "and (lease_expires_at is null or lease_expires_at <= :now) " +
-            "order by updated_at asc limit 100 for update skip locked",
+            "order by updated_at asc limit 100",
         nativeQuery = true,
     )
-    fun findRecoverableRunning(@Param("now") now: Instant): List<MissionGenerationJob>
+    fun findRecoverableRunningIds(@Param("now") now: Instant): List<UUID>
 
     @Modifying
     @Query(

@@ -5,10 +5,8 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepositor
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionGenerationOutbox
 import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
-import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +14,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.times
 import org.mockito.Mockito.`when`
 
 class MissionGenerationDeliveryServiceTest {
@@ -25,7 +24,7 @@ class MissionGenerationDeliveryServiceTest {
     fun `expired worker lease creates the next outbox generation`() {
         val fixture = fixture(attemptCount = 1)
 
-        assertEquals(RecoveryAction.REQUEUED, fixture.transactions.reconcile(fixture.job.id, now))
+        assertEquals(RecoveryAction.REQUEUED, fixture.transaction.reconcile(fixture.job.id, now))
         assertEquals(MissionGenerationJobStatus.PENDING, fixture.job.status)
         val captor = ArgumentCaptor.forClass(MissionGenerationOutbox::class.java)
         verify(fixture.outboxRepository).save(captor.capture())
@@ -37,10 +36,32 @@ class MissionGenerationDeliveryServiceTest {
     fun `retry exhaustion fails terminally without creating another task`() {
         val fixture = fixture(attemptCount = 5)
 
-        assertEquals(RecoveryAction.FAILED, fixture.transactions.reconcile(fixture.job.id, now))
+        assertEquals(RecoveryAction.FAILED, fixture.transaction.reconcile(fixture.job.id, now))
         assertEquals(MissionGenerationJobStatus.FAILED, fixture.job.status)
         assertEquals("MISSION_GENERATION_RETRY_EXHAUSTED", fixture.job.failureCode)
         verify(fixture.outboxRepository, never()).save(org.mockito.ArgumentMatchers.any())
+    }
+
+    @Test
+    fun `one recovery failure does not prevent the next job transaction`() {
+        val jobRepository = mock(MissionGenerationJobRepository::class.java)
+        val transaction = mock(MissionGenerationLeaseRecoveryTransaction::class.java)
+        val first = UUID.randomUUID()
+        val second = UUID.randomUUID()
+        `when`(jobRepository.findRecoverableRunningIds(now)).thenReturn(listOf(first, second))
+        `when`(transaction.reconcile(first, now)).thenThrow(IllegalStateException("first failed"))
+        `when`(transaction.reconcile(second, now)).thenReturn(RecoveryAction.REQUEUED)
+        val service = MissionGenerationLeaseRecoveryService(
+            jobRepository,
+            transaction,
+            java.time.Clock.fixed(now, java.time.ZoneOffset.UTC),
+        )
+
+        val result = service.reconcileExpiredLeases()
+
+        assertEquals(1, result.requeued)
+        verify(transaction, times(1)).reconcile(first, now)
+        verify(transaction, times(1)).reconcile(second, now)
     }
 
     private fun fixture(attemptCount: Int): Fixture {
@@ -66,10 +87,9 @@ class MissionGenerationDeliveryServiceTest {
             ),
         )
         return Fixture(
-            MissionGenerationDeliveryTransactions(
+            MissionGenerationLeaseRecoveryTransaction(
                 jobRepository,
                 outboxRepository,
-                Clock.fixed(now, ZoneOffset.UTC),
             ),
             job,
             outboxRepository,
@@ -77,7 +97,7 @@ class MissionGenerationDeliveryServiceTest {
     }
 
     private data class Fixture(
-        val transactions: MissionGenerationDeliveryTransactions,
+        val transaction: MissionGenerationLeaseRecoveryTransaction,
         val job: MissionGenerationJob,
         val outboxRepository: MissionGenerationOutboxRepository,
     )

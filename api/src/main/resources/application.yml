@@ -57,7 +57,7 @@ mission:
   lifecycle:
     scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:true}
   generation:
-    ai-activation: off
+    ai-activation: ${AI_ACTIVATION:off}
     stale-running-timeout: PT10M
     recovery-interval-millis: 60000
     delivery:

@@ -65,6 +65,19 @@ class MissionGenerationJob(
     fun ownsLease(token: UUID, now: Instant): Boolean =
         status == MissionGenerationJobStatus.RUNNING && leaseToken == token && leaseExpiresAt?.isAfter(now) == true
 
+    fun releaseOrFail(token: UUID, now: Instant, maxAttempts: Int): Boolean {
+        if (status != MissionGenerationJobStatus.RUNNING || leaseToken != token) return false
+        if (attemptCount >= maxAttempts) {
+            fail("MISSION_GENERATION_RETRY_EXHAUSTED", now)
+            return true
+        }
+        status = MissionGenerationJobStatus.PENDING
+        leaseToken = null
+        leaseExpiresAt = null
+        updatedAt = now
+        return true
+    }
+
     fun retryOrFail(now: Instant, maxAttempts: Int): Boolean {
         if (status != MissionGenerationJobStatus.RUNNING || leaseExpiresAt?.isAfter(now) == true) return false
         if (attemptCount >= maxAttempts) {

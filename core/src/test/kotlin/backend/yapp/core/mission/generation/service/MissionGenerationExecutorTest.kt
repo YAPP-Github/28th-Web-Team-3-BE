@@ -19,6 +19,7 @@ class MissionGenerationExecutorTest {
         val workService = mock(MissionGenerationWorkService::class.java)
         val generator = mock(MissionDraftContentGenerator::class.java)
         val jobId = UUID.randomUUID()
+        val leaseToken = UUID.randomUUID()
         val work = MissionGenerationWork(
             jobId,
             1,
@@ -35,6 +36,7 @@ class MissionGenerationExecutorTest {
                     estimatedSavingsWon = 1000,
                 ),
             ),
+            leaseToken,
         )
         `when`(workService.prepare(jobId)).thenReturn(MissionGenerationPreparation.Claimed(work))
         `when`(
@@ -52,6 +54,7 @@ class MissionGenerationExecutorTest {
         }
 
         verify(workService).prepare(jobId)
+        verify(workService).releaseOrFail(work)
         verifyNoMoreInteractions(workService)
     }
 }

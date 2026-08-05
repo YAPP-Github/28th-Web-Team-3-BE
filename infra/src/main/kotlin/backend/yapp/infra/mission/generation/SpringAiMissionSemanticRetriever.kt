@@ -17,7 +17,9 @@ class SpringAiMissionSemanticRetriever(
             return MissionSemanticRetrievalResult(emptyMap(), provider, modelVersion)
         }
         val query = client.embed(listOf(request.query)).single()
-        val topScores = PriorityQueue<ScoredDocument>(compareBy { it.score })
+        val topScores = PriorityQueue<ScoredDocument>(
+            compareBy<ScoredDocument> { it.score }.thenByDescending { it.templateId },
+        )
         request.candidates.chunked(EMBEDDING_BATCH_SIZE).forEach { candidates ->
             val embeddings = client.embed(candidates.map { it.text })
             require(embeddings.size == candidates.size) {
@@ -31,7 +33,9 @@ class SpringAiMissionSemanticRetriever(
                 }
             }
         }
-        val scores = topScores.sortedByDescending { it.score }.associate { it.templateId to it.score }
+        val scores = topScores
+            .sortedWith(compareByDescending<ScoredDocument> { it.score }.thenBy { it.templateId })
+            .associate { it.templateId to it.score }
         return MissionSemanticRetrievalResult(
             scores = scores,
             provider = provider,
