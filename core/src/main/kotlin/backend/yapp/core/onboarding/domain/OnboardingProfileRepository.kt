@@ -12,4 +12,6 @@ interface OnboardingProfileRepository : JpaRepository<OnboardingProfile, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select profile from OnboardingProfile profile where profile.guestUserId = :guestUserId")
     fun findByGuestUserIdForUpdate(@Param("guestUserId") guestUserId: Long): OnboardingProfile?
+
+    fun deleteByGuestUserId(guestUserId: Long): Long
 }

@@ -39,7 +39,12 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .exceptionHandling { it.authenticationEntryPoint(entryPoint) }
             .authorizeHttpRequests {
-                it.requestMatchers(HttpMethod.POST, "/api/auth/guest", "/api/auth/guest/refresh").permitAll()
+
+                it.requestMatchers(
+                    org.springframework.http.HttpMethod.POST,
+                    "/api/auth/guest",
+                    "/api/auth/guest/refresh",
+                ).permitAll()
                     .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                     .anyRequest().authenticated()
             }
@@ -54,7 +59,7 @@ private class BearerTokenFilter(
     private val objectMapper: ObjectMapper,
 ) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
-        request.method == HttpMethod.POST.name() &&
+        request.method == org.springframework.http.HttpMethod.POST.name() &&
             request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {

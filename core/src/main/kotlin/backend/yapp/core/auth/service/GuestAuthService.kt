@@ -47,7 +47,11 @@ class GuestAuthService(
         return issueAndStore(guestUser)
     }
 
-    fun authenticate(accessToken: String): Long = tokenPort.parseAccessToken(accessToken).guestUserId
+    fun authenticate(accessToken: String): Long {
+        val guestUserId = tokenPort.parseAccessToken(accessToken).guestUserId
+        if (!guestUserRepository.existsById(guestUserId)) throw BaseException(ErrorCode.UNAUTHORIZED)
+        return guestUserId
+    }
 
     private fun createOrFind(identifierHash: String): GuestUser = try {
         guestUserCreator.createIfAbsent(identifierHash)

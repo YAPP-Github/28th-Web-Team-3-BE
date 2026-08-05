@@ -9,6 +9,10 @@ import org.springframework.data.repository.query.Param
 
 interface RefreshTokenRepository : JpaRepository<RefreshToken, UUID> {
     @Modifying
+    @Query("delete from RefreshToken token where token.guestUser.id = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
+
+    @Modifying
     @Query("""
         delete from RefreshToken token
         where token.tokenHash = :tokenHash
