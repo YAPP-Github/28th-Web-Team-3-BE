@@ -21,13 +21,19 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.beans.factory.annotation.Value
 
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
     private val guestAuthService: GuestAuthService,
     private val objectMapper: ObjectMapper,
+    @Value("\${app.role:api}") private val appRole: String,
 ) {
+    init {
+        require(appRole in SUPPORTED_APP_ROLES) { "Unsupported app.role: $appRole" }
+    }
+
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         val entryPoint = { _: HttpServletRequest, response: HttpServletResponse, _: org.springframework.security.core.AuthenticationException ->
@@ -38,29 +44,46 @@ class SecurityConfig(
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .exceptionHandling { it.authenticationEntryPoint(entryPoint) }
-            .authorizeHttpRequests {
-
-                it.requestMatchers(
-                    org.springframework.http.HttpMethod.POST,
-                    "/api/auth/guest",
-                    "/api/auth/guest/refresh",
-                ).permitAll()
-                    .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                    .anyRequest().authenticated()
+            .authorizeHttpRequests { authorization ->
+                when (appRole) {
+                    "mission-worker" -> authorization
+                        .requestMatchers(HttpMethod.POST, "/internal/mission-generation/jobs/*/execute").permitAll()
+                        .anyRequest().denyAll()
+                    "mission-dispatcher" -> authorization
+                        .requestMatchers(HttpMethod.POST, "/internal/mission-generation/dispatch").permitAll()
+                        .anyRequest().denyAll()
+                    "api" -> authorization
+                        .requestMatchers("/internal/**").denyAll()
+                        .requestMatchers(
+                            HttpMethod.POST,
+                            "/api/auth/guest",
+                            "/api/auth/guest/refresh",
+                        ).permitAll()
+                        .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .anyRequest().authenticated()
+                    else -> error("Unsupported app.role: $appRole")
+                }
             }
-            .addFilterBefore(BearerTokenFilter(guestAuthService, objectMapper), UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(BearerTokenFilter(guestAuthService, objectMapper, appRole), UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }
 
+    companion object {
+        private val SUPPORTED_APP_ROLES = setOf("api", "mission-worker", "mission-dispatcher")
+    }
 }
 
 private class BearerTokenFilter(
     private val guestAuthService: GuestAuthService,
     private val objectMapper: ObjectMapper,
+    private val appRole: String,
 ) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
-        request.method == org.springframework.http.HttpMethod.POST.name() &&
-            request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
+        appRole != "api" || request.requestURI.startsWith("/internal/") ||
+            (
+                request.method == HttpMethod.POST.name() &&
+                    request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
+            )
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authorization = request.getHeader("Authorization")

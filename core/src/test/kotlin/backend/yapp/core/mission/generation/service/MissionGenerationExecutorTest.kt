@@ -7,6 +7,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
 import java.util.UUID
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.verify
@@ -18,6 +19,7 @@ class MissionGenerationExecutorTest {
         val workService = mock(MissionGenerationWorkService::class.java)
         val generator = mock(MissionDraftContentGenerator::class.java)
         val jobId = UUID.randomUUID()
+        val leaseToken = UUID.randomUUID()
         val work = MissionGenerationWork(
             jobId,
             1,
@@ -34,8 +36,9 @@ class MissionGenerationExecutorTest {
                     estimatedSavingsWon = 1000,
                 ),
             ),
+            leaseToken,
         )
-        `when`(workService.prepare(jobId)).thenReturn(work)
+        `when`(workService.prepare(jobId)).thenReturn(MissionGenerationPreparation.Claimed(work))
         `when`(
             generator.generate(
                 MissionDraftContentRequest(
@@ -46,10 +49,12 @@ class MissionGenerationExecutorTest {
             ),
         ).thenThrow(IllegalStateException("provider failed"))
 
-        MissionGenerationExecutor(workService, generator).execute(jobId)
+        assertFailsWith<IllegalStateException> {
+            MissionGenerationExecutor(workService, generator).execute(jobId)
+        }
 
         verify(workService).prepare(jobId)
-        verify(workService).fail(jobId, "MISSION_GENERATION_EXECUTION_FAILED")
+        verify(workService).releaseOrFail(work)
         verifyNoMoreInteractions(workService)
     }
 }

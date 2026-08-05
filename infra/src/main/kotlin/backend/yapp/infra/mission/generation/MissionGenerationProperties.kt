@@ -10,6 +10,16 @@ data class MissionGenerationProperties(
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
     val prompt: MissionPromptProperties = MissionPromptProperties(),
     val recommendation: RecommendationProperties = RecommendationProperties(),
+    val delivery: DeliveryProperties = DeliveryProperties(),
+)
+
+data class DeliveryProperties(
+    val enabled: Boolean = false,
+    val projectId: String = "",
+    val location: String = "asia-northeast3",
+    val queue: String = "mission-generation",
+    val workerUrl: String = "",
+    val oidcServiceAccount: String = "",
 )
 
 data class MissionPromptProperties(

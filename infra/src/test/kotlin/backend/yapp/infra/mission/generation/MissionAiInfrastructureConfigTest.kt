@@ -72,7 +72,7 @@ class MissionAiInfrastructureConfigTest {
     }
 
     @Test
-    fun `on creates both adapters with Vertex project and location`() {
+    fun `on rejects Vertex configuration because API key authentication is required`() {
         aiContextRunner()
             .withPropertyValues(
                 "mission.generation.ai-activation=on",
@@ -80,13 +80,7 @@ class MissionAiInfrastructureConfigTest {
                 "spring.ai.google.genai.location=asia-northeast3",
             )
             .run { context ->
-                assertNull(context.startupFailure)
-                assertIs<SpringAiMissionDraftContentGenerator>(
-                    context.getBean(MissionDraftContentGenerator::class.java),
-                )
-                assertIs<FallbackMissionSemanticRetriever>(
-                    context.getBean(MissionSemanticRetriever::class.java),
-                )
+                assertNotNull(context.startupFailure)
             }
     }
 

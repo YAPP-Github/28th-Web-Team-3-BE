@@ -1,5 +1,6 @@
 package backend.yapp.api.mission.lifecycle
 
+import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
 import backend.yapp.core.mission.generation.service.MissionLifecycleService
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 class MissionLifecycleAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val dataSource: DataSource,
+    @Autowired private val missionGenerationExecutor: MissionGenerationExecutor,
     @Autowired private val lifecycleService: MissionLifecycleService,
 ) {
     @Test
@@ -308,6 +310,7 @@ class MissionLifecycleAcceptanceTest(
                 .andReturn().response.contentAsString,
             "$.jobId",
         )
+        missionGenerationExecutor.execute(UUID.fromString(jobId))
         repeat(100) {
             val response = mockMvc.perform(
                 get("$GENERATION_PATH/$jobId").header(AUTHORIZATION, "Bearer $token"),

@@ -3,8 +3,7 @@ package backend.yapp.infra.mission.generation
 import backend.yapp.core.mission.generation.port.MissionSemanticRetrievalRequest
 import backend.yapp.core.mission.generation.port.MissionSemanticRetrievalResult
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
-import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
+import java.util.PriorityQueue
 import kotlin.math.sqrt
 import org.springframework.ai.embedding.EmbeddingModel
 
@@ -13,39 +12,35 @@ class SpringAiMissionSemanticRetriever(
     private val provider: String,
     private val modelVersion: String,
 ) : MissionSemanticRetriever {
-    private val templateCache = ConcurrentHashMap<String, Map<Long, FloatArray>>()
-
     override fun retrieve(request: MissionSemanticRetrievalRequest): MissionSemanticRetrievalResult {
         if (request.candidates.isEmpty()) {
             return MissionSemanticRetrievalResult(emptyMap(), provider, modelVersion)
         }
-        val cacheKey = cacheKey(request)
-        val templateVectors = templateCache.computeIfAbsent(cacheKey) {
-            val embeddings = client.embed(request.candidates.map { document -> document.text })
-            require(embeddings.size == request.candidates.size) {
-                "Embedding count did not match mission catalog size"
-            }
-            request.candidates.map { it.templateId }.zip(embeddings).toMap()
-        }
         val query = client.embed(listOf(request.query)).single()
-        val scores = templateVectors.mapValues { (_, vector) -> cosine(query, vector) }
-            .filterValues { it > 0.0 }
-            .entries.sortedByDescending { it.value }
-            .take(MAX_RESULTS)
-            .associate { it.toPair() }
+        val topScores = PriorityQueue<ScoredDocument>(
+            compareBy<ScoredDocument> { it.score }.thenByDescending { it.templateId },
+        )
+        request.candidates.chunked(EMBEDDING_BATCH_SIZE).forEach { candidates ->
+            val embeddings = client.embed(candidates.map { it.text })
+            require(embeddings.size == candidates.size) {
+                "Embedding count did not match mission catalog batch size"
+            }
+            candidates.zip(embeddings).forEach { (candidate, vector) ->
+                val score = cosine(query, vector)
+                if (score > 0.0) {
+                    topScores.add(ScoredDocument(candidate.templateId, score))
+                    if (topScores.size > MAX_RESULTS) topScores.remove()
+                }
+            }
+        }
+        val scores = topScores
+            .sortedWith(compareByDescending<ScoredDocument> { it.score }.thenBy { it.templateId })
+            .associate { it.templateId to it.score }
         return MissionSemanticRetrievalResult(
             scores = scores,
             provider = provider,
             modelVersion = modelVersion,
         )
-    }
-
-    private fun cacheKey(request: MissionSemanticRetrievalRequest): String {
-        val content = request.candidates.sortedBy { it.templateId }
-            .joinToString("|") { "${it.templateId}:${it.text}" }
-        val hash = MessageDigest.getInstance("SHA-256").digest(content.toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        return "$modelVersion:$hash"
     }
 
     private fun cosine(left: FloatArray, right: FloatArray): Double {
@@ -58,7 +53,13 @@ class SpringAiMissionSemanticRetriever(
 
     companion object {
         private const val MAX_RESULTS = 8
+        private const val EMBEDDING_BATCH_SIZE = 16
     }
+
+    private data class ScoredDocument(
+        val templateId: Long,
+        val score: Double,
+    )
 }
 
 fun interface MissionEmbeddingClient {

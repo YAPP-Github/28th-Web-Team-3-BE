@@ -9,6 +9,7 @@ import backend.yapp.core.mission.generation.service.MissionGenerationService
 import jakarta.validation.Valid
 import java.util.UUID
 import org.springframework.http.ResponseEntity
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/missions/generation-jobs")
+@ConditionalOnProperty(prefix = "app", name = ["role"], havingValue = "api", matchIfMissing = true)
 class MissionGenerationController(
     private val service: MissionGenerationService,
 ) : MissionGenerationApi {

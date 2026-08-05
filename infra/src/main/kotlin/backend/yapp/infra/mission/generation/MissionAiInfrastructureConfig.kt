@@ -35,10 +35,8 @@ class MissionAiInfrastructureConfig {
         objectMapper: ObjectMapper,
         properties: MissionGenerationProperties,
         @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
-        @Value("\${spring.ai.google.genai.project-id:}") projectId: String,
-        @Value("\${spring.ai.google.genai.location:}") location: String,
     ): MissionDraftContentGenerator {
-        validateGoogleGenAiAuthentication(apiKey, projectId, location)
+        validateGoogleGenAiAuthentication(apiKey)
         return SpringAiMissionDraftContentGenerator(
             client = ChatClientMissionDraftAiClient(chatClientBuilder.build()),
             objectMapper = objectMapper,
@@ -65,10 +63,8 @@ class MissionAiInfrastructureConfig {
         embeddingModel: EmbeddingModel,
         properties: MissionGenerationProperties,
         @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
-        @Value("\${spring.ai.google.genai.project-id:}") projectId: String,
-        @Value("\${spring.ai.google.genai.location:}") location: String,
     ): MissionSemanticRetriever {
-        validateGoogleGenAiAuthentication(apiKey, projectId, location)
+        validateGoogleGenAiAuthentication(apiKey)
         return FallbackMissionSemanticRetriever(
             primary = SpringAiMissionSemanticRetriever(
                 client = SpringAiMissionEmbeddingClient(embeddingModel),
@@ -79,16 +75,9 @@ class MissionAiInfrastructureConfig {
         )
     }
 
-    private fun validateGoogleGenAiAuthentication(
-        apiKey: String,
-        projectId: String,
-        location: String,
-    ) {
-        if (apiKey.isNotBlank()) {
-            return
-        }
-        require(projectId.isNotBlank() && location.isNotBlank()) {
-            "AI_ACTIVATION=on requires GOOGLE_GENAI_API_KEY or both GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION"
+    private fun validateGoogleGenAiAuthentication(apiKey: String) {
+        require(apiKey.isNotBlank()) {
+            "AI_ACTIVATION=on requires GOOGLE_GENAI_API_KEY"
         }
     }
 
