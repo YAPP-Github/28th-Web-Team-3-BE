@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 
 @Tag(name = "Guest Authentication", description = "UUID 식별값 기반의 게스트 사용자 인증 API")
 interface GuestAuthApi {
@@ -53,4 +54,12 @@ interface GuestAuthApi {
         ApiResponse(responseCode = "500", description = "INTERNAL_SERVER_ERROR", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun refresh(request: RefreshTokenRequest): TokenResponse
+
+    @Operation(summary = "게스트 회원 탈퇴", description = "인증된 게스트 계정과 모든 사용자 귀속 데이터를 영구 삭제합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        ApiResponse(responseCode = "204", description = "회원 탈퇴 성공"),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+    )
+    fun withdraw(guestUserId: Long)
 }

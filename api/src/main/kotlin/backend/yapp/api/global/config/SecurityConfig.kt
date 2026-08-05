@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
+import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.config.Customizer.withDefaults
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -38,7 +39,8 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .exceptionHandling { it.authenticationEntryPoint(entryPoint) }
             .authorizeHttpRequests {
-                it.requestMatchers("/api/auth/**", "/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                it.requestMatchers(HttpMethod.POST, "/api/auth/guest", "/api/auth/guest/refresh").permitAll()
+                    .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(BearerTokenFilter(guestAuthService, objectMapper), UsernamePasswordAuthenticationFilter::class.java)
@@ -52,7 +54,8 @@ private class BearerTokenFilter(
     private val objectMapper: ObjectMapper,
 ) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
-        request.requestURI.startsWith("/api/auth/")
+        request.method == HttpMethod.POST.name() &&
+            request.requestURI in setOf("/api/auth/guest", "/api/auth/guest/refresh")
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authorization = request.getHeader("Authorization")

@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface MissionGenerationJobRepository : JpaRepository<MissionGenerationJob, UUID> {
+    @Modifying
+    @Query("delete from MissionGenerationJob job where job.guestUserId = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findFirstByGuestUserIdAndActiveGenerationKeyOrderByCreatedAtDesc(
         guestUserId: Long,
         activeGenerationKey: String,
@@ -54,11 +57,17 @@ interface MissionDraftTemplateRepository : JpaRepository<MissionDraftTemplate, L
 }
 
 interface MissionDraftRepository : JpaRepository<MissionDraft, UUID> {
+    @Modifying
+    @Query("delete from MissionDraft draft where draft.jobId in (select job.id from MissionGenerationJob job where job.guestUserId = :guestUserId)")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByJobIdOrderByCategoryAscCreatedAtAsc(jobId: UUID): List<MissionDraft>
     fun findAllByJobIdAndIdIn(jobId: UUID, ids: Collection<UUID>): List<MissionDraft>
 }
 
 interface MissionRepository : JpaRepository<Mission, UUID> {
+    @Modifying
+    @Query("delete from Mission mission where mission.guestUserId = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByJobIdOrderByCreatedAtAsc(jobId: UUID): List<Mission>
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): Mission?
@@ -66,16 +75,25 @@ interface MissionRepository : JpaRepository<Mission, UUID> {
 }
 
 interface ManualMissionRepository : JpaRepository<ManualMission, UUID> {
+    @Modifying
+    @Query("delete from ManualMission mission where mission.guestUserId = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): ManualMission?
     fun findAllByStatusAndWeekEndsAtLessThanEqual(status: MissionStatus, cutoff: Instant): List<ManualMission>
 }
 
 interface MissionOutcomeEventRepository : JpaRepository<MissionOutcomeEvent, UUID> {
+    @Modifying
+    @Query("delete from MissionOutcomeEvent event where event.guestUserId = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByGuestUserIdOrderByOccurredAtDesc(guestUserId: Long): List<MissionOutcomeEvent>
 }
 
 interface MissionRecommendationSnapshotRepository : JpaRepository<MissionRecommendationSnapshot, UUID> {
+    @Modifying
+    @Query("delete from MissionRecommendationSnapshot snapshot where snapshot.guestUserId = :guestUserId")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findFirstByGuestUserIdAndJobIdIsNullOrderByCreatedAtDesc(guestUserId: Long): MissionRecommendationSnapshot?
     fun findByJobId(jobId: UUID): MissionRecommendationSnapshot?
@@ -83,5 +101,8 @@ interface MissionRecommendationSnapshotRepository : JpaRepository<MissionRecomme
 
 interface MissionRecommendationCandidateTraceRepository :
     JpaRepository<MissionRecommendationCandidateTrace, UUID> {
+    @Modifying
+    @Query("delete from MissionRecommendationCandidateTrace candidate where candidate.snapshotId in (select snapshot.id from MissionRecommendationSnapshot snapshot where snapshot.guestUserId = :guestUserId)")
+    fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllBySnapshotId(snapshotId: UUID): List<MissionRecommendationCandidateTrace>
 }

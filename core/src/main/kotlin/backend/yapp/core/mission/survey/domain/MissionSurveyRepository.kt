@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface MissionSurveyRepository : JpaRepository<MissionSurvey, Long> {
     @EntityGraph(attributePaths = ["answers"])
     fun findByGuestUserId(guestUserId: Long): MissionSurvey?
+
+    fun deleteByGuestUserId(guestUserId: Long): Long
 }
