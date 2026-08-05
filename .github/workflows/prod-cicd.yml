@@ -74,6 +74,8 @@ jobs:
       SERVER_URL: ${{ vars.SERVER_URL }}
       MISSION_WORKER_SERVICE: mission-generation-worker
       MISSION_DISPATCHER_SERVICE: mission-generation-dispatcher
+      MISSION_WORKER_RUNTIME_SERVICE_ACCOUNT: mission-worker-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+      MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT: mission-dispatcher-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       MISSION_QUEUE: mission-generation
 
     steps:
@@ -137,12 +139,12 @@ jobs:
               --min-backoff 10s --max-backoff 300s --quiet
           gcloud tasks queues add-iam-policy-binding "${MISSION_QUEUE}" \
             --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
-            --member "serviceAccount:${RUNTIME_SERVICE_ACCOUNT}" \
+            --member "serviceAccount:${MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT}" \
             --role roles/cloudtasks.enqueuer --quiet
           enqueuer_role="$(gcloud tasks queues get-iam-policy "${MISSION_QUEUE}" \
             --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
             --flatten 'bindings[].members' \
-            --filter "bindings.role=roles/cloudtasks.enqueuer AND bindings.members=serviceAccount:${RUNTIME_SERVICE_ACCOUNT}" \
+            --filter "bindings.role=roles/cloudtasks.enqueuer AND bindings.members=serviceAccount:${MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT}" \
             --format 'value(bindings.role)')"
           test "${enqueuer_role}" = roles/cloudtasks.enqueuer
 
@@ -156,7 +158,7 @@ jobs:
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --image "${IMAGE_URI}" \
-            --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
+            --service-account "${MISSION_WORKER_RUNTIME_SERVICE_ACCOUNT}" \
             --memory "1Gi" \
             --concurrency 1 \
             --timeout 600 \
@@ -177,7 +179,7 @@ jobs:
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --image "${IMAGE_URI}" \
-            --service-account "${RUNTIME_SERVICE_ACCOUNT}" \
+            --service-account "${MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT}" \
             --memory "512Mi" \
             --concurrency 1 \
             --timeout 300 \
