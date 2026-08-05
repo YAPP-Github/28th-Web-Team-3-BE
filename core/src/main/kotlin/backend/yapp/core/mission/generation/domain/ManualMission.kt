@@ -19,14 +19,8 @@ class ManualMission(
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 20)
     val category: MissionCategory,
-    @Column(name = "mission_text", nullable = false, length = 500)
+    @Column(name = "mission_text", nullable = false, length = 30)
     val missionText: String,
-    @Column(name = "structured_tags", nullable = false, length = 500)
-    val structuredTags: String,
-    @Column(name = "target_count", nullable = false)
-    val targetCount: Int,
-    @Column(name = "target_unit", nullable = false, length = 40)
-    val targetUnit: String,
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     var status: MissionStatus = MissionStatus.ACTIVE,

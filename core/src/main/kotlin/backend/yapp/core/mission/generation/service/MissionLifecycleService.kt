@@ -39,10 +39,9 @@ class MissionLifecycleService(
         guestUserId: Long,
         category: MissionCategory,
         text: String,
-        targetCount: Int,
-        targetUnit: String,
     ): LifecycleMissionSnapshot {
-        if (text.isBlank() || text.length > 500 || targetCount !in 1..100 || targetUnit.isBlank()) {
+        val normalizedText = text.trim()
+        if (normalizedText.isEmpty() || normalizedText.length > MAX_MANUAL_MISSION_TEXT_LENGTH) {
             throw BaseException(ErrorCode.MANUAL_MISSION_INVALID)
         }
         val now = clock.instant()
@@ -51,10 +50,7 @@ class MissionLifecycleService(
                 id = UUID.randomUUID(),
                 guestUserId = guestUserId,
                 category = category,
-                missionText = text.trim(),
-                structuredTags = tags(text, category),
-                targetCount = targetCount,
-                targetUnit = targetUnit.take(40),
+                missionText = normalizedText,
                 weekEndsAt = weekEnd(now),
                 createdAt = now,
             ),
@@ -151,14 +147,6 @@ class MissionLifecycleService(
         return nextMonday.atStartOfDay(zone).toInstant()
     }
 
-    private fun tags(text: String, category: MissionCategory): String {
-        val normalized = text.lowercase()
-        val detected = SAFE_TAG_KEYWORDS
-            .filterValues { keywords -> keywords.any(normalized::contains) }
-            .keys
-        return (setOf(category.name) + detected).joinToString(",")
-    }
-
     private fun recordOutcome(
         guestUserId: Long,
         source: MissionSource,
@@ -184,22 +172,12 @@ class MissionLifecycleService(
     )
 
     private fun ManualMission.toSnapshot() = LifecycleMissionSnapshot(
-        id, MissionSource.MANUAL, category, missionText, targetCount, targetUnit,
-        0, "NOT_ESTIMATED", status, weekEndsAt, createdAt,
+        id, MissionSource.MANUAL, category, missionText, null, null,
+        null, null, status, weekEndsAt, createdAt,
     )
 
     companion object {
-        private val SAFE_TAG_KEYWORDS = mapOf(
-            "DELIVERY" to setOf("배달"),
-            "DINING_OUT" to setOf("외식"),
-            "PAID_BEVERAGE" to setOf("카페", "음료"),
-            "TAXI" to setOf("택시"),
-            "PUBLIC_TRANSIT" to setOf("버스", "지하철", "대중교통"),
-            "SHOPPING" to setOf("쇼핑", "구매"),
-            "SUBSCRIPTION" to setOf("구독"),
-            "HOBBY" to setOf("취미", "게임", "공연"),
-            "INVENTORY" to setOf("재고", "냉장고"),
-        )
+        private const val MAX_MANUAL_MISSION_TEXT_LENGTH = 30
     }
 }
 
@@ -213,10 +191,10 @@ data class LifecycleMissionSnapshot(
     val source: MissionSource,
     val category: MissionCategory,
     val title: String,
-    val targetCount: Int,
-    val targetUnit: String,
-    val estimatedSavingsWon: Int,
-    val savingsEstimateVersion: String,
+    val targetCount: Int?,
+    val targetUnit: String?,
+    val estimatedSavingsWon: Int?,
+    val savingsEstimateVersion: String?,
     val status: MissionStatus,
     val weekEndsAt: Instant,
     val createdAt: Instant,

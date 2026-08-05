@@ -95,7 +95,11 @@ class MissionLifecycleAcceptanceTest(
         mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $owner"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.missions[0].source").value("MANUAL"))
-            .andExpect(jsonPath("$.missions[0].savingsLabel").value("예상 절약액 미산정"))
+            .andExpect(jsonPath("$.missions[0].targetCount").doesNotExist())
+            .andExpect(jsonPath("$.missions[0].targetUnit").doesNotExist())
+            .andExpect(jsonPath("$.missions[0].estimatedSavingsWon").doesNotExist())
+            .andExpect(jsonPath("$.missions[0].savingsEstimateVersion").doesNotExist())
+            .andExpect(jsonPath("$.missions[0].savingsLabel").doesNotExist())
 
         mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $other"))
             .andExpect(status().isOk)
@@ -107,6 +111,122 @@ class MissionLifecycleAcceptanceTest(
                     .header(AUTHORIZATION, "Bearer $owner"),
             ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.targetCount").doesNotExist())
+        }
+    }
+
+    @Test
+    fun `manual mission trims text and validates the normalized thirty character boundary`() {
+        val token = guestToken()
+        val thirtyCharacters = "가".repeat(30)
+
+        mockMvc.perform(
+            post("/api/missions/manual")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"category":"MEAL","text":"$thirtyCharacters  "}"""),
+        ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.title").value(thirtyCharacters))
+            .andExpect(jsonPath("$.targetCount").doesNotExist())
+
+        mockMvc.perform(
+            post("/api/missions/manual")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"category":"MEAL","text":"${"가".repeat(31)}"}"""),
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("MANUAL_MISSION_INVALID"))
+
+        mockMvc.perform(
+            post("/api/missions/manual")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"category":"MEAL","text":"   "}"""),
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("MANUAL_MISSION_INVALID"))
+    }
+
+    @Test
+    fun `manual mission ignores legacy target fields without persisting or returning them`() {
+        val token = guestToken()
+
+        mockMvc.perform(
+            post("/api/missions/manual")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "category": "MEAL",
+                      "text": "집밥 먹기",
+                      "targetCount": 99,
+                      "targetUnit": "TIMES_PER_WEEK"
+                    }
+                    """.trimIndent(),
+                ),
+        ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.title").value("집밥 먹기"))
+            .andExpect(jsonPath("$.targetCount").doesNotExist())
+            .andExpect(jsonPath("$.targetUnit").doesNotExist())
+    }
+
+    @Test
+    fun `manual mission rejects an invalid category`() {
+        val token = guestToken()
+
+        mockMvc.perform(
+            post("/api/missions/manual")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"category":"INVALID","text":"집밥 먹기"}"""),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `recommended mission retains measurement and savings response fields`() {
+        val token = issueReadyGuest()
+        createRecommended(token)
+
+        mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.missions[0].source").value("RECOMMENDED"))
+            .andExpect(jsonPath("$.missions[0].targetCount").isNumber)
+            .andExpect(jsonPath("$.missions[0].targetUnit").isString)
+            .andExpect(jsonPath("$.missions[0].estimatedSavingsWon").isNumber)
+            .andExpect(jsonPath("$.missions[0].savingsEstimateVersion").isString)
+            .andExpect(jsonPath("$.missions[0].savingsLabel").isString)
+    }
+
+    @Test
+    fun `manual mission schema retains only category and text domain fields`() {
+        dataSource.connection.use { connection ->
+            listOf("structured_tags", "target_count", "target_unit").forEach { column ->
+                connection.prepareStatement(
+                    """
+                    SELECT COUNT(*)
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE LOWER(TABLE_NAME) = 'manual_mission' AND LOWER(COLUMN_NAME) = ?
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, column)
+                    statement.executeQuery().use { result ->
+                        assertTrue(result.next())
+                        assertEquals(0, result.getInt(1))
+                    }
+                }
+            }
+            connection.prepareStatement(
+                """
+                SELECT CHARACTER_MAXIMUM_LENGTH
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE LOWER(TABLE_NAME) = 'manual_mission' AND LOWER(COLUMN_NAME) = 'mission_text'
+                """.trimIndent(),
+            ).use { statement ->
+                statement.executeQuery().use { result ->
+                    assertTrue(result.next())
+                    assertEquals(30, result.getInt(1))
+                }
+            }
         }
     }
 
@@ -139,6 +259,10 @@ class MissionLifecycleAcceptanceTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.paths['/api/missions'].get").exists())
             .andExpect(jsonPath("$.paths['/api/missions/manual'].post").exists())
+            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.category").exists())
+            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.text").exists())
+            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.targetCount").doesNotExist())
+            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.targetUnit").doesNotExist())
             .andExpect(jsonPath("$.paths['/api/missions/recommended/{missionId}'].delete.responses['204']").exists())
             .andExpect(jsonPath("$.paths['/api/missions/{source}/{missionId}/complete'].patch").exists())
     }
@@ -152,14 +276,13 @@ class MissionLifecycleAcceptanceTest(
                     """
                     {
                       "category": "MEAL",
-                      "text": "이번 주 배달 대신 집밥 먹기",
-                      "targetCount": 2,
-                      "targetUnit": "TIMES_PER_WEEK"
+                      "text": "이번 주 배달 대신 집밥 먹기"
                     }
                     """.trimIndent(),
                 ),
         ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.targetCount").doesNotExist())
             .andReturn().response.contentAsString
 
     private fun guestToken(): String {

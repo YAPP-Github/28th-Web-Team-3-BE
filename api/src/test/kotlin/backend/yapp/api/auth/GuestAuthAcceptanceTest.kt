@@ -290,8 +290,8 @@ class GuestAuthAcceptanceTest(
             VALUES ('$draftId', '$jobId', $templateId, 'MEAL', 'title', 'description', 'ACTION', 'COUNT', 1, 'TIMES_PER_WEEK', 1000, CURRENT_TIMESTAMP);
             INSERT INTO mission (id, job_id, draft_id, guest_user_id, category, title, description, action_code, metric_type, target_count, target_unit, estimated_savings_won, status, created_at, week_ends_at)
             VALUES ('$missionId', '$jobId', '$draftId', $guestUserId, 'MEAL', 'title', 'description', 'ACTION', 'COUNT', 1, 'TIMES_PER_WEEK', 1000, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-            INSERT INTO manual_mission (id, guest_user_id, category, mission_text, structured_tags, target_count, target_unit, status, week_ends_at, created_at)
-            VALUES ('${UUID.randomUUID()}', $guestUserId, 'MEAL', 'text', '[]', 1, 'TIMES_PER_WEEK', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+            INSERT INTO manual_mission (id, guest_user_id, category, mission_text, status, week_ends_at, created_at)
+            VALUES ('${UUID.randomUUID()}', $guestUserId, 'MEAL', 'text', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
             INSERT INTO mission_outcome_event (id, guest_user_id, mission_source, mission_id, final_status, occurred_at)
             VALUES ('${UUID.randomUUID()}', $guestUserId, 'RECOMMENDED', '$missionId', 'COMPLETED', CURRENT_TIMESTAMP);
             INSERT INTO mission_recommendation_snapshot (id, guest_user_id, algorithm_version, semantic_provider, semantic_model_version, eligible_candidate_ids, retrieved_candidate_ids, weekly_context_snapshot, created_at)
