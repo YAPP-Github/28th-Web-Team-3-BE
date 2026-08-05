@@ -12,21 +12,25 @@ import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.KotlinModule
+import java.time.Duration
 
 class SpringAiMissionDraftContentGenerator(
     private val client: MissionDraftAiClient,
     private val objectMapper: ObjectMapper,
     private val prompt: MissionPromptProperties,
+    private val telemetry: MissionDraftGenerationTelemetry = NoopMissionDraftGenerationTelemetry,
 ) : MissionDraftContentGenerator {
-    override fun generate(request: MissionDraftContentRequest): MissionDraftContentResult =
-        runCatching {
+    override fun generate(request: MissionDraftContentRequest): MissionDraftContentResult {
+        val startedAt = System.nanoTime()
+        return try {
             validateCandidateIds(request.candidates)
             if (request.candidates.isEmpty()) {
-                return@runCatching MissionDraftContentResult(
+                return MissionDraftContentResult(
                     copies = emptyList(),
                     source = MissionDraftGenerationSource.AI,
                 )
             }
+            telemetry.attempted(request.candidates.size)
             val response = client.generate(
                 MissionDraftAiRequest(
                     systemInstruction = prompt.systemInstruction,
@@ -37,12 +41,19 @@ class SpringAiMissionDraftContentGenerator(
                 copies = validateResponse(response, request.candidates),
                 source = MissionDraftGenerationSource.AI,
             )
-        }.getOrElse {
+                .also {
+                    telemetry.succeeded(request.candidates.size, elapsedSince(startedAt))
+                }
+        } catch (error: Throwable) {
+            val failure = MissionDraftGenerationFailureClassifier.classify(error)
+            telemetry.failed(failure, request.candidates.size, elapsedSince(startedAt))
+            telemetry.fallbackUsed(failure, request.candidates.size)
             MissionDraftContentResult(
                 copies = fallback(request.candidates),
                 source = MissionDraftGenerationSource.TEMPLATE_FALLBACK,
             )
         }
+    }
 
     private fun userInstruction(candidates: List<MissionDraftCandidate>): String {
         val candidateInput = candidates.map { candidate ->
@@ -68,8 +79,10 @@ class SpringAiMissionDraftContentGenerator(
     }
 
     private fun validateCandidateIds(candidates: List<MissionDraftCandidate>) {
-        require(candidates.map { it.templateId }.distinct().size == candidates.size) {
-            "Candidate templateId values must be unique"
+        if (candidates.map { it.templateId }.distinct().size != candidates.size) {
+            throw MissionDraftResponseValidationException(
+                MissionDraftValidationRule.CANDIDATE_TEMPLATE_ID_DUPLICATED,
+            )
         }
     }
 
@@ -85,23 +98,36 @@ class SpringAiMissionDraftContentGenerator(
                 description = item.description,
             )
         }
-        require(copies.size == candidates.size) { "AI response item count changed" }
-        require(copies.map { it.templateId }.distinct().size == copies.size) {
-            "AI response templateId values must be unique"
+        if (copies.size != candidates.size) {
+            throw MissionDraftResponseValidationException(
+                MissionDraftValidationRule.RESPONSE_ITEM_COUNT_MISMATCH,
+            )
         }
-        require(copies.map { it.templateId }.toSet() == expectedIds) {
-            "AI response templateId set changed"
+        if (copies.map { it.templateId }.distinct().size != copies.size) {
+            throw MissionDraftResponseValidationException(
+                MissionDraftValidationRule.RESPONSE_TEMPLATE_ID_DUPLICATED,
+            )
         }
-        require(copies.all { copy ->
-            copy.title.isNotBlank() &&
-                copy.title.length <= MAX_TITLE_LENGTH &&
-                copy.description.isNotBlank() &&
-                copy.description.length <= MAX_DESCRIPTION_LENGTH
-        }) {
-            "AI response copy violated text constraints"
+        if (copies.map { it.templateId }.toSet() != expectedIds) {
+            throw MissionDraftResponseValidationException(
+                MissionDraftValidationRule.RESPONSE_TEMPLATE_ID_SET_MISMATCH,
+            )
+        }
+        if (copies.any { copy ->
+                copy.title.isBlank() ||
+                    copy.title.length > MAX_TITLE_LENGTH ||
+                    copy.description.isBlank() ||
+                    copy.description.length > MAX_DESCRIPTION_LENGTH
+            }
+        ) {
+            throw MissionDraftResponseValidationException(
+                MissionDraftValidationRule.RESPONSE_COPY_TEXT_CONSTRAINT_VIOLATED,
+            )
         }
         return copies
     }
+
+    private fun elapsedSince(startedAt: Long): Duration = Duration.ofNanos(System.nanoTime() - startedAt)
 
     private fun fallback(candidates: List<MissionDraftCandidate>): List<MissionDraftCopy> =
         candidates.map { candidate ->

@@ -2,9 +2,11 @@ package backend.yapp.infra.mission.generation
 
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.embedding.EmbeddingModel
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -34,6 +36,7 @@ class MissionAiInfrastructureConfig {
         chatClientBuilder: ChatClient.Builder,
         objectMapper: ObjectMapper,
         properties: MissionGenerationProperties,
+        telemetry: MissionDraftGenerationTelemetry,
         @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
     ): MissionDraftContentGenerator {
         validateGoogleGenAiAuthentication(apiKey)
@@ -41,8 +44,17 @@ class MissionAiInfrastructureConfig {
             client = ChatClientMissionDraftAiClient(chatClientBuilder.build()),
             objectMapper = objectMapper,
             prompt = properties.prompt,
+            telemetry = telemetry,
         )
     }
+
+    @Bean
+    fun missionDraftGenerationTelemetry(
+        meterRegistryProvider: ObjectProvider<MeterRegistry>,
+    ): MissionDraftGenerationTelemetry =
+        meterRegistryProvider.ifAvailable
+            ?.let(::MicrometerMissionDraftGenerationTelemetry)
+            ?: NoopMissionDraftGenerationTelemetry
 
     @Bean
     @ConditionalOnProperty(

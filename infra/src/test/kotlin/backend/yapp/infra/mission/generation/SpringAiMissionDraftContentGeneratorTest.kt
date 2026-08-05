@@ -6,6 +6,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import java.util.UUID
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -115,8 +116,31 @@ class SpringAiMissionDraftContentGeneratorTest {
         assertEquals("기본 제목 1", result.copies.single().title)
     }
 
-    private fun generator(client: MissionDraftAiClient): SpringAiMissionDraftContentGenerator =
-        SpringAiMissionDraftContentGenerator(client, objectMapper, prompt)
+    @Test
+    fun `records a safe typed validation failure before using fallback`() {
+        val telemetry = RecordingTelemetry()
+        val result = generator(
+            client = {
+                MissionDraftAiResponse(emptyList())
+            },
+            telemetry = telemetry,
+        ).generate(request())
+
+        assertEquals(MissionDraftGenerationSource.TEMPLATE_FALLBACK, result.source)
+        assertEquals(
+            MissionDraftGenerationFailureCategory.RESPONSE_BUSINESS_VALIDATION,
+            telemetry.failures.single().category,
+        )
+        assertEquals("RESPONSE_ITEM_COUNT_MISMATCH", telemetry.failures.single().code)
+        assertEquals(1, telemetry.fallbacks.size)
+        assertEquals(1, telemetry.attempts)
+    }
+
+    private fun generator(
+        telemetry: MissionDraftGenerationTelemetry = NoopMissionDraftGenerationTelemetry,
+        client: MissionDraftAiClient,
+    ): SpringAiMissionDraftContentGenerator =
+        SpringAiMissionDraftContentGenerator(client, objectMapper, prompt, telemetry)
 
     private fun request(
         candidates: List<MissionDraftCandidate> = listOf(candidate(1)),
@@ -139,4 +163,24 @@ class SpringAiMissionDraftContentGeneratorTest {
             targetUnit = "TIMES_PER_WEEK",
             estimatedSavingsWon = 5_000,
         )
+
+    private class RecordingTelemetry : MissionDraftGenerationTelemetry {
+        var attempts = 0
+        val failures = mutableListOf<MissionDraftGenerationFailure>()
+        val fallbacks = mutableListOf<MissionDraftGenerationFailure>()
+
+        override fun attempted(candidateCount: Int) {
+            attempts++
+        }
+
+        override fun succeeded(candidateCount: Int, duration: Duration) = Unit
+
+        override fun failed(failure: MissionDraftGenerationFailure, candidateCount: Int, duration: Duration) {
+            failures += failure
+        }
+
+        override fun fallbackUsed(failure: MissionDraftGenerationFailure, candidateCount: Int) {
+            fallbacks += failure
+        }
+    }
 }
