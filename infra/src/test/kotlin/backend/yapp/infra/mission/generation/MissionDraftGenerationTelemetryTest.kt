@@ -62,6 +62,9 @@ class MissionDraftGenerationTelemetryTest {
         telemetry.succeeded(candidateCount = 16, duration = Duration.ofMillis(10))
         telemetry.failed(validationFailure, candidateCount = 16, duration = Duration.ofMillis(20))
         telemetry.fallbackUsed(validationFailure, candidateCount = 16)
+        telemetry.retryScheduled(
+            MissionDraftGenerationFailureClassifier.classify(ApiException(429, "RESOURCE_EXHAUSTED", "secret")),
+        )
 
         assertEquals(1.0, registry.get(MicrometerMissionDraftGenerationTelemetry.AI_ATTEMPTS).counter().count())
         assertEquals(1.0, registry.get(MicrometerMissionDraftGenerationTelemetry.AI_SUCCEEDED).counter().count())
@@ -70,6 +73,14 @@ class MissionDraftGenerationTelemetryTest {
             registry.get(MicrometerMissionDraftGenerationTelemetry.AI_FAILURES)
                 .tag("category", "RESPONSE_BUSINESS_VALIDATION")
                 .tag("code", "RESPONSE_ITEM_COUNT_MISMATCH")
+                .counter()
+                .count(),
+        )
+        assertEquals(
+            1.0,
+            registry.get(MicrometerMissionDraftGenerationTelemetry.AI_RETRIES)
+                .tag("category", "PROVIDER_QUOTA_OR_RATE_LIMIT")
+                .tag("code", "PROVIDER_RATE_LIMITED")
                 .counter()
                 .count(),
         )

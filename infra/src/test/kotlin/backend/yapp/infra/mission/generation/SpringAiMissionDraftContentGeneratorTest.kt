@@ -5,6 +5,7 @@ import backend.yapp.core.mission.generation.domain.MissionMetricType
 import backend.yapp.core.mission.generation.port.MissionDraftCandidate
 import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
+import com.google.genai.errors.ApiException
 import java.util.UUID
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
@@ -117,6 +118,34 @@ class SpringAiMissionDraftContentGeneratorTest {
     }
 
     @Test
+    fun `retries a rate limited provider response before returning AI copy`() {
+        val telemetry = RecordingTelemetry()
+        var calls = 0
+        val sleeps = mutableListOf<Duration>()
+        val generator = SpringAiMissionDraftContentGenerator(
+            client = {
+                calls++
+                if (calls == 1) throw ApiException(429, "RESOURCE_EXHAUSTED", "redacted")
+                MissionDraftAiResponse(listOf(MissionDraftAiCopy(1, "생성 제목", "생성 설명")))
+            },
+            objectMapper = objectMapper,
+            prompt = prompt,
+            telemetry = telemetry,
+            rateLimitRetry = MissionDraftRateLimitRetryProperties(maxAttempts = 3),
+            sleeper = sleeps::add,
+        )
+
+        val result = generator.generate(request())
+
+        assertEquals(MissionDraftGenerationSource.AI, result.source)
+        assertEquals(2, calls)
+        assertEquals(listOf(Duration.ofMillis(500)), sleeps)
+        assertEquals(1, telemetry.retries.size)
+        assertEquals("PROVIDER_RATE_LIMITED", telemetry.retries.single().code)
+        assertEquals(0, telemetry.failures.size)
+    }
+
+    @Test
     fun `records a safe typed validation failure before using fallback`() {
         val telemetry = RecordingTelemetry()
         val result = generator(
@@ -168,6 +197,7 @@ class SpringAiMissionDraftContentGeneratorTest {
         var attempts = 0
         val failures = mutableListOf<MissionDraftGenerationFailure>()
         val fallbacks = mutableListOf<MissionDraftGenerationFailure>()
+        val retries = mutableListOf<MissionDraftGenerationFailure>()
 
         override fun attempted(candidateCount: Int) {
             attempts++
@@ -181,6 +211,10 @@ class SpringAiMissionDraftContentGeneratorTest {
 
         override fun fallbackUsed(failure: MissionDraftGenerationFailure, candidateCount: Int) {
             fallbacks += failure
+        }
+
+        override fun retryScheduled(failure: MissionDraftGenerationFailure) {
+            retries += failure
         }
     }
 }

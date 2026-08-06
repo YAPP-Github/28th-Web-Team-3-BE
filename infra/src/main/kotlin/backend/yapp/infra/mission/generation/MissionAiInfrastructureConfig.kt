@@ -45,6 +45,7 @@ class MissionAiInfrastructureConfig {
             objectMapper = objectMapper,
             prompt = properties.prompt,
             telemetry = telemetry,
+            rateLimitRetry = properties.rateLimitRetry,
         )
     }
 

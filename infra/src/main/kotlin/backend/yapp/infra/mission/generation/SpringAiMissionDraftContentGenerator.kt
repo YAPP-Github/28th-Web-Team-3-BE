@@ -19,6 +19,8 @@ class SpringAiMissionDraftContentGenerator(
     private val objectMapper: ObjectMapper,
     private val prompt: MissionPromptProperties,
     private val telemetry: MissionDraftGenerationTelemetry = NoopMissionDraftGenerationTelemetry,
+    private val rateLimitRetry: MissionDraftRateLimitRetryProperties = MissionDraftRateLimitRetryProperties(),
+    private val sleeper: (Duration) -> Unit = { duration -> Thread.sleep(duration.toMillis()) },
 ) : MissionDraftContentGenerator {
     override fun generate(request: MissionDraftContentRequest): MissionDraftContentResult {
         val startedAt = System.nanoTime()
@@ -31,12 +33,7 @@ class SpringAiMissionDraftContentGenerator(
                 )
             }
             telemetry.attempted(request.candidates.size)
-            val response = client.generate(
-                MissionDraftAiRequest(
-                    systemInstruction = prompt.systemInstruction,
-                    userInstruction = userInstruction(request.candidates),
-                ),
-            )
+            val response = generateWithRateLimitRetry(request)
             MissionDraftContentResult(
                 copies = validateResponse(response, request.candidates),
                 source = MissionDraftGenerationSource.AI,
@@ -75,6 +72,33 @@ class SpringAiMissionDraftContentGenerator(
             appendLine("<candidate-data>")
             appendLine(objectMapper.writeValueAsString(candidateInput))
             append("</candidate-data>")
+        }
+    }
+
+    private fun generateWithRateLimitRetry(request: MissionDraftContentRequest): MissionDraftAiResponse {
+        val aiRequest = MissionDraftAiRequest(
+            systemInstruction = prompt.systemInstruction,
+            userInstruction = userInstruction(request.candidates),
+        )
+        var attempt = 1
+        var backoff = rateLimitRetry.initialBackoff
+        while (true) {
+            try {
+                return client.generate(aiRequest)
+            } catch (error: Throwable) {
+                val failure = MissionDraftGenerationFailureClassifier.classify(error)
+                if (
+                    failure.category != MissionDraftGenerationFailureCategory.PROVIDER_QUOTA_OR_RATE_LIMIT ||
+                    attempt >= rateLimitRetry.maxAttempts
+                ) {
+                    throw error
+                }
+                telemetry.retryScheduled(failure)
+                sleeper(backoff)
+                val doubledBackoff = backoff.multipliedBy(2)
+                backoff = if (doubledBackoff > rateLimitRetry.maxBackoff) rateLimitRetry.maxBackoff else doubledBackoff
+                attempt++
+            }
         }
     }
 

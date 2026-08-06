@@ -141,6 +141,8 @@ interface MissionDraftGenerationTelemetry {
     fun failed(failure: MissionDraftGenerationFailure, candidateCount: Int, duration: Duration)
 
     fun fallbackUsed(failure: MissionDraftGenerationFailure, candidateCount: Int)
+
+    fun retryScheduled(failure: MissionDraftGenerationFailure)
 }
 
 object NoopMissionDraftGenerationTelemetry : MissionDraftGenerationTelemetry {
@@ -151,6 +153,8 @@ object NoopMissionDraftGenerationTelemetry : MissionDraftGenerationTelemetry {
     override fun failed(failure: MissionDraftGenerationFailure, candidateCount: Int, duration: Duration) = Unit
 
     override fun fallbackUsed(failure: MissionDraftGenerationFailure, candidateCount: Int) = Unit
+
+    override fun retryScheduled(failure: MissionDraftGenerationFailure) = Unit
 }
 
 class MicrometerMissionDraftGenerationTelemetry(
@@ -181,6 +185,10 @@ class MicrometerMissionDraftGenerationTelemetry(
 
     override fun fallbackUsed(failure: MissionDraftGenerationFailure, candidateCount: Int) {
         meterRegistry.counter(FALLBACKS, "reason_category", failure.category.name).increment()
+    }
+
+    override fun retryScheduled(failure: MissionDraftGenerationFailure) {
+        meterRegistry.counter(AI_RETRIES, "category", failure.category.name, "code", failure.code).increment()
     }
 
     private fun recordDuration(outcome: String, category: String, duration: Duration) {
@@ -220,6 +228,7 @@ class MicrometerMissionDraftGenerationTelemetry(
         const val AI_SUCCEEDED = "mission_generation_ai_succeeded_total"
         const val AI_FAILURES = "mission_generation_ai_failures_total"
         const val FALLBACKS = "mission_generation_fallbacks_total"
+        const val AI_RETRIES = "mission_generation_ai_retries_total"
         const val VALIDATION_FAILURES = "mission_generation_validation_failures_total"
         const val AI_DURATION = "mission_generation_ai_duration_seconds"
 
