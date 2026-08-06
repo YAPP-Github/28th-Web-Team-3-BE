@@ -15,6 +15,7 @@ data class MissionGenerationProperties(
 )
 
 data class MissionDraftRateLimitRetryProperties(
+    /** The total number of provider calls, including the initial call. */
     val maxAttempts: Int = 3,
     val initialBackoff: Duration = Duration.ofMillis(500),
     val maxBackoff: Duration = Duration.ofSeconds(2),

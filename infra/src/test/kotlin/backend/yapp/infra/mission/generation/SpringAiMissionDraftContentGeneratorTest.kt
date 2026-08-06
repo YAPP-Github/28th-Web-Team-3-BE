@@ -146,6 +146,33 @@ class SpringAiMissionDraftContentGeneratorTest {
     }
 
     @Test
+    fun `falls back after the configured total provider attempts are rate limited`() {
+        val telemetry = RecordingTelemetry()
+        var calls = 0
+        val sleeps = mutableListOf<Duration>()
+        val generator = SpringAiMissionDraftContentGenerator(
+            client = {
+                calls++
+                throw ApiException(429, "RESOURCE_EXHAUSTED", "redacted")
+            },
+            objectMapper = objectMapper,
+            prompt = prompt,
+            telemetry = telemetry,
+            rateLimitRetry = MissionDraftRateLimitRetryProperties(maxAttempts = 3),
+            sleeper = sleeps::add,
+        )
+
+        val result = generator.generate(request())
+
+        assertEquals(MissionDraftGenerationSource.TEMPLATE_FALLBACK, result.source)
+        assertEquals(3, calls)
+        assertEquals(listOf(Duration.ofMillis(500), Duration.ofSeconds(1)), sleeps)
+        assertEquals(2, telemetry.retries.size)
+        assertEquals(1, telemetry.failures.size)
+        assertEquals("PROVIDER_RATE_LIMITED", telemetry.failures.single().code)
+    }
+
+    @Test
     fun `records a safe typed validation failure before using fallback`() {
         val telemetry = RecordingTelemetry()
         val result = generator(
