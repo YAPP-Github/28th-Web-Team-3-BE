@@ -8,10 +8,26 @@ data class MissionGenerationProperties(
     val aiActivation: String = "off",
     val executor: ExecutorProperties = ExecutorProperties(),
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
+    val rateLimitRetry: MissionDraftRateLimitRetryProperties = MissionDraftRateLimitRetryProperties(),
     val prompt: MissionPromptProperties = MissionPromptProperties(),
     val recommendation: RecommendationProperties = RecommendationProperties(),
     val delivery: DeliveryProperties = DeliveryProperties(),
 )
+
+data class MissionDraftRateLimitRetryProperties(
+    /** The total number of provider calls, including the initial call. */
+    val maxAttempts: Int = 3,
+    val initialBackoff: Duration = Duration.ofMillis(500),
+    val maxBackoff: Duration = Duration.ofSeconds(2),
+) {
+    init {
+        require(maxAttempts >= 1) { "mission.generation.rate-limit-retry.max-attempts must be at least 1" }
+        require(!initialBackoff.isNegative) { "mission.generation.rate-limit-retry.initial-backoff must not be negative" }
+        require(maxBackoff >= initialBackoff) {
+            "mission.generation.rate-limit-retry.max-backoff must be greater than or equal to initial-backoff"
+        }
+    }
+}
 
 data class DeliveryProperties(
     val enabled: Boolean = false,

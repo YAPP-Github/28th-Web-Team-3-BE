@@ -58,6 +58,10 @@ mission:
     scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:true}
   generation:
     ai-activation: ${AI_ACTIVATION:off}
+    rate-limit-retry:
+      max-attempts: ${MISSION_GENERATION_RATE_LIMIT_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff: ${MISSION_GENERATION_RATE_LIMIT_RETRY_INITIAL_BACKOFF:PT0.5S}
+      max-backoff: ${MISSION_GENERATION_RATE_LIMIT_RETRY_MAX_BACKOFF:PT2S}
     stale-running-timeout: PT10M
     recovery-interval-millis: 60000
     delivery:
