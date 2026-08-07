@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 
 data class GoalStatusResponse(
     val targetAmountManwon: Int,
+    val periodMonths: Int,
     val totalSavedManwon: Int,
     val progressPercent: Int,
     val usageMonths: Int,
@@ -15,6 +16,7 @@ data class GoalStatusResponse(
         fun from(status: GoalStatus): GoalStatusResponse =
             GoalStatusResponse(
                 targetAmountManwon = status.targetAmountManwon,
+                periodMonths = status.periodMonths,
                 totalSavedManwon = status.totalSavedManwon,
                 progressPercent = status.progressPercent,
                 usageMonths = status.usageMonths,

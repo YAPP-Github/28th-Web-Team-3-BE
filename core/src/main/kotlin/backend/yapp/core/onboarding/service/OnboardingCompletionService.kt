@@ -1,15 +1,14 @@
 package backend.yapp.core.onboarding.service
 
-import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
-import backend.yapp.core.onboarding.domain.OnboardingStatus
+import backend.yapp.core.goal.domain.GoalRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class OnboardingCompletionService(
-    private val profileRepository: OnboardingProfileRepository,
+    private val goalRepository: GoalRepository,
 ) {
     @Transactional(readOnly = true)
     fun isCompleted(guestUserId: Long): Boolean =
-        profileRepository.findByGuestUserId(guestUserId)?.status == OnboardingStatus.COMPLETED
+        goalRepository.findByGuestUserId(guestUserId) != null
 }

@@ -227,6 +227,32 @@ class MissionGenerationAcceptanceTest(
                 statement.setObject(3, now)
                 statement.executeUpdate()
             }
+            connection.prepareStatement(
+                """
+                    INSERT INTO onboarding_goal
+                        (guest_user_id, plan, period_months, monthly_saving_manwon, uplift_permille,
+                         target_amount_manwon, config_version, created_at)
+                    VALUES (?, 'PLAN_1', 24, 100, 150, 2760, 'test', ?)
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, guestUserId)
+                statement.setObject(2, now)
+                statement.executeUpdate()
+            }
+            connection.prepareStatement(
+                """
+                    INSERT INTO goal
+                        (guest_user_id, target_amount_manwon, period_months, monthly_target_manwon,
+                         base_amount_manwon, started_at, created_at, updated_at, version)
+                    VALUES (?, 2760, 24, 100, 1800, ?, ?, ?, 0)
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, guestUserId)
+                statement.setObject(2, now)
+                statement.setObject(3, now)
+                statement.setObject(4, now)
+                statement.executeUpdate()
+            }
         }
     }
 
