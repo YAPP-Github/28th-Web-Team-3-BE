@@ -25,6 +25,7 @@ enum class ErrorCode(
     INVALID_ONBOARDING_INPUT(HttpStatus.BAD_REQUEST, 400, "온보딩 입력값이 올바르지 않습니다."),
     ONBOARDING_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "온보딩 정보가 없습니다."),
     ONBOARDING_INCOMPLETE(HttpStatus.CONFLICT, 409, "온보딩 입력이 완료되지 않았습니다."),
+    ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, 409, "이미 온보딩이 완료되었습니다."),
 
     // Mission survey
     MISSION_SURVEY_INVALID(HttpStatus.BAD_REQUEST, 400, "미션 설문 응답이 올바르지 않습니다."),

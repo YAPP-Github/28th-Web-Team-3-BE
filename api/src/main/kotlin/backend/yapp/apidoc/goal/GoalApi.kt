@@ -25,7 +25,7 @@ interface GoalApi {
         description = "홈·목표 상세 화면 데이터를 반환한다.<br><br>" +
             "전체: 목표 금액, 총 저축액(온보딩 순자산 + 누적 저축), 진행률(%, 100 캡), 서비스 사용기간(개월), 목표일 D-day<br>" +
             "이번 달: 목표 금액(온보딩 월저축), 이번 달 저축액, 진행률, 말일까지 D-day<br><br>" +
-            "온보딩 목표가 확정되지 않았으면 409. 최초 조회 시 온보딩 확정 데이터로 목표가 생성된다.",
+            "온보딩 목표가 확정되지 않았으면 409. 목표는 온보딩 목표 확정 시 생성된다.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = GoalStatusResponse::class))]),

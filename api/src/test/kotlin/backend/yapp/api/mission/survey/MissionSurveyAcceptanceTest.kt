@@ -132,7 +132,7 @@ class MissionSurveyAcceptanceTest(
             )
 
         assertEquals(
-            (1..15).map(Int::toString),
+            (1..16).map(Int::toString),
             queryStrings(
                 """
                     SELECT version

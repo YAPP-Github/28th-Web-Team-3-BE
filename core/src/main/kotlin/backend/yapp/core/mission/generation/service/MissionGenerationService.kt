@@ -12,8 +12,7 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepositor
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionRepository
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
-import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
-import backend.yapp.core.onboarding.domain.OnboardingStatus
+import backend.yapp.core.goal.domain.GoalRepository
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
@@ -30,16 +29,14 @@ class MissionGenerationService(
     private val jobRepository: MissionGenerationJobRepository,
     private val draftRepository: MissionDraftRepository,
     private val missionRepository: MissionRepository,
-    private val onboardingProfileRepository: OnboardingProfileRepository,
+    private val goalRepository: GoalRepository,
     private val surveyRepository: MissionSurveyRepository,
     private val clock: Clock,
     private val outboxRepository: MissionGenerationOutboxRepository,
 ) {
     @Transactional
     fun request(guestUserId: Long): MissionGenerationJobSnapshot {
-        val profile = onboardingProfileRepository.findByGuestUserIdForUpdate(guestUserId)
-            ?: throw BaseException(ErrorCode.ONBOARDING_INCOMPLETE)
-        if (profile.status != OnboardingStatus.COMPLETED) {
+        if (goalRepository.findByGuestUserId(guestUserId) == null) {
             throw BaseException(ErrorCode.ONBOARDING_INCOMPLETE)
         }
         if (surveyRepository.findByGuestUserId(guestUserId) == null) {

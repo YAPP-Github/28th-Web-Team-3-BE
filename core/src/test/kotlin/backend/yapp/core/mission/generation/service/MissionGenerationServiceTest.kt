@@ -8,9 +8,8 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxReposi
 import backend.yapp.core.mission.generation.domain.MissionRepository
 import backend.yapp.core.mission.survey.domain.MissionSurvey
 import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
-import backend.yapp.core.onboarding.domain.OnboardingProfile
-import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
-import backend.yapp.core.onboarding.domain.OnboardingStatus
+import backend.yapp.core.goal.domain.Goal
+import backend.yapp.core.goal.domain.GoalRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -33,8 +32,8 @@ class MissionGenerationServiceTest {
             guestUserId = GUEST_USER_ID,
             createdAt = now,
         ).also { it.start(now) }
-        `when`(fixture.onboardingRepository.findByGuestUserIdForUpdate(GUEST_USER_ID))
-            .thenReturn(OnboardingProfile(GUEST_USER_ID, status = OnboardingStatus.COMPLETED))
+        `when`(fixture.goalRepository.findByGuestUserId(GUEST_USER_ID))
+            .thenReturn(Goal(GUEST_USER_ID, 2_000, 24, 100, 0, now))
         `when`(fixture.surveyRepository.findByGuestUserId(GUEST_USER_ID))
             .thenReturn(MissionSurvey(GUEST_USER_ID))
         `when`(
@@ -58,7 +57,7 @@ class MissionGenerationServiceTest {
 
     private fun fixture(): Fixture {
         val jobRepository = mock(MissionGenerationJobRepository::class.java)
-        val onboardingRepository = mock(OnboardingProfileRepository::class.java)
+        val goalRepository = mock(GoalRepository::class.java)
         val surveyRepository = mock(MissionSurveyRepository::class.java)
         val draftRepository = mock(MissionDraftRepository::class.java)
         val missionRepository = mock(MissionRepository::class.java)
@@ -67,7 +66,7 @@ class MissionGenerationServiceTest {
             jobRepository = jobRepository,
             draftRepository = draftRepository,
             missionRepository = missionRepository,
-            onboardingProfileRepository = onboardingRepository,
+            goalRepository = goalRepository,
             surveyRepository = surveyRepository,
             clock = Clock.fixed(now, ZoneOffset.UTC),
             outboxRepository = outboxRepository,
@@ -75,7 +74,7 @@ class MissionGenerationServiceTest {
         return Fixture(
             service,
             jobRepository,
-            onboardingRepository,
+            goalRepository,
             surveyRepository,
             outboxRepository,
         )
@@ -84,7 +83,7 @@ class MissionGenerationServiceTest {
     private data class Fixture(
         val service: MissionGenerationService,
         val jobRepository: MissionGenerationJobRepository,
-        val onboardingRepository: OnboardingProfileRepository,
+        val goalRepository: GoalRepository,
         val surveyRepository: MissionSurveyRepository,
         val outboxRepository: MissionGenerationOutboxRepository,
     )

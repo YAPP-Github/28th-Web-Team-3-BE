@@ -30,6 +30,7 @@ class GoalAcceptanceTest(
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(2760))
+            .andExpect(jsonPath("$.periodMonths").value(24))
             .andExpect(jsonPath("$.totalSavedManwon").value(0))
             .andExpect(jsonPath("$.thisMonth.targetManwon").value(100))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(0))
@@ -49,6 +50,7 @@ class GoalAcceptanceTest(
             .contentType(MediaType.APPLICATION_JSON).content("""{"targetAmountManwon":5000,"periodMonths":36}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(5000))
+            .andExpect(jsonPath("$.periodMonths").value(36))
             .andExpect(jsonPath("$.totalSavedManwon").value(20))
     }
 

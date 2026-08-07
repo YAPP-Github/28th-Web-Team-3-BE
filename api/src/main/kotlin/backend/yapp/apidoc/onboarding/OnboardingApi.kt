@@ -35,12 +35,12 @@ interface OnboardingApi {
             "4/4 목표기간: goalPeriodMonths<br><br>" +
             "스텝마다 서버에 저장하므로 앱을 껐다 켜도 진행 상태가 복원된다. <br><br>" +
             "월저축액이 월급을 초과하면 400(INVALID_ONBOARDING_INPUT).<br><br> " +
-            "목표 확정(COMPLETED) 이후 월저축액·목표기간을 바꾸면 확정해 둔 목표와 어긋나므로, " +
-            "목표가 무효화되고 진행 중(IN_PROGRESS) 상태로 되돌아간다.",
+            "온보딩이 완료(COMPLETED)된 뒤에는 수정할 수 없다. 완료 후 목표 금액·기간 변경은 Goal API를 사용한다.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "저장 성공", content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "400", description = "INVALID_ONBOARDING_INPUT 또는 VALIDATION_FAILED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "409", description = "ONBOARDING_ALREADY_COMPLETED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun patchProfile(guestUserId: Long, request: ProfilePatchRequest): ProfileResponse
@@ -100,7 +100,7 @@ interface OnboardingApi {
         description = "목표 선택 화면의 '이 목표로 시작' 동작. 사용자가 고른 안(PLAN_1 확실하게 / PLAN_2 여유롭게)으로 " +
             "목표를 확정 저장하고, 온보딩을 완료(COMPLETED) 처리한다. <br>" +
                 "확정된 목표 금액·기간을 반환한다. <br>" +
-            "이미 확정된 목표가 있으면 새 선택으로 대체된다. <br><br> " +
+            "이미 온보딩을 완료했다면 409(ONBOARDING_ALREADY_COMPLETED). <br><br> " +
                 "월저축액·목표기간이 없으면 409(ONBOARDING_INCOMPLETE).",
     )
     @ApiResponses(
@@ -108,7 +108,7 @@ interface OnboardingApi {
         ApiResponse(responseCode = "400", description = "VALIDATION_FAILED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
         ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
-        ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE 또는 ONBOARDING_ALREADY_COMPLETED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun confirmGoal(guestUserId: Long, request: GoalConfirmRequest): GoalResponse
 }

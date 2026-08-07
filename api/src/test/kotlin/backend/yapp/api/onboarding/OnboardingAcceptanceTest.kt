@@ -61,10 +61,18 @@ class OnboardingAcceptanceTest(
 
         mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
             .andExpect(jsonPath("$.status").value("COMPLETED"))
+
+        mockMvc.perform(
+            post("/api/onboarding/goal")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"plan":"PLAN_2"}"""),
+        ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.name").value("ONBOARDING_ALREADY_COMPLETED"))
     }
 
     @Test
-    fun `editing goal inputs after completion reopens onboarding`() {
+    fun `completed onboarding profile cannot be edited`() {
         val token = issueGuestToken()
         patchProfile(token, """{"birthDate":"1998-03-01"}""")
         patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
@@ -77,12 +85,17 @@ class OnboardingAcceptanceTest(
                 .content("""{"plan":"PLAN_1"}"""),
         ).andExpect(status().isCreated)
 
-        // 확정 후 목표 금액에 영향을 주는 월저축액을 바꾸면 온보딩이 다시 진행 중으로 돌아간다.
-        patchProfile(token, """{"monthlySavingManwon":150}""")
+        mockMvc.perform(
+            patch("/api/onboarding/profile")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"monthlySavingManwon":150}"""),
+        ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.name").value("ONBOARDING_ALREADY_COMPLETED"))
 
         mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+            .andExpect(jsonPath("$.status").value("COMPLETED"))
     }
 
     @Test

@@ -11,6 +11,8 @@ import backend.yapp.core.onboarding.domain.OnboardingGoalRepository
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.OnboardingStatus
 import backend.yapp.core.onboarding.port.OnboardingConfigPort
+import backend.yapp.core.goal.domain.Goal
+import backend.yapp.core.goal.domain.GoalRepository
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class OnboardingGoalService(
     private val profileRepository: OnboardingProfileRepository,
-    private val goalRepository: OnboardingGoalRepository,
+    private val onboardingGoalRepository: OnboardingGoalRepository,
+    private val goalRepository: GoalRepository,
     private val configPort: OnboardingConfigPort,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -32,13 +35,15 @@ class OnboardingGoalService(
     @Transactional
     fun confirm(guestUserId: Long, plan: GoalPlan): OnboardingGoal {
         val profile = readGoalReadyProfile(guestUserId)
+        if (profile.status == OnboardingStatus.COMPLETED) {
+            throw BaseException(ErrorCode.ONBOARDING_ALREADY_COMPLETED)
+        }
         val config = configPort.current()
         val chosen = GoalPlanCalculator(config)
             .calculate(profile.monthlySavingManwon!!, profile.goalPeriodMonths!!)
             .of(plan)
 
-        goalRepository.deleteByGuestUserId(guestUserId)
-        val goal = goalRepository.save(
+        val onboardingGoal = onboardingGoalRepository.save(
             OnboardingGoal(
                 guestUserId = guestUserId,
                 plan = plan,
@@ -50,10 +55,20 @@ class OnboardingGoalService(
                 createdAt = clock.instant(),
             ),
         )
+        goalRepository.save(
+            Goal(
+                guestUserId = guestUserId,
+                targetAmountManwon = onboardingGoal.targetAmountManwon,
+                periodMonths = onboardingGoal.periodMonths,
+                monthlyTargetManwon = onboardingGoal.monthlySavingManwon,
+                baseAmountManwon = profile.netWorthManwon ?: 0,
+                startedAt = onboardingGoal.createdAt,
+            ),
+        )
         profile.status = OnboardingStatus.COMPLETED
         profile.updatedAt = clock.instant()
         profileRepository.save(profile)
-        return goal
+        return onboardingGoal
     }
 
     private fun readGoalReadyProfile(guestUserId: Long): OnboardingProfile {

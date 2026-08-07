@@ -2,7 +2,6 @@ package backend.yapp.core.onboarding.service
 
 import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
-import backend.yapp.core.onboarding.domain.OnboardingGoalRepository
 import backend.yapp.core.onboarding.domain.OnboardingProfile
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.OnboardingStatus
@@ -14,16 +13,15 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class OnboardingProfileService(
     private val profileRepository: OnboardingProfileRepository,
-    private val goalRepository: OnboardingGoalRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun patch(guestUserId: Long, command: ProfilePatchCommand): OnboardingProfile {
         val profile = profileRepository.findByGuestUserId(guestUserId)
             ?: OnboardingProfile(guestUserId = guestUserId)
-
-        val previousSaving = profile.monthlySavingManwon
-        val previousPeriod = profile.goalPeriodMonths
+        if (profile.status == OnboardingStatus.COMPLETED) {
+            throw BaseException(ErrorCode.ONBOARDING_ALREADY_COMPLETED)
+        }
 
         command.birthDate?.let { profile.birthDate = validateBirthDate(it) }
         command.monthlySalaryManwon?.let { profile.monthlySalaryManwon = validateRange(it, 0, MAX_MONEY_MANWON) }
@@ -32,28 +30,8 @@ class OnboardingProfileService(
         command.goalPeriodMonths?.let { profile.goalPeriodMonths = validateRange(it, MIN_MONTHS, MAX_MONTHS) }
         validateSavingWithinSalary(profile)
 
-        invalidateGoalIfInputsChanged(profile, previousSaving, previousPeriod)
-
         profile.updatedAt = clock.instant()
         return profileRepository.save(profile)
-    }
-
-    /**
-     * 목표 확정(COMPLETED) 이후 목표 금액에 영향을 주는 값(월저축액·목표기간)이 바뀌면,
-     * 확정 시점 값으로 저장된 목표와 어긋나므로 목표를 삭제하고 진행 중 상태로 되돌린다.
-     */
-    private fun invalidateGoalIfInputsChanged(
-        profile: OnboardingProfile,
-        previousSaving: Int?,
-        previousPeriod: Int?,
-    ) {
-        if (profile.status != OnboardingStatus.COMPLETED) return
-        val goalInputChanged =
-            profile.monthlySavingManwon != previousSaving || profile.goalPeriodMonths != previousPeriod
-        if (!goalInputChanged) return
-
-        goalRepository.deleteByGuestUserId(profile.guestUserId)
-        profile.status = OnboardingStatus.IN_PROGRESS
     }
 
     @Transactional(readOnly = true)

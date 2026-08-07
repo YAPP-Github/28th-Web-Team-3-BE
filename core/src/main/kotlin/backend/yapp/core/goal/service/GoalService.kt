@@ -11,7 +11,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,11 +19,10 @@ import org.springframework.transaction.annotation.Transactional
 class GoalService(
     private val goalRepository: GoalRepository,
     private val monthlySavingRepository: MonthlySavingRepository,
-    private val goalInitializer: GoalInitializer,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
-    fun status(guestUserId: Long): GoalStatus = computeStatus(getOrCreateGoal(guestUserId))
+    fun status(guestUserId: Long): GoalStatus = computeStatus(getGoal(guestUserId))
 
     /**
      * "현재 저축액 입력": 이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액은 월별 합으로 재계산된다.
@@ -32,7 +30,7 @@ class GoalService(
     @Transactional
     fun setThisMonthSaving(guestUserId: Long, savedAmountManwon: Int): GoalStatus {
         val amount = validateRange(savedAmountManwon, MIN_SAVING_MANWON, MAX_SAVING_MANWON)
-        val goal = getOrCreateGoal(guestUserId)
+        val goal = getGoal(guestUserId)
         val yearMonth = currentYearMonth()
 
         val existing = monthlySavingRepository.findByGuestUserIdAndYearMonth(guestUserId, yearMonth)
@@ -55,7 +53,7 @@ class GoalService(
 
     @Transactional
     fun updateGoal(guestUserId: Long, targetAmountManwon: Int?, periodMonths: Int?): GoalStatus {
-        val goal = getOrCreateGoal(guestUserId)
+        val goal = getGoal(guestUserId)
         targetAmountManwon?.let { goal.targetAmountManwon = validateRange(it, MIN_TARGET_MANWON, MAX_TARGET_MANWON) }
         periodMonths?.let { goal.periodMonths = validateRange(it, MIN_MONTHS, MAX_MONTHS) }
         goal.updatedAt = clock.instant()
@@ -67,15 +65,9 @@ class GoalService(
         return computeStatus(goal)
     }
 
-    private fun getOrCreateGoal(guestUserId: Long): Goal =
-        goalRepository.findByGuestUserId(guestUserId) ?: createOrFind(guestUserId)
-
-    private fun createOrFind(guestUserId: Long): Goal = try {
-        goalInitializer.createIfAbsent(guestUserId)
-    } catch (_: DataIntegrityViolationException) {
+    private fun getGoal(guestUserId: Long): Goal =
         goalRepository.findByGuestUserId(guestUserId)
-            ?: throw BaseException(ErrorCode.INTERNAL_SERVER_ERROR)
-    }
+            ?: throw BaseException(ErrorCode.GOAL_ONBOARDING_REQUIRED)
 
     private fun computeStatus(goal: Goal): GoalStatus {
         val today = LocalDate.ofInstant(clock.instant(), ZONE)
@@ -92,6 +84,7 @@ class GoalService(
 
         return GoalStatus(
             targetAmountManwon = goal.targetAmountManwon,
+            periodMonths = goal.periodMonths,
             totalSavedManwon = totalSaved,
             progressPercent = cappedPercent(totalSaved, goal.targetAmountManwon),
             usageMonths = ChronoUnit.MONTHS.between(startedDate, today).toInt() + 1,
