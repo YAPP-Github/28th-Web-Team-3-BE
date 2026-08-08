@@ -28,7 +28,9 @@ class PolicyController(
 ) {
     @Operation(
         summary = "혜택 목록 조회",
-        description = "청년정책(혜택) 목록을 페이지 단위로 조회한다. `category`로 4분류(금융/주거/복지/교육) 필터링. 각 항목의 `bookmarked`는 현재 게스트의 저장 여부.",
+        description = "청년정책(혜택) 목록을 페이지 단위로 조회한다. `category`로 4분류(금융/주거/복지/교육) 필터링. " +
+            "온보딩에 생년월일이 입력돼 있으면 만 나이 대상에 해당하는 정책만 자동 노출한다(생년월일 미입력 시 연령 무관 전체). " +
+            "각 항목의 `bookmarked`는 현재 게스트의 저장 여부.",
     )
     @GetMapping
     fun list(
