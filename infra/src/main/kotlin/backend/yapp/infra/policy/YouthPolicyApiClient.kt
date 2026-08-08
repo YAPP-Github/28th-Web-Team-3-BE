@@ -10,13 +10,18 @@ import tools.jackson.databind.ObjectMapper
 /**
  * 온통청년 청년정책 목록조회 API 어댑터. `GET {baseUrl}?apiKeyNm=...&pageType=1&rtnType=json&pageNum=&pageSize=`.
  * 응답 JSON 봉투(`result.youthPolicyList`, `result.pagging.totCount`)를 [ExternalYouthPolicy]로 변환한다.
+ *
+ * 온통청년 서버는 `User-Agent` 헤더가 없으면 500(HTML 에러 페이지)을 반환하므로 반드시 지정한다.
  */
 @Component
 class YouthPolicyApiClient(
     private val properties: YouthPolicyProperties,
     private val objectMapper: ObjectMapper,
 ) : YouthPolicyProviderPort {
-    private val restClient: RestClient = RestClient.builder().baseUrl(properties.baseUrl).build()
+    private val restClient: RestClient = RestClient.builder()
+        .baseUrl(properties.baseUrl)
+        .defaultHeader("User-Agent", USER_AGENT)
+        .build()
 
     override fun fetch(pageNum: Int, pageSize: Int): ExternalYouthPolicyPage {
         val json = restClient.get()
@@ -39,6 +44,10 @@ class YouthPolicyApiClient(
             policies = items.mapNotNull { it.toExternal() },
             totalCount = response.result?.pagging?.totCount ?: items.size,
         )
+    }
+
+    companion object {
+        private const val USER_AGENT = "YappBenefitSync/1.0"
     }
 }
 
