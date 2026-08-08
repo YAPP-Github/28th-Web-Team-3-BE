@@ -29,9 +29,10 @@ class PolicyImportAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     private val sampleJson = """
-        {"result":{"pagging":{"totCount":2},"youthPolicyList":[
+        {"result":{"pagging":{"totCount":3},"youthPolicyList":[
           {"plcyNo":"UP1","plcyNm":"업로드 월세 지원","lclsfNm":"주거","mclsfNm":"전월세 및 주거급여 지원","plcyExplnCn":"업로드로 저장"},
-          {"plcyNo":"UP2","plcyNm":"창업 지원","mclsfNm":"창업"}
+          {"plcyNo":"UP2","plcyNm":"창업 지원","mclsfNm":"창업"},
+          {"plcyNo":"UP3","plcyNm":"청년 자산형성 지원","lclsfNm":"금융･복지･문화","mclsfNm":"취약계층 및 금융지원","plcyExplnCn":"금융 카테고리"}
         ]}}
     """.trimIndent()
 
@@ -45,24 +46,37 @@ class PolicyImportAcceptanceTest(
 
     @Test
     fun `import parses json, filters out-of-scope, upserts, and serves policies`() {
-        // 스코프 밖(창업) 제외 → upserted 1
+        // 스코프 밖(창업) 제외 → 주거·금융 2건 저장
         mockMvc.perform(multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.fetched").value(2))
-            .andExpect(jsonPath("$.upserted").value(1))
+            .andExpect(jsonPath("$.fetched").value(3))
+            .andExpect(jsonPath("$.upserted").value(2))
             .andExpect(jsonPath("$.skipped").value(1))
 
         // 재업로드는 externalId 기준 upsert(멱등) → 중복 저장되지 않음
         mockMvc.perform(multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.upserted").value(1))
+            .andExpect(jsonPath("$.upserted").value(2))
 
         val token = issueGuestToken()
+        // 중분류가 4분류(category)로 정규화되어 노출됨
         mockMvc.perform(get("/api/policies").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+
+        // category 필터: 주거
+        mockMvc.perform(get("/api/policies?category=주거").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].title").value("업로드 월세 지원"))
-            .andExpect(jsonPath("$[0].largeCategory").value("주거"))
+            .andExpect(jsonPath("$[0].category").value("주거"))
+
+        // category 필터: 금융 (소스 대분류는 '금융･복지･문화'였지만 중분류로 금융 정규화)
+        mockMvc.perform(get("/api/policies?category=금융").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].title").value("청년 자산형성 지원"))
+            .andExpect(jsonPath("$[0].category").value("금융"))
     }
 
     private fun jsonFile() =

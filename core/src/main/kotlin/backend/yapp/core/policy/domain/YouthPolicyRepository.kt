@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface YouthPolicyRepository : JpaRepository<YouthPolicy, Long> {
     fun findByExternalId(externalId: String): YouthPolicy?
 
-    fun findByLargeCategoryContaining(largeCategory: String, pageable: Pageable): Page<YouthPolicy>
+    fun findByCategory(category: String, pageable: Pageable): Page<YouthPolicy>
 }
