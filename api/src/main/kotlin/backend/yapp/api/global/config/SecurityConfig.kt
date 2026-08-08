@@ -62,6 +62,8 @@ class SecurityConfig(
                             "/api/auth/guest",
                             "/api/auth/guest/refresh",
                         ).permitAll()
+                        // 관리자 토큰(X-Admin-Token)으로 컨트롤러에서 검증하는 수동 업로드 엔드포인트
+                        .requestMatchers(HttpMethod.POST, "/api/admin/policies/import").permitAll()
                         .requestMatchers("/api/health", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated()
                     else -> error("Unsupported app.role: $appRole")

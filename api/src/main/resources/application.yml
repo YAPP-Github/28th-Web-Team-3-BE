@@ -1,6 +1,10 @@
 spring:
   config:
     import: classpath:application-db.yml
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 30MB
   ai:
     google:
       genai:
@@ -102,3 +106,7 @@ mission:
 
 youth-policy:
   api-key: ${YOUTH_POLICY_API_KEY:}
+
+admin:
+  # 청년정책 수동 업로드 엔드포인트 보호용 토큰(시크릿 주입). 비어 있으면 업로드는 항상 거부된다.
+  import-token: ${POLICY_IMPORT_TOKEN:}

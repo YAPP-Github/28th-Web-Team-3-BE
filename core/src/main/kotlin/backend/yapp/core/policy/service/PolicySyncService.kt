@@ -38,17 +38,33 @@ class PolicySyncService(
             val page = provider.fetch(pageNum, PAGE_SIZE)
             if (page.policies.isEmpty()) break
             fetched += page.policies.size
-
-            for (external in page.policies) {
-                if (!PolicyScopeFilter.isInScope(external, today)) continue
-                upsert(external)
-                upserted++
-            }
+            upserted += upsertInScope(page.policies, today)
 
             if (fetched >= page.totalCount) break
             pageNum++
         }
         return PolicySyncResult(fetched = fetched, upserted = upserted, skipped = fetched - upserted)
+    }
+
+    /**
+     * 온통청년 API 응답에서 파싱한 정책 목록을 스코프 필터 후 upsert 한다.
+     * 클라우드 IP 차단으로 서버가 직접 호출하지 못할 때, 사람이 받아온 데이터를 업로드해 갱신하는 경로에서 사용한다.
+     */
+    @Transactional
+    fun ingest(policies: List<ExternalYouthPolicy>): PolicySyncResult {
+        val today = LocalDate.ofInstant(clock.instant(), ZONE)
+        val upserted = upsertInScope(policies, today)
+        return PolicySyncResult(fetched = policies.size, upserted = upserted, skipped = policies.size - upserted)
+    }
+
+    private fun upsertInScope(policies: List<ExternalYouthPolicy>, today: LocalDate): Int {
+        var upserted = 0
+        for (external in policies) {
+            if (!PolicyScopeFilter.isInScope(external, today)) continue
+            upsert(external)
+            upserted++
+        }
+        return upserted
     }
 
     private fun upsert(external: ExternalYouthPolicy) {
