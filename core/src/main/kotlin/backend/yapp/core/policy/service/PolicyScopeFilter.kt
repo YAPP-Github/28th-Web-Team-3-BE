@@ -1,27 +1,28 @@
 package backend.yapp.core.policy.service
 
+import backend.yapp.core.policy.domain.PolicyCategory
 import backend.yapp.core.policy.port.ExternalYouthPolicy
 import java.time.LocalDate
 
 /**
- * 동기화 대상 청년정책을 가려내는 순수 필터.
+ * 동기화 대상 청년정책을 가려내고 노출용 4분류([PolicyCategory])로 정규화하는 순수 필터.
  *
  * 규칙:
- * - 중분류가 포함 목록에 있으면 대상. 단 "취업" 중분류는 정책명에 "자격증"이 포함될 때만 대상.
+ * - 중분류가 매핑표에 있으면 대상이며 해당 4분류로 분류. 단 "취업" 중분류는 정책명에 "자격증"이 포함될 때만 대상(→교육).
  * - 신청/사업 종료일이 오늘보다 과거이면 제외(마감·사업종료). 종료일을 알 수 없으면 포함.
- * - 다중 카테고리(콤마)와 중복 표기는 정규화해 하나라도 포함되면 대상으로 본다.
+ * - 다중 카테고리(콤마)와 중복 표기는 정규화한다. 여러 4분류에 걸치면 우선순위(주거>금융>교육>복지)로 대표 1개.
  */
 object PolicyScopeFilter {
-    private val INCLUDED_MEDIUM = setOf(
-        "건강",
-        "교육비지원",
-        "문화활동 및 생활지원",
-        "취약계층 및 금융지원",
-        "주택 및 거주지",
-        "전월세 및 주거급여 지원",
-        "문화활동",
-        "기숙사",
-        "재직자",
+    private val MEDIUM_TO_CATEGORY: Map<String, PolicyCategory> = mapOf(
+        "주택 및 거주지" to PolicyCategory.HOUSING,
+        "전월세 및 주거급여 지원" to PolicyCategory.HOUSING,
+        "기숙사" to PolicyCategory.HOUSING,
+        "취약계층 및 금융지원" to PolicyCategory.FINANCE,
+        "재직자" to PolicyCategory.FINANCE,
+        "교육비지원" to PolicyCategory.EDUCATION,
+        "건강" to PolicyCategory.WELFARE,
+        "문화활동 및 생활지원" to PolicyCategory.WELFARE,
+        "문화활동" to PolicyCategory.WELFARE,
     )
     private const val EMPLOYMENT_MEDIUM = "취업"
     private const val CERTIFICATE_KEYWORD = "자격증"
@@ -29,15 +30,19 @@ object PolicyScopeFilter {
     private val DATE_REGEX = Regex("""(\d{4})[-.]?(\d{2})[-.]?(\d{2})""")
 
     fun isInScope(policy: ExternalYouthPolicy, today: LocalDate): Boolean {
-        if (!isIncludedCategory(policy)) return false
+        if (resolveCategory(policy) == null) return false
         val end = resolveEndDate(policy)
         return end == null || !end.isBefore(today)
     }
 
-    private fun isIncludedCategory(policy: ExternalYouthPolicy): Boolean {
+    /** 중분류를 4분류로 정규화한다. 어느 분류에도 안 걸리면 null(=스코프 밖). 다중이면 우선순위(선언 순서)로 대표 1개. */
+    fun resolveCategory(policy: ExternalYouthPolicy): PolicyCategory? {
         val mediums = splitCategories(policy.mediumCategory)
-        if (mediums.any { it in INCLUDED_MEDIUM }) return true
-        return mediums.contains(EMPLOYMENT_MEDIUM) && policy.title.contains(CERTIFICATE_KEYWORD)
+        val categories = mediums.mapNotNullTo(mutableSetOf()) { MEDIUM_TO_CATEGORY[it] }
+        if (mediums.contains(EMPLOYMENT_MEDIUM) && policy.title.contains(CERTIFICATE_KEYWORD)) {
+            categories.add(PolicyCategory.EDUCATION)
+        }
+        return categories.minByOrNull { it.ordinal }
     }
 
     /** 다중/중복 카테고리 정규화: 콤마 분리 → 공백 제거 → 중복 제거. */

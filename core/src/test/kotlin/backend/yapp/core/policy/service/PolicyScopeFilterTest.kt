@@ -1,10 +1,12 @@
 package backend.yapp.core.policy.service
 
+import backend.yapp.core.policy.domain.PolicyCategory
 import backend.yapp.core.policy.port.ExternalYouthPolicy
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolicyScopeFilterTest {
@@ -57,6 +59,42 @@ class PolicyScopeFilterTest {
     @Test
     fun `policy with future deadline is included`() {
         assertTrue(PolicyScopeFilter.isInScope(policy(medium = "건강", applyPeriodText = "20260803 ~ 20261231"), today))
+    }
+
+    @Test
+    fun `resolveCategory maps mediums to the 4 display categories`() {
+        assertEquals(PolicyCategory.HOUSING, PolicyScopeFilter.resolveCategory(policy(medium = "전월세 및 주거급여 지원")))
+        assertEquals(PolicyCategory.FINANCE, PolicyScopeFilter.resolveCategory(policy(medium = "취약계층 및 금융지원")))
+        assertEquals(PolicyCategory.FINANCE, PolicyScopeFilter.resolveCategory(policy(medium = "재직자")))
+        assertEquals(PolicyCategory.EDUCATION, PolicyScopeFilter.resolveCategory(policy(medium = "교육비지원")))
+        assertEquals(PolicyCategory.WELFARE, PolicyScopeFilter.resolveCategory(policy(medium = "건강")))
+    }
+
+    @Test
+    fun `resolveCategory maps 취업 자격증 to EDUCATION only with 자격증 in title`() {
+        assertEquals(
+            PolicyCategory.EDUCATION,
+            PolicyScopeFilter.resolveCategory(policy(title = "청년 자격증 응시료 지원", medium = "취업")),
+        )
+        assertNull(PolicyScopeFilter.resolveCategory(policy(title = "청년 면접비 지원", medium = "취업")))
+    }
+
+    @Test
+    fun `resolveCategory picks the highest-priority category among multiple`() {
+        // 주거 > 금융 > 교육 > 복지
+        assertEquals(
+            PolicyCategory.HOUSING,
+            PolicyScopeFilter.resolveCategory(policy(medium = "취약계층 및 금융지원,주택 및 거주지")),
+        )
+        assertEquals(
+            PolicyCategory.FINANCE,
+            PolicyScopeFilter.resolveCategory(policy(medium = "건강,취약계층 및 금융지원")),
+        )
+    }
+
+    @Test
+    fun `resolveCategory returns null for out-of-scope medium`() {
+        assertNull(PolicyScopeFilter.resolveCategory(policy(medium = "창업")))
     }
 
     @Test

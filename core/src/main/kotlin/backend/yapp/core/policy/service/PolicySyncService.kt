@@ -70,21 +70,28 @@ class PolicySyncService(
     private fun upsert(external: ExternalYouthPolicy) {
         val now = clock.instant()
         val deadline = PolicyScopeFilter.resolveEndDate(external)
+        val category = PolicyScopeFilter.resolveCategory(external)?.label
         val existing = repository.findByExternalId(external.externalId)
         if (existing != null) {
-            existing.apply(external, deadline, now)
+            existing.apply(external, deadline, category, now)
             repository.save(existing)
         } else {
-            repository.save(newPolicy(external, deadline, now))
+            repository.save(newPolicy(external, deadline, category, now))
         }
     }
 
-    private fun YouthPolicy.apply(external: ExternalYouthPolicy, deadline: LocalDate?, now: java.time.Instant) {
+    private fun YouthPolicy.apply(
+        external: ExternalYouthPolicy,
+        deadline: LocalDate?,
+        category: String?,
+        now: java.time.Instant,
+    ) {
         title = external.title
         description = external.description
         supportContent = external.supportContent
         largeCategory = external.largeCategory
         mediumCategory = external.mediumCategory
+        this.category = category
         supervisingOrg = external.supervisingOrg
         applyUrl = external.applyUrl
         applyPeriodText = external.applyPeriodText
@@ -99,7 +106,12 @@ class PolicySyncService(
         updatedAt = now
     }
 
-    private fun newPolicy(external: ExternalYouthPolicy, deadline: LocalDate?, now: java.time.Instant): YouthPolicy =
+    private fun newPolicy(
+        external: ExternalYouthPolicy,
+        deadline: LocalDate?,
+        category: String?,
+        now: java.time.Instant,
+    ): YouthPolicy =
         YouthPolicy(
             externalId = external.externalId,
             title = external.title,
@@ -107,6 +119,7 @@ class PolicySyncService(
             supportContent = external.supportContent,
             largeCategory = external.largeCategory,
             mediumCategory = external.mediumCategory,
+            category = category,
             supervisingOrg = external.supervisingOrg,
             applyUrl = external.applyUrl,
             applyPeriodText = external.applyPeriodText,

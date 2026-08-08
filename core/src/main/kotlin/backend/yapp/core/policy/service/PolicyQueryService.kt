@@ -10,10 +10,11 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 혜택(청년정책) 목록 요약. 요약값 없이 정책명·대분류·설명만 노출한다. */
+/** 혜택(청년정책) 목록 요약. 요약값 없이 정책명·카테고리·설명만 노출한다. */
 data class PolicySummary(
     val id: Long,
     val title: String,
+    val category: String?,
     val largeCategory: String?,
     val description: String?,
     val bookmarked: Boolean,
@@ -25,6 +26,7 @@ data class PolicyDetail(
     val title: String,
     val description: String?,
     val supportContent: String?,
+    val category: String?,
     val largeCategory: String?,
     val mediumCategory: String?,
     val supervisingOrg: String?,
@@ -50,7 +52,7 @@ class PolicyQueryService(
         val policies = if (category.isNullOrBlank()) {
             policyRepository.findAll(pageable).content
         } else {
-            policyRepository.findByLargeCategoryContaining(category, pageable).content
+            policyRepository.findByCategory(category, pageable).content
         }
         val bookmarkedIds = bookmarkedIds(guestUserId, policies.map { it.id })
         return policies.map { it.toSummary(it.id in bookmarkedIds) }
@@ -73,7 +75,7 @@ class PolicyQueryService(
     }
 
     private fun YouthPolicy.toSummary(bookmarked: Boolean) =
-        PolicySummary(id, title, largeCategory, description, bookmarked)
+        PolicySummary(id, title, category, largeCategory, description, bookmarked)
 
     private fun YouthPolicy.toDetail(bookmarked: Boolean) =
         PolicyDetail(
@@ -81,6 +83,7 @@ class PolicyQueryService(
             title = title,
             description = description,
             supportContent = supportContent,
+            category = category,
             largeCategory = largeCategory,
             mediumCategory = mediumCategory,
             supervisingOrg = supervisingOrg,

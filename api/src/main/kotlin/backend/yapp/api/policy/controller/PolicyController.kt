@@ -5,6 +5,7 @@ import backend.yapp.api.policy.dto.PolicySummaryResponse
 import backend.yapp.core.bookmark.domain.ContentType
 import backend.yapp.core.bookmark.service.BookmarkService
 import backend.yapp.core.policy.service.PolicyQueryService
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -27,6 +28,7 @@ class PolicyController(
     @GetMapping
     fun list(
         @AuthenticationPrincipal guestUserId: Long,
+        @Parameter(description = "혜택 필터 카테고리. 금융 / 주거 / 복지 / 교육 중 하나. 미지정 시 전체.")
         @RequestParam(required = false) category: String?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,

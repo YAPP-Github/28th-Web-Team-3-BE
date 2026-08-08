@@ -7,13 +7,21 @@ import backend.yapp.core.policy.service.PolicySyncResult
 data class PolicySummaryResponse(
     val id: Long,
     val title: String,
+    val category: String?,
     val largeCategory: String?,
     val description: String?,
     val bookmarked: Boolean,
 ) {
     companion object {
         fun from(summary: PolicySummary) =
-            PolicySummaryResponse(summary.id, summary.title, summary.largeCategory, summary.description, summary.bookmarked)
+            PolicySummaryResponse(
+                summary.id,
+                summary.title,
+                summary.category,
+                summary.largeCategory,
+                summary.description,
+                summary.bookmarked,
+            )
     }
 }
 
@@ -22,6 +30,7 @@ data class PolicyDetailResponse(
     val title: String,
     val description: String?,
     val supportContent: String?,
+    val category: String?,
     val largeCategory: String?,
     val mediumCategory: String?,
     val supervisingOrg: String?,
@@ -42,6 +51,7 @@ data class PolicyDetailResponse(
                 title = detail.title,
                 description = detail.description,
                 supportContent = detail.supportContent,
+                category = detail.category,
                 largeCategory = detail.largeCategory,
                 mediumCategory = detail.mediumCategory,
                 supervisingOrg = detail.supervisingOrg,
