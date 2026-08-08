@@ -3,8 +3,10 @@ package backend.yapp.infra.policy
 import backend.yapp.core.policy.port.ExternalYouthPolicy
 import backend.yapp.core.policy.port.ExternalYouthPolicyPage
 import backend.yapp.core.policy.port.YouthPolicyProviderPort
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -12,30 +14,21 @@ import tools.jackson.databind.ObjectMapper
  * 응답 JSON 봉투(`result.youthPolicyList`, `result.pagging.totCount`)를 [ExternalYouthPolicy]로 변환한다.
  *
  * 온통청년 서버는 `User-Agent` 헤더가 없으면 500(HTML 에러 페이지)을 반환하므로 반드시 지정한다.
+ * 정부 서버가 간헐적으로 5xx(HTML 에러 페이지)를 반환하는 경우가 있어 5xx/네트워크 오류는 짧게 재시도한다.
  */
 @Component
 class YouthPolicyApiClient(
     private val properties: YouthPolicyProperties,
     private val objectMapper: ObjectMapper,
 ) : YouthPolicyProviderPort {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val restClient: RestClient = RestClient.builder()
         .baseUrl(properties.baseUrl)
         .defaultHeader("User-Agent", USER_AGENT)
         .build()
 
     override fun fetch(pageNum: Int, pageSize: Int): ExternalYouthPolicyPage {
-        val json = restClient.get()
-            .uri { builder ->
-                builder
-                    .queryParam("apiKeyNm", properties.apiKey)
-                    .queryParam("pageType", "1")
-                    .queryParam("rtnType", "json")
-                    .queryParam("pageNum", pageNum)
-                    .queryParam("pageSize", pageSize)
-                    .build()
-            }
-            .retrieve()
-            .body(String::class.java)
+        val json = fetchWithRetry(pageNum, pageSize)
             ?: return ExternalYouthPolicyPage(emptyList(), 0)
 
         val response = objectMapper.readValue(json, YouthPolicyApiResponse::class.java)
@@ -46,8 +39,45 @@ class YouthPolicyApiClient(
         )
     }
 
+    private fun fetchWithRetry(pageNum: Int, pageSize: Int): String? {
+        var lastError: RestClientException? = null
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                return restClient.get()
+                    .uri { builder ->
+                        builder
+                            .queryParam("apiKeyNm", properties.apiKey)
+                            .queryParam("pageType", "1")
+                            .queryParam("rtnType", "json")
+                            .queryParam("pageNum", pageNum)
+                            .queryParam("pageSize", pageSize)
+                            .build()
+                    }
+                    .retrieve()
+                    .body(String::class.java)
+            } catch (e: RestClientException) {
+                lastError = e
+                // 진단용: 상태/본문 스니펫만 남긴다(인증키는 URI에만 있고 로깅하지 않음).
+                log.warn(
+                    "온통청년 API 호출 실패 page={} attempt={}/{}: {}",
+                    pageNum, attempt, MAX_ATTEMPTS, diagnose(e),
+                )
+                if (attempt < MAX_ATTEMPTS) Thread.sleep(RETRY_BACKOFF_MS * attempt)
+            }
+        }
+        throw lastError!!
+    }
+
+    private fun diagnose(e: RestClientException): String {
+        val server = e as? org.springframework.web.client.HttpStatusCodeException ?: return e.message.orEmpty()
+        val body = server.responseBodyAsString.replace(Regex("\\s+"), " ").take(200)
+        return "status=${server.statusCode} bodySnippet=[$body]"
+    }
+
     companion object {
         private const val USER_AGENT = "YappBenefitSync/1.0"
+        private const val MAX_ATTEMPTS = 4
+        private const val RETRY_BACKOFF_MS = 800L
     }
 }
 
