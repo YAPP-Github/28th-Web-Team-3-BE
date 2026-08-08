@@ -13,6 +13,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-flyway")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("com.google.cloud:google-cloud-tasks:2.62.0")
+    implementation("org.springframework:spring-web")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
     testImplementation("org.mockito:mockito-core")

@@ -99,3 +99,6 @@ mission:
       exploration-rate: 0.20
       embedding:
         model-version: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}:${GEMINI_EMBEDDING_DIMENSIONS:256}
+
+youth-policy:
+  api-key: ${YOUTH_POLICY_API_KEY:}
