@@ -52,6 +52,9 @@ class SecurityConfig(
                     "mission-dispatcher" -> authorization
                         .requestMatchers(HttpMethod.POST, "/internal/mission-generation/dispatch").permitAll()
                         .anyRequest().denyAll()
+                    "policy-sync" -> authorization
+                        .requestMatchers(HttpMethod.POST, "/internal/policies/sync").permitAll()
+                        .anyRequest().denyAll()
                     "api" -> authorization
                         .requestMatchers("/internal/**").denyAll()
                         .requestMatchers(
@@ -69,7 +72,7 @@ class SecurityConfig(
     }
 
     companion object {
-        private val SUPPORTED_APP_ROLES = setOf("api", "mission-worker", "mission-dispatcher")
+        private val SUPPORTED_APP_ROLES = setOf("api", "mission-worker", "mission-dispatcher", "policy-sync")
     }
 }
 
