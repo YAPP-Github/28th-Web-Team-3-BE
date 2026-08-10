@@ -30,6 +30,8 @@ class YouthPolicy(
     var mediumCategory: String? = null,
     @Column(name = "category", length = 20)
     var category: String? = null,
+    @Column(name = "region_codes", length = 200)
+    var regionCodes: String? = null,
     @Column(name = "supervising_org", length = 300)
     var supervisingOrg: String? = null,
     @Column(name = "apply_url", columnDefinition = "TEXT")

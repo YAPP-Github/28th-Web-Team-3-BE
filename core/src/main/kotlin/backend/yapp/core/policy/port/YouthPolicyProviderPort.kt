@@ -31,4 +31,6 @@ data class ExternalYouthPolicy(
     val earnCondition: String? = null,
     val additionalQualification: String? = null,
     val externalModifiedAt: String? = null,
+    /** 온통청년 지역코드(zipCd). 시군구 행정구역 코드 콤마 목록(앞 2자리=시도). */
+    val regionCode: String? = null,
 )

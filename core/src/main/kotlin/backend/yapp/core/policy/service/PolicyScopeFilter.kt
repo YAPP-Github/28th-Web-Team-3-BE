@@ -1,5 +1,6 @@
 package backend.yapp.core.policy.service
 
+import backend.yapp.core.onboarding.domain.ResidentialArea
 import backend.yapp.core.policy.domain.PolicyCategory
 import backend.yapp.core.policy.port.ExternalYouthPolicy
 import java.time.LocalDate
@@ -28,6 +29,46 @@ object PolicyScopeFilter {
     private const val CERTIFICATE_KEYWORD = "자격증"
 
     private val DATE_REGEX = Regex("""(\d{4})[-.]?(\d{2})[-.]?(\d{2})""")
+
+    /**
+     * 온통청년 지역코드(zipCd) 앞 2자리(시도) → 거주지역([ResidentialArea]).
+     * 2026 행정개편 데이터 기준(12=전남광주통합특별시). 전국 정책은 16개 코드를 모두 포함한다.
+     */
+    private val SIDO_CODE_TO_AREA: Map<String, ResidentialArea> = mapOf(
+        "11" to ResidentialArea.SEOUL,
+        "12" to ResidentialArea.JEONNAM,
+        "26" to ResidentialArea.BUSAN,
+        "27" to ResidentialArea.DAEGU,
+        "28" to ResidentialArea.INCHEON,
+        "30" to ResidentialArea.DAEJEON,
+        "31" to ResidentialArea.ULSAN,
+        "36" to ResidentialArea.SEJONG,
+        "41" to ResidentialArea.GYEONGGI,
+        "43" to ResidentialArea.CHUNGBUK,
+        "44" to ResidentialArea.CHUNGNAM,
+        "47" to ResidentialArea.GYEONGBUK,
+        "48" to ResidentialArea.GYEONGNAM,
+        "50" to ResidentialArea.JEJU,
+        "51" to ResidentialArea.GANGWON,
+        "52" to ResidentialArea.JEONBUK,
+    )
+
+    /** 저장/조회 지역 필터용 구분자 포함 문자열(예: `,SEOUL,BUSAN,`). LIKE 매칭을 안전하게 하기 위해 앞뒤에 콤마를 둔다. */
+    const val REGION_DELIMITER = ","
+
+    /**
+     * 정책의 지역코드(zipCd)를 거주지역 집합으로 정규화해 `,SEOUL,JEONNAM,` 형태 문자열로 만든다.
+     * 지역코드가 없거나 알려진 시도가 없으면 null.
+     */
+    fun resolveRegionCodes(policy: ExternalYouthPolicy): String? {
+        val areas = policy.regionCode
+            ?.split(",")
+            ?.mapNotNull { code -> SIDO_CODE_TO_AREA[code.trim().take(2)] }
+            ?.toSortedSet()
+            ?: return null
+        if (areas.isEmpty()) return null
+        return areas.joinToString(separator = REGION_DELIMITER, prefix = REGION_DELIMITER, postfix = REGION_DELIMITER) { it.name }
+    }
 
     fun isInScope(policy: ExternalYouthPolicy, today: LocalDate): Boolean {
         if (resolveCategory(policy) == null) return false

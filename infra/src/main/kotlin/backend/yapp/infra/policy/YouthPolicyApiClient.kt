@@ -108,6 +108,7 @@ data class YouthPolicyApiItem(
     val earnEtcCn: String? = null,
     val addAplyQlfcCndCn: String? = null,
     val lastMdfcnDt: String? = null,
+    val zipCd: String? = null,
 ) {
     fun toExternal(): ExternalYouthPolicy? {
         val id = plcyNo.blankToNull() ?: return null
@@ -130,6 +131,7 @@ data class YouthPolicyApiItem(
             earnCondition = earnEtcCn.blankToNull(),
             additionalQualification = addAplyQlfcCndCn.blankToNull(),
             externalModifiedAt = lastMdfcnDt.blankToNull(),
+            regionCode = zipCd.blankToNull(),
         )
     }
 }
