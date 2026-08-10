@@ -1,15 +1,12 @@
 package backend.yapp.api.mission.generation
 
 import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
-import backend.yapp.core.mission.generation.service.MissionGenerationDeliveryTransactions
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
-import java.sql.Statement
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNotEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -28,292 +25,118 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 class MissionGenerationAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val dataSource: DataSource,
-    @Autowired private val missionGenerationExecutor: MissionGenerationExecutor,
-    @Autowired private val deliveryTransactions: MissionGenerationDeliveryTransactions,
+    @Autowired private val executor: MissionGenerationExecutor,
 ) {
     @Test
-    fun `dispatcher atomically claims a due outbox row`() {
-        val token = issueReadyGuest()
-        val jobId = requestJob(token)
+    fun `one item request creates deterministic candidates and same item can be generated again`() {
+        val token = readyGuestToken()
+        val firstJobId = requestJob(token)
+        executor.execute(UUID.fromString(firstJobId))
 
-        val claimed = deliveryTransactions.claimDue()
-        val reclaimed = deliveryTransactions.claimDue()
-
-        assertTrue(claimed.any { it.jobId == UUID.fromString(jobId) })
-        assertTrue(reclaimed.none { it.jobId == UUID.fromString(jobId) })
-    }
-
-    @Test
-    fun `generation flow returns drafts and confirms selected missions idempotently`() {
-        val token = issueReadyGuest()
-        val jobId = requestJob(token)
-        missionGenerationExecutor.execute(UUID.fromString(jobId))
-        awaitSucceeded(token, jobId)
-
-        val draftJson = mockMvc.perform(
-            get("$GENERATION_PATH/$jobId/drafts")
-                .header("Authorization", "Bearer $token"),
+        val draftsJson = mockMvc.perform(
+            get("$GENERATION_PATH/$firstJobId/drafts").header(AUTHORIZATION, "Bearer $token"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.categories.length()").value(1))
             .andExpect(jsonPath("$.categories[0].category").value("MEAL"))
-            .andExpect(jsonPath("$.categories[0].drafts.length()").value(4))
-            .andExpect(jsonPath("$.categories[0].drafts[0].savingsLabel").isNotEmpty)
+            .andExpect(jsonPath("$.categories[0].drafts.length()").value(3))
+            .andExpect(jsonPath("$.categories[0].drafts[0].item").value("DELIVERY_FOOD"))
+            .andExpect(jsonPath("$.categories[0].drafts[0].targetCount").value(2))
+            .andExpect(jsonPath("$.categories[0].drafts[0].estimatedSavingsWon").value(20_000))
+            .andExpect(jsonPath("$.categories[0].drafts[2].targetCount").value(1))
+            .andExpect(jsonPath("$.categories[0].drafts[2].estimatedSavingsWon").value(10_000))
+            .andExpect(jsonPath("$.categories[0].drafts[0].savingsDisclaimer").isNotEmpty)
             .andReturn().response.contentAsString
+        val draftIds: List<String> = JsonPath.read(draftsJson, "$.categories[0].drafts[*].id")
 
-        val draftIds: List<String> = JsonPath.read(
-            draftJson,
-            "$.categories[0].drafts[*].id",
-        )
-        val request = """{"selectedDraftIds":["${draftIds[0]}","${draftIds[1]}"]}"""
-        val first = confirm(token, jobId, request)
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions.length()").value(2))
-            .andExpect(jsonPath("$.missions[0].status").value("ACTIVE"))
-            .andReturn().response.contentAsString
-        val second = confirm(token, jobId, request)
-            .andExpect(status().isOk)
-            .andReturn().response.contentAsString
-
-        assertEquals(
-            JsonPath.read<String>(first, "$.missions[0].id"),
-            JsonPath.read<String>(second, "$.missions[0].id"),
-        )
-
-        confirm(token, jobId, """{"selectedDraftIds":["${draftIds[2]}"]}""")
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.name").value("MISSION_CONFIRM_CONFLICT"))
-    }
-
-    @Test
-    fun `generation confirms more than four drafts across categories`() {
-        val token = issueReadyGuest()
-        val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
-        insertTransportSurveyAnswer(guestUserId)
-        val jobId = requestJob(token)
-        missionGenerationExecutor.execute(UUID.fromString(jobId))
-        awaitSucceeded(token, jobId)
-
-        val draftsJson = mockMvc.perform(
-            get("$GENERATION_PATH/$jobId/drafts")
-                .header("Authorization", "Bearer $token"),
-        ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.categories.length()").value(2))
-            .andExpect(jsonPath("$.categories[0].drafts.length()").value(4))
-            .andExpect(jsonPath("$.categories[1].drafts.length()").value(4))
-            .andReturn().response.contentAsString
-        val draftIds: List<String> = JsonPath.read(draftsJson, "$.categories[*].drafts[*].id")
-        val request = draftIds.take(5).joinToString(",") { "\"$it\"" }
-
-        confirm(token, jobId, "{\"selectedDraftIds\":[$request]}")
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions.length()").value(5))
-    }
-
-    @Test
-    fun `generation validates prerequisites ownership and selection size`() {
-        val incompleteToken = issueGuestToken()
         mockMvc.perform(
-            post(GENERATION_PATH)
-                .header("Authorization", "Bearer $incompleteToken"),
-        ).andExpect(status().isConflict)
+            post("$GENERATION_PATH/$firstJobId/confirm")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"selectedDraftIds":["${draftIds[0]}","${draftIds[2]}"]}"""),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.missions.length()").value(2))
+
+        val secondJobId = requestJob(token)
+        assertNotEquals(firstJobId, secondJobId)
+    }
+
+    @Test
+    fun `generation validates input and requires completed onboarding`() {
+        val incomplete = guestToken()
+        request(incomplete, VALID_BODY).andExpect(status().isConflict)
             .andExpect(jsonPath("$.name").value("ONBOARDING_INCOMPLETE"))
 
-        val ownerToken = issueReadyGuest()
-        val otherToken = issueReadyGuest()
-        val jobId = requestJob(ownerToken)
-        missionGenerationExecutor.execute(UUID.fromString(jobId))
-        awaitSucceeded(ownerToken, jobId)
-
-        mockMvc.perform(
-            get("$GENERATION_PATH/$jobId")
-                .header("Authorization", "Bearer $otherToken"),
-        ).andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.name").value("MISSION_GENERATION_JOB_NOT_FOUND"))
-
-        val draftsJson = mockMvc.perform(
-            get("$GENERATION_PATH/$jobId/drafts")
-                .header("Authorization", "Bearer $ownerToken"),
-        ).andExpect(status().isOk).andReturn().response.contentAsString
-        val draftId = JsonPath.read<String>(draftsJson, "$.categories[0].drafts[0].id")
-
-        confirm(ownerToken, jobId, """{"selectedDraftIds":[]}""")
-            .andExpect(status().isBadRequest)
-        confirm(ownerToken, jobId, """{"selectedDraftIds":["$draftId","$draftId"]}""")
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.name").value("MISSION_CONFIRM_INVALID"))
+        val ready = readyGuestToken()
+        request(
+            ready,
+            """{"category":"MEAL","item":"GAME","baselineFrequency":5,"baselineAmountWon":50000}""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("MISSION_GENERATION_INPUT_INVALID"))
+        request(
+            ready,
+            """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":0,"baselineAmountWon":50000}""",
+        ).andExpect(status().isBadRequest)
     }
 
     @Test
-    fun `generation endpoints require authentication and are published in OpenAPI`() {
+    fun `old survey is unavailable and new generation contract is published`() {
+        val token = guestToken()
+        mockMvc.perform(
+            get("/api/missions/surveys/questions").header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isMethodNotAllowed)
         mockMvc.perform(post(GENERATION_PATH)).andExpect(status().isUnauthorized)
-        mockMvc.perform(get("$GENERATION_PATH/${UUID.randomUUID()}")).andExpect(status().isUnauthorized)
-
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.paths['$GENERATION_PATH'].post.responses['202']").exists())
-            .andExpect(jsonPath("$.paths['$GENERATION_PATH/{jobId}'].get").exists())
-            .andExpect(jsonPath("$.paths['$GENERATION_PATH/{jobId}/drafts'].get").exists())
-            .andExpect(jsonPath("$.paths['$GENERATION_PATH/{jobId}/confirm'].post").exists())
+            .andExpect(jsonPath("$.paths['$GENERATION_PATH'].post").exists())
+            .andExpect(jsonPath("$.components.schemas.MissionGenerationCreateRequest.properties.item").exists())
+            .andExpect(jsonPath("$.paths['/api/missions/surveys']").doesNotExist())
     }
 
     private fun requestJob(token: String): String {
-        val response = mockMvc.perform(
-            post(GENERATION_PATH)
-                .header("Authorization", "Bearer $token"),
-        ).andExpect(status().isAccepted)
-            .andExpect(jsonPath("$.jobId").isNotEmpty)
+        val body = request(token, VALID_BODY).andExpect(status().isAccepted)
             .andReturn().response.contentAsString
-        return JsonPath.read(response, "$.jobId")
+        return JsonPath.read(body, "$.jobId")
     }
 
-    private fun awaitSucceeded(token: String, jobId: String) {
-        repeat(100) {
-            val response = mockMvc.perform(
-                get("$GENERATION_PATH/$jobId")
-                    .header("Authorization", "Bearer $token"),
-            ).andExpect(status().isOk).andReturn().response.contentAsString
-            when (val currentStatus = JsonPath.read<String>(response, "$.status")) {
-                "SUCCEEDED" -> {
-                    assertEquals("MOCK", JsonPath.read<String>(response, "$.generationSource"))
-                    return
-                }
-                "FAILED" -> error("Mission generation failed")
-                else -> {
-                    assertTrue(currentStatus == "PENDING" || currentStatus == "RUNNING")
-                    Thread.sleep(20)
-                }
+    private fun request(token: String, body: String) = mockMvc.perform(
+        post(GENERATION_PATH)
+            .header(AUTHORIZATION, "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body),
+    )
+
+    private fun readyGuestToken(): String = guestToken().also { token ->
+        val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
+        val now = Instant.now()
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO onboarding_profile
+                    (guest_user_id, birth_date, address, monthly_salary_manwon, monthly_saving_manwon,
+                     net_worth_manwon, goal_period_months, status, created_at, updated_at)
+                VALUES (?, DATE '1998-03-01', 'SEOUL', 350, 100, 1800, 24, 'COMPLETED', ?, ?)
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, guestUserId)
+                statement.setObject(2, now)
+                statement.setObject(3, now)
+                statement.executeUpdate()
             }
         }
-        error("Mission generation did not finish")
     }
 
-    private fun confirm(token: String, jobId: String, body: String) =
-        mockMvc.perform(
-            post("$GENERATION_PATH/$jobId/confirm")
-                .header("Authorization", "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body),
-        )
-
-    private fun issueReadyGuest(): String =
-        issueGuestToken().also { token ->
-            val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
-            insertCompletedOnboarding(guestUserId)
-            insertMealSurvey(guestUserId)
-        }
-
-    private fun issueGuestToken(): String {
-        val response = mockMvc.perform(
-            post("/api/auth/guest")
-                .contentType(MediaType.APPLICATION_JSON)
+    private fun guestToken(): String {
+        val body = mockMvc.perform(
+            post("/api/auth/guest").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"uuid":"${UUID.randomUUID()}"}"""),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
-        return JsonPath.read(response, "$.accessToken")
-    }
-
-    private fun insertCompletedOnboarding(guestUserId: Long) {
-        val now = Instant.now()
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(
-                """
-                    INSERT INTO onboarding_profile
-                        (guest_user_id, birth_date, monthly_salary_manwon, monthly_saving_manwon,
-                         net_worth_manwon, goal_period_months, status, created_at, updated_at)
-                    VALUES (?, DATE '1998-03-01', 350, 100, 1800, 24, 'COMPLETED', ?, ?)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.executeUpdate()
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO onboarding_goal
-                        (guest_user_id, plan, period_months, monthly_saving_manwon, uplift_permille,
-                         target_amount_manwon, config_version, created_at)
-                    VALUES (?, 'PLAN_1', 24, 100, 150, 2760, 'test', ?)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.executeUpdate()
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO goal
-                        (guest_user_id, target_amount_manwon, period_months, monthly_target_manwon,
-                         base_amount_manwon, started_at, created_at, updated_at, version)
-                    VALUES (?, 2760, 24, 100, 1800, ?, ?, ?, 0)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.setObject(4, now)
-                statement.executeUpdate()
-            }
-        }
-    }
-
-    private fun insertMealSurvey(guestUserId: Long) {
-        val now = Instant.now()
-        dataSource.connection.use { connection ->
-            val surveyId = connection.prepareStatement(
-                """
-                    INSERT INTO mission_survey
-                        (guest_user_id, schema_version, created_at, updated_at, version)
-                    VALUES (?, 'V1', ?, ?, 0)
-                """.trimIndent(),
-                Statement.RETURN_GENERATED_KEYS,
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.executeUpdate()
-                statement.generatedKeys.use { keys ->
-                    check(keys.next())
-                    keys.getLong(1)
-                }
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO mission_survey_answer
-                        (mission_survey_id, category_code, question_code, value_type, answer_code)
-                    VALUES (?, 'MEAL', 'MEAL_TARGET', 'OPTION', 'DELIVERY')
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, surveyId)
-                statement.executeUpdate()
-            }
-        }
-    }
-
-    private fun insertTransportSurveyAnswer(guestUserId: Long) {
-        dataSource.connection.use { connection ->
-            val surveyId = connection.prepareStatement(
-                "SELECT id FROM mission_survey WHERE guest_user_id = ?",
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.executeQuery().use { result ->
-                    check(result.next())
-                    result.getLong(1)
-                }
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO mission_survey_answer
-                        (mission_survey_id, category_code, question_code, value_type, answer_code)
-                    VALUES (?, 'TRANSPORT', 'TRANSPORT_TARGET', 'OPTION', 'TAXI')
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, surveyId)
-                statement.executeUpdate()
-            }
-        }
+        return JsonPath.read(body, "$.accessToken")
     }
 
     companion object {
         private const val GENERATION_PATH = "/api/missions/generation-jobs"
+        private const val AUTHORIZATION = "Authorization"
+        private const val VALID_BODY =
+            """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":5,"baselineAmountWon":50000}"""
     }
 }

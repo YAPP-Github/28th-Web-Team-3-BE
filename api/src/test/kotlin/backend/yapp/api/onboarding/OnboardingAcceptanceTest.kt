@@ -25,7 +25,7 @@ class OnboardingAcceptanceTest(
     fun `full onboarding flow saves each step and completes the goal`() {
         val token = issueGuestToken()
 
-        patchProfile(token, """{"birthDate":"1998-03-01"}""")
+        patchProfile(token, """{"birthDate":"1998-03-01","address":"SEOUL"}""")
         patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
         patchProfile(token, """{"netWorthManwon":1800}""")
         patchProfile(token, """{"goalPeriodMonths":24}""")
@@ -74,7 +74,7 @@ class OnboardingAcceptanceTest(
     @Test
     fun `completed onboarding profile cannot be edited`() {
         val token = issueGuestToken()
-        patchProfile(token, """{"birthDate":"1998-03-01"}""")
+        patchProfile(token, """{"birthDate":"1998-03-01","address":"SEOUL"}""")
         patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
         patchProfile(token, """{"netWorthManwon":1800}""")
         patchProfile(token, """{"goalPeriodMonths":24}""")
@@ -113,7 +113,7 @@ class OnboardingAcceptanceTest(
     @Test
     fun `report before required input returns conflict`() {
         val token = issueGuestToken()
-        patchProfile(token, """{"birthDate":"1998-03-01"}""")
+        patchProfile(token, """{"birthDate":"1998-03-01","address":"SEOUL"}""")
 
         mockMvc.perform(get("/api/onboarding/report").header("Authorization", "Bearer $token"))
             .andExpect(status().isConflict)

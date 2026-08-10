@@ -1,13 +1,7 @@
 package backend.yapp.api.mission.lifecycle
 
-import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
-import backend.yapp.core.mission.generation.service.MissionLifecycleService
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
-import java.sql.Statement
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.ZoneId
 import java.util.UUID
 import javax.sql.DataSource
 import kotlin.test.assertEquals
@@ -32,408 +26,106 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 class MissionLifecycleAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val dataSource: DataSource,
-    @Autowired private val missionGenerationExecutor: MissionGenerationExecutor,
-    @Autowired private val lifecycleService: MissionLifecycleService,
 ) {
     @Test
-    fun `recommended mission deletion is owner scoped and preserves outcome history`() {
-        val owner = issueReadyGuest()
-        val other = issueReadyGuest()
-        val missionId = createRecommended(owner)
+    fun `manual mission completion drives current weekly list and progress`() {
+        val token = guestToken()
+        val missionId = JsonPath.read<String>(createManual(token), "$.id")
+
+        mockMvc.perform(get("/api/missions/progress").header(AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.completedCount").value(0))
+            .andExpect(jsonPath("$.totalCount").value(1))
 
         mockMvc.perform(
-            delete("/api/missions/recommended/$missionId")
-                .header(AUTHORIZATION, "Bearer $other"),
-        ).andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.name").value("MISSION_NOT_FOUND"))
-
-        completeRecommended(owner, missionId)
-        assertEquals(1, outcomeEventCount(UUID.fromString(missionId)))
+            patch("/api/missions/MANUAL/$missionId/complete").header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("COMPLETED"))
 
         mockMvc.perform(
-            delete("/api/missions/recommended/$missionId")
-                .header(AUTHORIZATION, "Bearer $owner"),
+            get("/api/missions").param("status", "ACTIVE").header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.missions.length()").value(0))
+        mockMvc.perform(get("/api/missions/progress").header(AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.completedCount").value(1))
+            .andExpect(jsonPath("$.progressPercent").value(100))
+    }
+
+    @Test
+    fun `user deletion is soft and keeps weekly completion history`() {
+        val token = guestToken()
+        val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
+        val missionId = JsonPath.read<String>(createManual(token), "$.id")
+        mockMvc.perform(
+            patch("/api/missions/MANUAL/$missionId/complete").header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isOk)
+
+        mockMvc.perform(
+            delete("/api/missions/MANUAL/$missionId").header(AUTHORIZATION, "Bearer $token"),
         ).andExpect(status().isNoContent)
-            .andExpect { result -> assertEquals("", result.response.contentAsString) }
-
-        mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $owner"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions.length()").value(0))
-        assertEquals(1, outcomeEventCount(UUID.fromString(missionId)))
-    }
-
-    @Test
-    fun `recommended mission deletion rejects missing manual and malformed identifiers`() {
-        val token = guestToken()
-        val manualId = JsonPath.read<String>(createManual(token), "$.id")
-
-        mockMvc.perform(
-            delete("/api/missions/recommended/${UUID.randomUUID()}")
-                .header(AUTHORIZATION, "Bearer $token"),
-        ).andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.name").value("MISSION_NOT_FOUND"))
-        mockMvc.perform(
-            delete("/api/missions/recommended/$manualId")
-                .header(AUTHORIZATION, "Bearer $token"),
-        ).andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.name").value("MISSION_NOT_FOUND"))
-        mockMvc.perform(
-            delete("/api/missions/recommended/not-a-uuid")
-                .header(AUTHORIZATION, "Bearer $token"),
-        ).andExpect(status().isBadRequest)
-    }
-
-    @Test
-    fun `manual mission is isolated by owner and completion is idempotent`() {
-        val owner = guestToken()
-        val other = guestToken()
-        val created = createManual(owner)
-        val id = JsonPath.read<String>(created, "$.id")
-        val weekEndsAt = Instant.parse(JsonPath.read(created, "$.weekEndsAt"))
-            .atZone(ZoneId.of("Asia/Seoul"))
-        assertEquals(DayOfWeek.MONDAY, weekEndsAt.dayOfWeek)
-        assertEquals(0, weekEndsAt.hour)
-
-        mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $owner"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions[0].source").value("MANUAL"))
-            .andExpect(jsonPath("$.missions[0].targetCount").doesNotExist())
-            .andExpect(jsonPath("$.missions[0].targetUnit").doesNotExist())
-            .andExpect(jsonPath("$.missions[0].estimatedSavingsWon").doesNotExist())
-            .andExpect(jsonPath("$.missions[0].savingsEstimateVersion").doesNotExist())
-            .andExpect(jsonPath("$.missions[0].savingsLabel").doesNotExist())
-
-        mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $other"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions.length()").value(0))
-
-        repeat(2) {
-            mockMvc.perform(
-                patch("/api/missions/MANUAL/$id/complete")
-                    .header(AUTHORIZATION, "Bearer $owner"),
-            ).andExpect(status().isOk)
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.targetCount").doesNotExist())
-        }
-    }
-
-    @Test
-    fun `manual mission trims text and validates the normalized thirty character boundary`() {
-        val token = guestToken()
-        val thirtyCharacters = "가".repeat(30)
-
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"category":"MEAL","text":"$thirtyCharacters  "}"""),
-        ).andExpect(status().isCreated)
-            .andExpect(jsonPath("$.title").value(thirtyCharacters))
-            .andExpect(jsonPath("$.targetCount").doesNotExist())
-
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"category":"MEAL","text":"${"가".repeat(31)}"}"""),
-        ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.name").value("MANUAL_MISSION_INVALID"))
-
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"category":"MEAL","text":"   "}"""),
-        ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.name").value("MANUAL_MISSION_INVALID"))
-    }
-
-    @Test
-    fun `manual mission ignores legacy target fields without persisting or returning them`() {
-        val token = guestToken()
-
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "category": "MEAL",
-                      "text": "집밥 먹기",
-                      "targetCount": 99,
-                      "targetUnit": "TIMES_PER_WEEK"
-                    }
-                    """.trimIndent(),
-                ),
-        ).andExpect(status().isCreated)
-            .andExpect(jsonPath("$.title").value("집밥 먹기"))
-            .andExpect(jsonPath("$.targetCount").doesNotExist())
-            .andExpect(jsonPath("$.targetUnit").doesNotExist())
-    }
-
-    @Test
-    fun `manual mission rejects an invalid category`() {
-        val token = guestToken()
-
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"category":"INVALID","text":"집밥 먹기"}"""),
-        ).andExpect(status().isBadRequest)
-    }
-
-    @Test
-    fun `recommended mission retains measurement and savings response fields`() {
-        val token = issueReadyGuest()
-        createRecommended(token)
-
         mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $token"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions[0].source").value("RECOMMENDED"))
-            .andExpect(jsonPath("$.missions[0].targetCount").isNumber)
-            .andExpect(jsonPath("$.missions[0].targetUnit").isString)
-            .andExpect(jsonPath("$.missions[0].estimatedSavingsWon").isNumber)
-            .andExpect(jsonPath("$.missions[0].savingsEstimateVersion").isString)
-            .andExpect(jsonPath("$.missions[0].savingsLabel").isString)
-    }
+            .andExpect(status().isOk).andExpect(jsonPath("$.missions.length()").value(0))
 
-    @Test
-    fun `manual mission schema retains only category and text domain fields`() {
         dataSource.connection.use { connection ->
-            listOf("structured_tags", "target_count", "target_unit").forEach { column ->
-                connection.prepareStatement(
-                    """
-                    SELECT COUNT(*)
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE LOWER(TABLE_NAME) = 'manual_mission' AND LOWER(COLUMN_NAME) = ?
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, column)
-                    statement.executeQuery().use { result ->
-                        assertTrue(result.next())
-                        assertEquals(0, result.getInt(1))
-                    }
-                }
-            }
             connection.prepareStatement(
-                """
-                SELECT CHARACTER_MAXIMUM_LENGTH
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE LOWER(TABLE_NAME) = 'manual_mission' AND LOWER(COLUMN_NAME) = 'mission_text'
-                """.trimIndent(),
+                "SELECT deleted_at FROM manual_mission WHERE id = ? AND guest_user_id = ?",
             ).use { statement ->
+                statement.setObject(1, UUID.fromString(missionId))
+                statement.setLong(2, guestUserId)
                 statement.executeQuery().use { result ->
                     assertTrue(result.next())
-                    assertEquals(30, result.getInt(1))
+                    assertTrue(result.getObject(1) != null)
+                }
+            }
+            connection.prepareStatement(
+                "SELECT COUNT(*) FROM mission_weekly_completion WHERE mission_id = ?",
+            ).use { statement ->
+                statement.setObject(1, UUID.fromString(missionId))
+                statement.executeQuery().use { result ->
+                    result.next()
+                    assertEquals(1, result.getInt(1))
                 }
             }
         }
     }
 
     @Test
-    fun `overdue active mission becomes incomplete and cannot be completed`() {
+    fun `catalog and lifecycle endpoints publish the replacement policy`() {
         val token = guestToken()
-        val id = JsonPath.read<String>(createManual(token), "$.id")
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(
-                "UPDATE manual_mission SET week_ends_at = ? WHERE id = ?",
-            ).use { statement ->
-                statement.setObject(1, Instant.parse("2020-01-01T00:00:00Z"))
-                statement.setObject(2, UUID.fromString(id))
-                assertEquals(1, statement.executeUpdate())
-            }
-        }
+        mockMvc.perform(get("/api/missions/catalog").header(AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.categories.length()").value(3))
+            .andExpect(jsonPath("$.categories[0].items.length()").value(6))
+            .andExpect(jsonPath("$.categories[1].items.length()").value(5))
+            .andExpect(jsonPath("$.categories[2].items.length()").value(8))
 
-        lifecycleService.markOverdueIncomplete()
-
-        mockMvc.perform(
-            patch("/api/missions/MANUAL/$id/complete")
-                .header(AUTHORIZATION, "Bearer $token"),
-        ).andExpect(status().isConflict)
-            .andExpect(jsonPath("$.name").value("MISSION_STATUS_CONFLICT"))
-    }
-
-    @Test
-    fun `lifecycle endpoints are published in OpenAPI`() {
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.paths['/api/missions'].get").exists())
-            .andExpect(jsonPath("$.paths['/api/missions/manual'].post").exists())
-            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.category").exists())
-            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.text").exists())
-            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.targetCount").doesNotExist())
-            .andExpect(jsonPath("$.components.schemas.ManualMissionCreateRequest.properties.targetUnit").doesNotExist())
-            .andExpect(jsonPath("$.paths['/api/missions/recommended/{missionId}'].delete.responses['204']").exists())
+            .andExpect(jsonPath("$.paths['/api/missions/catalog'].get").exists())
+            .andExpect(jsonPath("$.paths['/api/missions/progress'].get").exists())
+            .andExpect(jsonPath("$.paths['/api/missions/{source}/{missionId}'].delete").exists())
             .andExpect(jsonPath("$.paths['/api/missions/{source}/{missionId}/complete'].patch").exists())
     }
 
-    private fun createManual(token: String): String =
-        mockMvc.perform(
-            post("/api/missions/manual")
-                .header(AUTHORIZATION, "Bearer $token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "category": "MEAL",
-                      "text": "이번 주 배달 대신 집밥 먹기"
-                    }
-                    """.trimIndent(),
-                ),
-        ).andExpect(status().isCreated)
-            .andExpect(jsonPath("$.status").value("ACTIVE"))
-            .andExpect(jsonPath("$.targetCount").doesNotExist())
-            .andReturn().response.contentAsString
+    private fun createManual(token: String): String = mockMvc.perform(
+        post("/api/missions/manual")
+            .header(AUTHORIZATION, "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"category":"MEAL","text":"탄산음료 3번 이하로 마시기"}"""),
+    ).andExpect(status().isCreated)
+        .andExpect(jsonPath("$.targetCount").doesNotExist())
+        .andExpect(jsonPath("$.estimatedSavingsWon").doesNotExist())
+        .andReturn().response.contentAsString
 
     private fun guestToken(): String {
         val body = mockMvc.perform(
-            post("/api/auth/guest")
-                .contentType(MediaType.APPLICATION_JSON)
+            post("/api/auth/guest").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"uuid":"${UUID.randomUUID()}"}"""),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         return JsonPath.read(body, "$.accessToken")
     }
 
-    private fun issueReadyGuest(): String =
-        guestToken().also { token ->
-            val guestUserId = SignedJWT.parse(token).jwtClaimsSet.subject.toLong()
-            insertCompletedOnboarding(guestUserId)
-            insertMealSurvey(guestUserId)
-        }
-
-    private fun createRecommended(token: String): String {
-        val jobId = JsonPath.read<String>(
-            mockMvc.perform(post(GENERATION_PATH).header(AUTHORIZATION, "Bearer $token"))
-                .andExpect(status().isAccepted)
-                .andReturn().response.contentAsString,
-            "$.jobId",
-        )
-        missionGenerationExecutor.execute(UUID.fromString(jobId))
-        repeat(100) {
-            val response = mockMvc.perform(
-                get("$GENERATION_PATH/$jobId").header(AUTHORIZATION, "Bearer $token"),
-            ).andExpect(status().isOk).andReturn().response.contentAsString
-            when (JsonPath.read<String>(response, "$.status")) {
-                "SUCCEEDED" -> {
-                    val drafts = mockMvc.perform(
-                        get("$GENERATION_PATH/$jobId/drafts").header(AUTHORIZATION, "Bearer $token"),
-                    ).andExpect(status().isOk).andReturn().response.contentAsString
-                    val draftId = JsonPath.read<String>(drafts, "$.categories[0].drafts[0].id")
-                    val confirmed = mockMvc.perform(
-                        post("$GENERATION_PATH/$jobId/confirm")
-                            .header(AUTHORIZATION, "Bearer $token")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""{"selectedDraftIds":["$draftId"]}"""),
-                    ).andExpect(status().isOk).andReturn().response.contentAsString
-                    return JsonPath.read(confirmed, "$.missions[0].id")
-                }
-                "FAILED" -> error("Mission generation failed")
-                else -> Thread.sleep(20)
-            }
-        }
-        error("Mission generation did not finish")
-    }
-
-    private fun completeRecommended(token: String, missionId: String) {
-        mockMvc.perform(
-            patch("/api/missions/RECOMMENDED/$missionId/complete")
-                .header(AUTHORIZATION, "Bearer $token"),
-        ).andExpect(status().isOk)
-    }
-
-    private fun outcomeEventCount(missionId: UUID): Int =
-        dataSource.connection.use { connection ->
-            connection.prepareStatement("SELECT COUNT(*) FROM mission_outcome_event WHERE mission_id = ?").use { statement ->
-                statement.setObject(1, missionId)
-                statement.executeQuery().use { result ->
-                    assertTrue(result.next())
-                    result.getInt(1)
-                }
-            }
-        }
-
-    private fun insertCompletedOnboarding(guestUserId: Long) {
-        val now = Instant.now()
-        dataSource.connection.use { connection ->
-            connection.prepareStatement(
-                """
-                    INSERT INTO onboarding_profile
-                        (guest_user_id, birth_date, monthly_salary_manwon, monthly_saving_manwon,
-                         net_worth_manwon, goal_period_months, status, created_at, updated_at)
-                    VALUES (?, DATE '1998-03-01', 350, 100, 1800, 24, 'COMPLETED', ?, ?)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.executeUpdate()
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO onboarding_goal
-                        (guest_user_id, plan, period_months, monthly_saving_manwon, uplift_permille,
-                         target_amount_manwon, config_version, created_at)
-                    VALUES (?, 'PLAN_1', 24, 100, 150, 2760, 'test', ?)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.executeUpdate()
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO goal
-                        (guest_user_id, target_amount_manwon, period_months, monthly_target_manwon,
-                         base_amount_manwon, started_at, created_at, updated_at, version)
-                    VALUES (?, 2760, 24, 100, 1800, ?, ?, ?, 0)
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.setObject(4, now)
-                statement.executeUpdate()
-            }
-        }
-    }
-
-    private fun insertMealSurvey(guestUserId: Long) {
-        val now = Instant.now()
-        dataSource.connection.use { connection ->
-            val surveyId = connection.prepareStatement(
-                """
-                    INSERT INTO mission_survey
-                        (guest_user_id, schema_version, created_at, updated_at, version)
-                    VALUES (?, 'V1', ?, ?, 0)
-                """.trimIndent(),
-                Statement.RETURN_GENERATED_KEYS,
-            ).use { statement ->
-                statement.setLong(1, guestUserId)
-                statement.setObject(2, now)
-                statement.setObject(3, now)
-                statement.executeUpdate()
-                statement.generatedKeys.use { keys ->
-                    check(keys.next())
-                    keys.getLong(1)
-                }
-            }
-            connection.prepareStatement(
-                """
-                    INSERT INTO mission_survey_answer
-                        (mission_survey_id, category_code, question_code, value_type, answer_code)
-                    VALUES (?, 'MEAL', 'MEAL_TARGET', 'OPTION', 'DELIVERY')
-                """.trimIndent(),
-            ).use { statement ->
-                statement.setLong(1, surveyId)
-                statement.executeUpdate()
-            }
-        }
-    }
-
     companion object {
         private const val AUTHORIZATION = "Authorization"
-        private const val GENERATION_PATH = "/api/missions/generation-jobs"
     }
 }

@@ -5,11 +5,14 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationJob
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
+import backend.yapp.core.mission.generation.domain.MissionCategory
+import backend.yapp.core.mission.generation.domain.MissionItem
 import backend.yapp.core.mission.generation.domain.MissionRepository
-import backend.yapp.core.mission.survey.domain.MissionSurvey
-import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
-import backend.yapp.core.goal.domain.Goal
-import backend.yapp.core.goal.domain.GoalRepository
+import backend.yapp.core.onboarding.domain.OnboardingProfile
+import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
+import backend.yapp.core.onboarding.domain.OnboardingStatus
+import backend.yapp.core.onboarding.domain.ResidentialArea
+import java.time.LocalDate
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -30,12 +33,21 @@ class MissionGenerationServiceTest {
         val existing = MissionGenerationJob(
             id = UUID.randomUUID(),
             guestUserId = GUEST_USER_ID,
+            category = MissionCategory.MEAL,
+            item = MissionItem.DELIVERY_FOOD,
+            baselineFrequency = 1,
+            baselineAmountWon = 1,
             createdAt = now,
         ).also { it.start(now) }
-        `when`(fixture.goalRepository.findByGuestUserId(GUEST_USER_ID))
-            .thenReturn(Goal(GUEST_USER_ID, 2_000, 24, 100, 0, now))
-        `when`(fixture.surveyRepository.findByGuestUserId(GUEST_USER_ID))
-            .thenReturn(MissionSurvey(GUEST_USER_ID))
+        `when`(fixture.onboardingRepository.findByGuestUserIdForUpdate(GUEST_USER_ID))
+            .thenReturn(
+                OnboardingProfile(
+                    GUEST_USER_ID,
+                    birthDate = LocalDate.of(2000, 1, 1),
+                    address = ResidentialArea.SEOUL,
+                    status = OnboardingStatus.COMPLETED,
+                ),
+            )
         `when`(
             fixture.jobRepository.findFirstByGuestUserIdAndActiveGenerationKeyOrderByCreatedAtDesc(
                 GUEST_USER_ID,
@@ -43,7 +55,13 @@ class MissionGenerationServiceTest {
             ),
         ).thenReturn(existing)
 
-        val result = fixture.service.request(GUEST_USER_ID)
+        val result = fixture.service.request(
+            GUEST_USER_ID,
+            MissionCategory.MEAL,
+            MissionItem.DELIVERY_FOOD,
+            1,
+            1,
+        )
 
         assertEquals(existing.id, result.jobId)
         assertEquals(MissionGenerationJobStatus.RUNNING, result.status)
@@ -57,8 +75,7 @@ class MissionGenerationServiceTest {
 
     private fun fixture(): Fixture {
         val jobRepository = mock(MissionGenerationJobRepository::class.java)
-        val goalRepository = mock(GoalRepository::class.java)
-        val surveyRepository = mock(MissionSurveyRepository::class.java)
+        val onboardingRepository = mock(OnboardingProfileRepository::class.java)
         val draftRepository = mock(MissionDraftRepository::class.java)
         val missionRepository = mock(MissionRepository::class.java)
         val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)
@@ -66,16 +83,14 @@ class MissionGenerationServiceTest {
             jobRepository = jobRepository,
             draftRepository = draftRepository,
             missionRepository = missionRepository,
-            goalRepository = goalRepository,
-            surveyRepository = surveyRepository,
+            onboardingProfileRepository = onboardingRepository,
             clock = Clock.fixed(now, ZoneOffset.UTC),
             outboxRepository = outboxRepository,
         )
         return Fixture(
             service,
             jobRepository,
-            goalRepository,
-            surveyRepository,
+            onboardingRepository,
             outboxRepository,
         )
     }
@@ -83,8 +98,7 @@ class MissionGenerationServiceTest {
     private data class Fixture(
         val service: MissionGenerationService,
         val jobRepository: MissionGenerationJobRepository,
-        val goalRepository: GoalRepository,
-        val surveyRepository: MissionSurveyRepository,
+        val onboardingRepository: OnboardingProfileRepository,
         val outboxRepository: MissionGenerationOutboxRepository,
     )
 

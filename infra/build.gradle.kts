@@ -8,6 +8,7 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("io.micrometer:micrometer-core")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")

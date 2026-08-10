@@ -86,7 +86,7 @@ class GoalAcceptanceTest(
         val token = issueGuestToken()
         patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
         patchProfile(token, """{"netWorthManwon":1800}""")
-        patchProfile(token, """{"goalPeriodMonths":24}""")
+        patchProfile(token, """{"goalPeriodMonths":24,"address":"SEOUL"}""")
         mockMvc.perform(post("/api/onboarding/goal").header("Authorization", "Bearer $token")
             .contentType(MediaType.APPLICATION_JSON).content("""{"plan":"PLAN_1"}"""))
             .andExpect(status().isCreated)

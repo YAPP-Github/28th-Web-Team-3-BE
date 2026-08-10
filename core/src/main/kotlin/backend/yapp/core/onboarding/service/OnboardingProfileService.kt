@@ -24,6 +24,7 @@ class OnboardingProfileService(
         }
 
         command.birthDate?.let { profile.birthDate = validateBirthDate(it) }
+        command.address?.let { profile.address = it }
         command.monthlySalaryManwon?.let { profile.monthlySalaryManwon = validateRange(it, 0, MAX_MONEY_MANWON) }
         command.monthlySavingManwon?.let { profile.monthlySavingManwon = validateRange(it, 0, MAX_MONEY_MANWON) }
         command.netWorthManwon?.let { profile.netWorthManwon = validateRange(it, 0, MAX_NET_WORTH_MANWON) }

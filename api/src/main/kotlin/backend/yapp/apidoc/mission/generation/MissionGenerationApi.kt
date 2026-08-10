@@ -5,6 +5,7 @@ import backend.yapp.api.mission.generation.dto.MissionConfirmRequest
 import backend.yapp.api.mission.generation.dto.MissionConfirmResponse
 import backend.yapp.api.mission.generation.dto.MissionDraftsResponse
 import backend.yapp.api.mission.generation.dto.MissionGenerationJobResponse
+import backend.yapp.api.mission.generation.dto.MissionGenerationCreateRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -23,7 +24,7 @@ import org.springframework.http.ResponseEntity
 interface MissionGenerationApi {
     @Operation(
         summary = "미션 생성 job 요청",
-        description = "온보딩과 미션 설문 완료 후 호출한다. 진행 중인 job이 있으면 같은 job을 반환한다.",
+        description = "카테고리·항목·주간 빈도·주간 금액을 입력해 하나의 항목에 대한 미션 후보를 생성한다.",
     )
     @ApiResponses(
         ApiResponse(
@@ -37,7 +38,10 @@ interface MissionGenerationApi {
             content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))],
         ),
     )
-    fun request(guestUserId: Long): ResponseEntity<MissionGenerationJobResponse>
+    fun request(
+        guestUserId: Long,
+        request: MissionGenerationCreateRequest,
+    ): ResponseEntity<MissionGenerationJobResponse>
 
     @Operation(summary = "미션 생성 job 상태 polling")
     @ApiResponses(

@@ -3,6 +3,9 @@ package backend.yapp.api.mission.lifecycle.controller
 import backend.yapp.api.mission.lifecycle.dto.ManualMissionCreateRequest
 import backend.yapp.api.mission.lifecycle.dto.MissionLifecycleResponse
 import backend.yapp.api.mission.lifecycle.dto.MissionsResponse
+import backend.yapp.api.mission.lifecycle.dto.MissionProgressResponse
+import backend.yapp.api.mission.lifecycle.dto.MissionCatalogResponse
+import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionStatus
 import backend.yapp.core.mission.generation.service.MissionLifecycleService
 import backend.yapp.core.mission.generation.service.MissionSource
@@ -29,12 +32,24 @@ import org.springframework.web.bind.annotation.RestController
 class MissionController(
     private val service: MissionLifecycleService,
 ) {
+    @GetMapping("/catalog")
+    @Operation(summary = "미션 카테고리·항목 목록 조회")
+    fun catalog(): MissionCatalogResponse = MissionCatalogResponse.create()
+
     @GetMapping
     @Operation(summary = "내 미션 조회")
     fun list(
         @AuthenticationPrincipal guestUserId: Long,
         @RequestParam(required = false) status: MissionStatus?,
-    ): MissionsResponse = MissionsResponse.from(service.list(guestUserId, status))
+        @RequestParam(required = false) category: MissionCategory?,
+    ): MissionsResponse = MissionsResponse.from(service.list(guestUserId, status, category))
+
+    @GetMapping("/progress")
+    @Operation(summary = "이번 주 미션 진행률 조회")
+    fun progress(
+        @AuthenticationPrincipal guestUserId: Long,
+        @RequestParam(required = false) category: MissionCategory?,
+    ): MissionProgressResponse = MissionProgressResponse.from(service.progress(guestUserId, category))
 
     @PostMapping("/manual")
     @Operation(summary = "수동 미션 생성")
@@ -50,14 +65,15 @@ class MissionController(
         ),
     )
 
-    @DeleteMapping("/recommended/{missionId}")
-    @Operation(summary = "추천 미션 삭제")
+    @DeleteMapping("/{source}/{missionId}")
+    @Operation(summary = "미션 삭제")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteRecommended(
+    fun delete(
         @AuthenticationPrincipal guestUserId: Long,
+        @PathVariable source: MissionSource,
         @PathVariable missionId: UUID,
     ) {
-        service.deleteRecommended(guestUserId, missionId)
+        service.delete(guestUserId, source, missionId)
     }
 
     @PatchMapping("/{source}/{missionId}/complete")

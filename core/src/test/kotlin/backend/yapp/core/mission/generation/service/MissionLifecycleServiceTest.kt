@@ -6,9 +6,8 @@ import backend.yapp.core.mission.generation.domain.ManualMissionRepository
 import backend.yapp.core.mission.generation.domain.Mission
 import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionMetricType
-import backend.yapp.core.mission.generation.domain.MissionOutcomeEventRepository
 import backend.yapp.core.mission.generation.domain.MissionRepository
-import backend.yapp.core.mission.generation.domain.MissionStatus
+import backend.yapp.core.mission.generation.domain.MissionWeeklyCompletionRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -16,49 +15,33 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class MissionLifecycleServiceTest {
     @Test
-    fun `deletes an owned recommended mission`() {
+    fun `user deletion soft deletes an owned mission and preserves its row`() {
         val fixture = fixture()
         val mission = recommendedMission()
-        `when`(fixture.missionRepository.findByIdAndGuestUserId(mission.id, GUEST_USER_ID))
-            .thenReturn(mission)
+        `when`(fixture.missionRepository.findByIdAndGuestUserIdForUpdate(mission.id, GUEST_USER_ID)).thenReturn(mission)
 
-        fixture.service.deleteRecommended(GUEST_USER_ID, mission.id)
+        fixture.service.delete(GUEST_USER_ID, MissionSource.RECOMMENDED, mission.id)
 
-        verify(fixture.missionRepository).delete(mission)
+        assertNotNull(mission.deletedAt)
     }
 
     @Test
-    fun `does not delete a mission that is missing or owned by another user`() {
+    fun `cannot delete a missing or another users mission`() {
         val fixture = fixture()
         val missionId = UUID.randomUUID()
-        `when`(fixture.missionRepository.findByIdAndGuestUserId(missionId, GUEST_USER_ID))
-            .thenReturn(null)
+        `when`(fixture.missionRepository.findByIdAndGuestUserIdForUpdate(missionId, GUEST_USER_ID)).thenReturn(null)
 
         val exception = assertFailsWith<BaseException> {
-            fixture.service.deleteRecommended(GUEST_USER_ID, missionId)
+            fixture.service.delete(GUEST_USER_ID, MissionSource.RECOMMENDED, missionId)
         }
 
         assertEquals(ErrorCode.MISSION_NOT_FOUND, exception.errorCode)
-        verify(fixture.missionRepository, never()).delete(org.mockito.ArgumentMatchers.any(Mission::class.java))
-    }
-
-    @Test
-    fun `deletes an incomplete recommended mission`() {
-        val fixture = fixture()
-        val mission = recommendedMission().also { it.markIncomplete() }
-        `when`(fixture.missionRepository.findByIdAndGuestUserId(mission.id, GUEST_USER_ID))
-            .thenReturn(mission)
-
-        fixture.service.deleteRecommended(GUEST_USER_ID, mission.id)
-
-        verify(fixture.missionRepository).delete(mission)
     }
 
     private fun fixture(): Fixture {
@@ -66,7 +49,7 @@ class MissionLifecycleServiceTest {
         val service = MissionLifecycleService(
             missionRepository = missionRepository,
             manualRepository = mock(ManualMissionRepository::class.java),
-            outcomeRepository = mock(MissionOutcomeEventRepository::class.java),
+            weeklyCompletionRepository = mock(MissionWeeklyCompletionRepository::class.java),
             clock = Clock.fixed(NOW, ZoneOffset.UTC),
         )
         return Fixture(service, missionRepository)
@@ -84,9 +67,8 @@ class MissionLifecycleServiceTest {
         metricType = MissionMetricType.COUNT,
         targetCount = 1,
         targetUnit = "TIMES_PER_WEEK",
-        estimatedSavingsWon = 15000,
-        status = MissionStatus.ACTIVE,
-        weekEndsAt = NOW.plusSeconds(604800),
+        estimatedSavingsWon = 15_000,
+        weekEndsAt = NOW.plusSeconds(604_800),
         createdAt = NOW,
     )
 

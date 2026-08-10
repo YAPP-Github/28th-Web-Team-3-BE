@@ -4,6 +4,7 @@ import backend.yapp.api.mission.generation.dto.MissionConfirmRequest
 import backend.yapp.api.mission.generation.dto.MissionConfirmResponse
 import backend.yapp.api.mission.generation.dto.MissionDraftsResponse
 import backend.yapp.api.mission.generation.dto.MissionGenerationJobResponse
+import backend.yapp.api.mission.generation.dto.MissionGenerationCreateRequest
 import backend.yapp.apidoc.mission.generation.MissionGenerationApi
 import backend.yapp.core.mission.generation.service.MissionGenerationService
 import jakarta.validation.Valid
@@ -27,8 +28,19 @@ class MissionGenerationController(
     @PostMapping
     override fun request(
         @AuthenticationPrincipal guestUserId: Long,
+        @Valid @RequestBody request: MissionGenerationCreateRequest,
     ): ResponseEntity<MissionGenerationJobResponse> =
-        ResponseEntity.accepted().body(MissionGenerationJobResponse.from(service.request(guestUserId)))
+        ResponseEntity.accepted().body(
+            MissionGenerationJobResponse.from(
+                service.request(
+                    guestUserId = guestUserId,
+                    category = request.category,
+                    item = request.item,
+                    baselineFrequency = request.baselineFrequency,
+                    baselineAmountWon = request.baselineAmountWon,
+                ),
+            ),
+        )
 
     @GetMapping("/{jobId}")
     override fun status(

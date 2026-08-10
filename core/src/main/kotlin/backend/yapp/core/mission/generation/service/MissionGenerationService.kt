@@ -11,8 +11,10 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxReposi
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionRepository
-import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
-import backend.yapp.core.goal.domain.GoalRepository
+import backend.yapp.core.mission.generation.domain.MissionCategory
+import backend.yapp.core.mission.generation.domain.MissionItem
+import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
+import backend.yapp.core.onboarding.domain.OnboardingStatus
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
@@ -29,31 +31,49 @@ class MissionGenerationService(
     private val jobRepository: MissionGenerationJobRepository,
     private val draftRepository: MissionDraftRepository,
     private val missionRepository: MissionRepository,
-    private val goalRepository: GoalRepository,
-    private val surveyRepository: MissionSurveyRepository,
+    private val onboardingProfileRepository: OnboardingProfileRepository,
     private val clock: Clock,
     private val outboxRepository: MissionGenerationOutboxRepository,
 ) {
     @Transactional
-    fun request(guestUserId: Long): MissionGenerationJobSnapshot {
-        if (goalRepository.findByGuestUserId(guestUserId) == null) {
-            throw BaseException(ErrorCode.ONBOARDING_INCOMPLETE)
+    fun request(
+        guestUserId: Long,
+        category: MissionCategory,
+        item: MissionItem,
+        baselineFrequency: Int,
+        baselineAmountWon: Int,
+    ): MissionGenerationJobSnapshot {
+        if (!category.active || item.category != category || baselineFrequency !in 1..10 || baselineAmountWon !in 1..2_000_000) {
+            throw BaseException(ErrorCode.MISSION_GENERATION_INPUT_INVALID)
         }
-        if (surveyRepository.findByGuestUserId(guestUserId) == null) {
-            throw BaseException(ErrorCode.MISSION_SURVEY_NOT_FOUND)
+        val profile = onboardingProfileRepository.findByGuestUserIdForUpdate(guestUserId)
+            ?: throw BaseException(ErrorCode.ONBOARDING_INCOMPLETE)
+        if (profile.status != OnboardingStatus.COMPLETED || profile.birthDate == null || profile.address == null) {
+            throw BaseException(ErrorCode.ONBOARDING_INCOMPLETE)
         }
 
         val existing = jobRepository.findFirstByGuestUserIdAndActiveGenerationKeyOrderByCreatedAtDesc(
             guestUserId,
             MissionGenerationJob.ACTIVE_KEY,
         )
-        if (existing != null) return existing.toSnapshot()
+        if (existing != null) {
+            if (existing.category == category && existing.item == item &&
+                existing.baselineFrequency == baselineFrequency && existing.baselineAmountWon == baselineAmountWon
+            ) {
+                return existing.toSnapshot()
+            }
+            throw BaseException(ErrorCode.MISSION_GENERATION_ALREADY_IN_PROGRESS)
+        }
 
         val now = clock.instant()
         val job = jobRepository.saveAndFlush(
             MissionGenerationJob(
                 id = UUID.randomUUID(),
                 guestUserId = guestUserId,
+                category = category,
+                item = item,
+                baselineFrequency = baselineFrequency,
+                baselineAmountWon = baselineAmountWon,
                 createdAt = now,
             ),
         )
@@ -68,6 +88,10 @@ class MissionGenerationService(
         return job.toSnapshot()
     }
 
+    @Deprecated("Use the consumption baseline request")
+    fun request(guestUserId: Long): MissionGenerationJobSnapshot =
+        request(guestUserId, MissionCategory.MEAL, MissionItem.DELIVERY_FOOD, 1, 1)
+
     @Transactional(readOnly = true)
     fun status(guestUserId: Long, jobId: UUID): MissionGenerationJobSnapshot =
         ownedJob(guestUserId, jobId).toSnapshot()
@@ -80,6 +104,7 @@ class MissionGenerationService(
             MissionDraftSnapshot(
                 id = draft.id,
                 category = draft.category,
+                item = draft.item,
                 title = draft.title,
                 description = draft.description,
                 actionCode = draft.actionCode,
@@ -127,6 +152,7 @@ class MissionGenerationService(
                 draftId = draft.id,
                 guestUserId = guestUserId,
                 category = draft.category,
+                item = draft.item,
                 title = draft.title,
                 description = draft.description,
                 actionCode = draft.actionCode,
@@ -173,6 +199,7 @@ class MissionGenerationService(
         MissionSnapshot(
             id = id,
             category = category,
+            item = item,
             title = title,
             description = description,
             actionCode = actionCode,

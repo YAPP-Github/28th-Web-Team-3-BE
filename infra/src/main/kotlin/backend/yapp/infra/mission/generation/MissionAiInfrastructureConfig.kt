@@ -1,6 +1,7 @@
 package backend.yapp.infra.mission.generation
 
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.ai.chat.client.ChatClient
@@ -16,6 +17,30 @@ import tools.jackson.databind.ObjectMapper
 @Configuration
 @EnableConfigurationProperties(MissionGenerationProperties::class)
 class MissionAiInfrastructureConfig {
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "off",
+        matchIfMissing = true,
+    )
+    fun staticMissionAlternativeGenerator(): MissionAlternativeGenerationPort =
+        StaticMissionAlternativeGenerator()
+
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "on",
+    )
+    fun aiMissionAlternativeGenerator(
+        chatClientBuilder: ChatClient.Builder,
+        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
+    ): MissionAlternativeGenerationPort {
+        validateGoogleGenAiAuthentication(apiKey)
+        return SpringAiMissionAlternativeGenerator(chatClientBuilder.build())
+    }
+
     @Bean
     @ConditionalOnProperty(
         prefix = "mission.generation",

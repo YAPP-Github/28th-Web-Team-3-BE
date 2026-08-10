@@ -21,6 +21,13 @@ class MissionDraft(
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 20)
     val category: MissionCategory,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_code", length = 40)
+    val item: MissionItem? = null,
+    @Column(name = "title_template", length = 120)
+    val titleTemplate: String? = null,
+    @Column(name = "priority_order")
+    val priorityOrder: Int? = null,
     @Column(name = "title", nullable = false, length = 120)
     val title: String,
     @Column(name = "description", nullable = false, length = 500)

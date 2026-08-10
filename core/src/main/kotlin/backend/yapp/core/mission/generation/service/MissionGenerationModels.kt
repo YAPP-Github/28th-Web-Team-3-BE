@@ -3,6 +3,7 @@ package backend.yapp.core.mission.generation.service
 import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionMetricType
+import backend.yapp.core.mission.generation.domain.MissionItem
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import java.time.Instant
 import java.util.UUID
@@ -20,6 +21,7 @@ data class MissionGenerationJobSnapshot(
 data class MissionDraftSnapshot(
     val id: UUID,
     val category: MissionCategory,
+    val item: MissionItem?,
     val title: String,
     val description: String,
     val actionCode: String,
@@ -33,6 +35,7 @@ data class MissionDraftSnapshot(
 data class MissionSnapshot(
     val id: UUID,
     val category: MissionCategory,
+    val item: MissionItem?,
     val title: String,
     val description: String,
     val actionCode: String,

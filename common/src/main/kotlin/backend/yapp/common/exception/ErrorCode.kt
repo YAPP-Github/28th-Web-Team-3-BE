@@ -33,6 +33,8 @@ enum class ErrorCode(
     MISSION_SURVEY_CONFLICT(HttpStatus.CONFLICT, 409, "미션 설문이 동시에 변경되었습니다. 다시 시도해 주세요."),
 
     // Mission generation
+    MISSION_GENERATION_INPUT_INVALID(HttpStatus.BAD_REQUEST, 400, "미션 생성 입력값이 올바르지 않습니다."),
+    MISSION_GENERATION_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, 409, "다른 미션 생성 작업이 진행 중입니다."),
     MISSION_GENERATION_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "미션 생성 작업을 찾을 수 없습니다."),
     MISSION_GENERATION_NOT_READY(HttpStatus.CONFLICT, 409, "미션 생성 작업이 아직 완료되지 않았습니다."),
     MISSION_GENERATION_FAILED(HttpStatus.CONFLICT, 409, "미션 생성 작업이 실패했습니다. 다시 요청해 주세요."),
