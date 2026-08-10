@@ -16,7 +16,10 @@ data class ProfilePatchRequest(
     @field:Past
     val birthDate: LocalDate? = null,
     @field:Schema(
-        description = "거주지역. 광주를 제외한 16개 시·도 중 하나. 주소 입력 기능 제공 전까지 생략 시 SEOUL로 저장된다.",
+        description = "거주지역(16개 시·도, 광주 제외 — 2026 개편으로 광주는 전남에 통합). " +
+            "허용 값: SEOUL(서울), GYEONGGI(경기), INCHEON(인천), BUSAN(부산), DAEGU(대구), DAEJEON(대전), " +
+            "SEJONG(세종), ULSAN(울산), CHUNGNAM(충남), CHUNGBUK(충북), GYEONGNAM(경남), GYEONGBUK(경북), " +
+            "JEONNAM(전남), JEONBUK(전북), GANGWON(강원), JEJU(제주). 생략 시 SEOUL로 저장된다.",
         example = "SEOUL",
         defaultValue = "SEOUL",
     )
