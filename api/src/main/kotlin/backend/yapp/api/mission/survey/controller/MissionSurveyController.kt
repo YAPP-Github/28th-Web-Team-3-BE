@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 
 @RestController
+@ConditionalOnProperty(prefix = "mission.survey", name = ["enabled"], havingValue = "true")
 @RequestMapping("/api/missions/surveys")
 class MissionSurveyController(
     private val missionSurveyService: MissionSurveyService,

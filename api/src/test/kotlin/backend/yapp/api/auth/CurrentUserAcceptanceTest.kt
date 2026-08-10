@@ -37,7 +37,7 @@ class CurrentUserAcceptanceTest(
             patch("/api/onboarding/profile")
                 .header("Authorization", "Bearer $token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"monthlySavingManwon":100,"goalPeriodMonths":24}"""),
+                .content("""{"monthlySavingManwon":100,"goalPeriodMonths":24,"address":"SEOUL"}"""),
         ).andExpect(status().isOk)
 
         mockMvc.perform(

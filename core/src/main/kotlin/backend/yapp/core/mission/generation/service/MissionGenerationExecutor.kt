@@ -1,21 +1,27 @@
 package backend.yapp.core.mission.generation.service
 
-import backend.yapp.core.mission.generation.domain.MissionCategory
+import backend.yapp.core.mission.generation.domain.MissionBlogTip
+import backend.yapp.core.mission.generation.domain.MissionBlogTipRepository
 import backend.yapp.core.mission.generation.domain.MissionDraft
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
+import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
-import backend.yapp.core.mission.generation.port.MissionDraftCandidate
-import backend.yapp.core.mission.generation.port.MissionDraftCandidateProvider
-import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
-import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
-import backend.yapp.core.mission.generation.port.MissionDraftCopy
+import backend.yapp.core.mission.generation.domain.MissionItem
+import backend.yapp.core.mission.generation.domain.MissionMetricType
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRequest
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationResult
+import backend.yapp.core.mission.generation.port.MissionBlogSearchPort
+import backend.yapp.core.mission.generation.port.MissionBlogSearchResult
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
-import backend.yapp.core.mission.generation.port.MissionRecommendationTracePort
-import backend.yapp.core.mission.survey.domain.MissionSurveyRepository
+import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
+import backend.yapp.core.onboarding.domain.ResidentialArea
 import java.time.Clock
 import java.time.Duration
+import java.time.LocalDate
 import java.util.UUID
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -23,7 +29,10 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class MissionGenerationExecutor(
     private val workService: MissionGenerationWorkService,
-    private val contentGenerator: MissionDraftContentGenerator,
+    private val blogSearchPort: MissionBlogSearchPort,
+    private val alternativeGenerator: MissionAlternativeGenerationPort,
+    @Value("\${mission.generation.naver-blog.ai-context-count:15}")
+    private val aiContextCount: Int,
 ) {
     fun execute(jobId: UUID): MissionGenerationExecutionResult {
         val work = when (val preparation = workService.prepare(jobId)) {
@@ -32,26 +41,22 @@ class MissionGenerationExecutor(
             MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
         }
         try {
-            if (work.candidates.isEmpty()) {
-                workService.complete(
-                    work = work,
-                    copiesByTemplateId = emptyMap(),
-                    generationSource = MissionDraftGenerationSource.TEMPLATE_FALLBACK,
-                )
-                return MissionGenerationExecutionResult.COMPLETED
+            val query = MissionSearchQueryFactory.create(
+                item = work.item,
+                birthDate = work.birthDate,
+                address = work.address,
+                today = LocalDate.now(workService.clock),
+                rotationSeed = work.jobId.hashCode(),
+            )
+            val blogResults = try {
+                blogSearchPort.search(query, aiContextCount.coerceIn(1, 100))
+            } catch (_: Exception) {
+                emptyList()
             }
-            val result = contentGenerator.generate(
-                MissionDraftContentRequest(
-                    jobId = work.jobId,
-                    guestUserId = work.guestUserId,
-                    candidates = work.candidates,
-                ),
+            val generated = alternativeGenerator.generate(
+                MissionAlternativeGenerationRequest(work.item, blogResults.take(aiContextCount.coerceIn(1, 100))),
             )
-            workService.complete(
-                work = work,
-                copiesByTemplateId = result.copies.associateBy { it.templateId },
-                generationSource = result.source,
-            )
+            workService.complete(work, generated, blogResults)
             return MissionGenerationExecutionResult.COMPLETED
         } catch (exception: Exception) {
             workService.releaseOrFail(work)
@@ -63,72 +68,113 @@ class MissionGenerationExecutor(
 @Service
 class MissionGenerationWorkService(
     private val jobRepository: MissionGenerationJobRepository,
-    private val surveyRepository: MissionSurveyRepository,
-    private val candidateProvider: MissionDraftCandidateProvider,
+    private val profileRepository: OnboardingProfileRepository,
+    private val templateRepository: MissionDraftTemplateRepository,
     private val draftRepository: MissionDraftRepository,
-    private val tracePort: MissionRecommendationTracePort,
-    private val clock: Clock,
+    private val blogTipRepository: MissionBlogTipRepository,
+    val clock: Clock,
 ) {
     @Transactional
     fun prepare(jobId: UUID): MissionGenerationPreparation {
         val job = jobRepository.findByIdForUpdate(jobId) ?: return MissionGenerationPreparation.Skipped
         val now = clock.instant()
-        if (job.status == MissionGenerationJobStatus.RUNNING &&
-            job.leaseExpiresAt?.isAfter(now) == true
-        ) {
+        if (job.status == MissionGenerationJobStatus.RUNNING && job.leaseExpiresAt?.isAfter(now) == true) {
             return MissionGenerationPreparation.ActiveLease
         }
         val leaseToken = UUID.randomUUID()
         if (!job.claim(now, leaseToken, DEFAULT_LEASE_DURATION)) return MissionGenerationPreparation.Skipped
 
-        val survey = surveyRepository.findByGuestUserId(job.guestUserId)
-            ?: error("Mission survey disappeared before generation")
-        val categories = survey.answerRows()
-            .map { MissionCategory.valueOf(it.categoryCode) }
-            .toSet()
-        val candidates = candidateProvider.candidates(job.guestUserId, categories)
-            .groupBy { it.category }
-            .flatMap { (_, categoryCandidates) -> categoryCandidates.take(MAX_DRAFTS_PER_CATEGORY) }
-        tracePort.linkToJob(job.guestUserId, job.id)
-
+        val item = checkNotNull(job.item) { "Mission generation item is missing" }
+        val profile = checkNotNull(profileRepository.findByGuestUserId(job.guestUserId)) {
+            "Onboarding profile disappeared before generation"
+        }
         return MissionGenerationPreparation.Claimed(
-            MissionGenerationWork(job.id, job.guestUserId, candidates, leaseToken),
+            MissionGenerationWork(
+                jobId = job.id,
+                guestUserId = job.guestUserId,
+                item = item,
+                baselineFrequency = checkNotNull(job.baselineFrequency),
+                baselineAmountWon = checkNotNull(job.baselineAmountWon),
+                birthDate = checkNotNull(profile.birthDate),
+                address = profile.address,
+                leaseToken = leaseToken,
+            ),
         )
     }
 
     @Transactional
     fun complete(
         work: MissionGenerationWork,
-        copiesByTemplateId: Map<Long, MissionDraftCopy>,
-        generationSource: MissionDraftGenerationSource,
+        generated: MissionAlternativeGenerationResult,
+        blogResults: List<MissionBlogSearchResult>,
     ) {
         val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
         if (!job.ownsLease(work.leaseToken, clock.instant())) return
+        if (generated.alternatives.isEmpty() || generated.alternatives.size > MAX_ALTERNATIVES) {
+            error("AI returned an invalid alternative count")
+        }
 
+        val selectedAlternatives = generated.alternatives.take(work.baselineFrequency)
+        val allocations = MissionTargetAllocator.allocate(
+            work.baselineFrequency,
+            work.baselineAmountWon,
+            selectedAlternatives.size,
+        )
+        val template = checkNotNull(templateRepository.findByTargetCodeAndActiveTrue(work.item.name)) {
+            "Mission item template is missing: ${work.item.name}"
+        }
         val now = clock.instant()
-        val drafts = work.candidates.map { candidate ->
-            val copy = copiesByTemplateId[candidate.templateId]
+        val drafts = selectedAlternatives.zip(allocations).mapIndexed { index, (alternative, allocation) ->
             MissionDraft(
                 id = UUID.randomUUID(),
                 jobId = work.jobId,
-                templateId = candidate.templateId,
-                category = candidate.category,
-                title = copy?.title?.takeIf(String::isNotBlank)?.take(MAX_TITLE_LENGTH)
-                    ?: candidate.templateTitle,
-                description = copy?.description?.takeIf(String::isNotBlank)?.take(MAX_DESCRIPTION_LENGTH)
-                    ?: candidate.templateDescription,
-                actionCode = candidate.actionCode,
-                metricType = candidate.metricType,
-                targetCount = candidate.targetCount,
-                targetUnit = candidate.targetUnit,
-                estimatedSavingsWon = candidate.estimatedSavingsWon,
-                savingsEstimateVersion = candidate.savingsEstimateVersion,
+                templateId = template.id,
+                category = work.item.category,
+                item = work.item,
+                titleTemplate = alternative.titleTemplate,
+                priorityOrder = index + 1,
+                title = MissionTitleRenderer.render(alternative.titleTemplate, allocation.targetCount).take(MAX_TITLE_LENGTH),
+                description = alternative.description.take(MAX_DESCRIPTION_LENGTH),
+                actionCode = work.item.name,
+                metricType = MissionMetricType.COUNT,
+                targetCount = allocation.targetCount,
+                targetUnit = "TIMES_PER_WEEK",
+                estimatedSavingsWon = allocation.estimatedSavingsWon,
+                savingsEstimateVersion = "V2_DETERMINISTIC",
                 createdAt = now,
             )
         }
         draftRepository.saveAll(drafts)
-        job.succeed(now, now.plus(DRAFT_TTL), generationSource)
-        tracePort.markShown(job.id, drafts.map { it.templateId }.toSet())
+        saveBlogTips(work, blogResults, now)
+        job.succeed(now, now.plus(DRAFT_TTL), generated.source)
+    }
+
+    private fun saveBlogTips(
+        work: MissionGenerationWork,
+        results: List<MissionBlogSearchResult>,
+        now: java.time.Instant,
+    ) {
+        results.forEach { result ->
+            val existing = blogTipRepository.findByGuestUserIdAndUrl(work.guestUserId, result.url)
+            if (existing == null) {
+                blogTipRepository.save(
+                    MissionBlogTip(
+                        id = UUID.randomUUID(),
+                        guestUserId = work.guestUserId,
+                        item = work.item,
+                        title = result.title,
+                        source = result.source,
+                        url = result.url,
+                        searchedAt = now,
+                    ),
+                )
+            } else {
+                existing.item = work.item
+                existing.title = result.title
+                existing.source = result.source
+                existing.searchedAt = now
+            }
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -139,7 +185,7 @@ class MissionGenerationWorkService(
 
     companion object {
         private val DEFAULT_LEASE_DURATION: Duration = Duration.ofMinutes(10)
-        private const val MAX_DRAFTS_PER_CATEGORY = 4
+        private const val MAX_ALTERNATIVES = 3
         private const val MAX_TITLE_LENGTH = 120
         private const val MAX_DESCRIPTION_LENGTH = 500
         private const val MAX_ATTEMPTS = 5
@@ -150,7 +196,11 @@ class MissionGenerationWorkService(
 data class MissionGenerationWork(
     val jobId: UUID,
     val guestUserId: Long,
-    val candidates: List<MissionDraftCandidate>,
+    val item: MissionItem,
+    val baselineFrequency: Int,
+    val baselineAmountWon: Int,
+    val birthDate: LocalDate,
+    val address: ResidentialArea?,
     val leaseToken: UUID,
 )
 

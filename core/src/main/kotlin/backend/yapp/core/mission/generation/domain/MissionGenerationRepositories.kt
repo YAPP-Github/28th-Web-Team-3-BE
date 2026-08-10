@@ -80,6 +80,7 @@ interface MissionDraftTemplateRepository : JpaRepository<MissionDraftTemplate, L
     fun findByCategoryInAndActiveTrueOrderByCategoryAscSortOrderAsc(
         categories: Collection<MissionCategory>,
     ): List<MissionDraftTemplate>
+    fun findByTargetCodeAndActiveTrue(targetCode: String): MissionDraftTemplate?
 }
 
 interface MissionDraftRepository : JpaRepository<MissionDraft, UUID> {
@@ -96,7 +97,14 @@ interface MissionRepository : JpaRepository<Mission, UUID> {
     fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByJobIdOrderByCreatedAtAsc(jobId: UUID): List<Mission>
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
+    fun findAllByGuestUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): Mission?
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select mission from Mission mission where mission.id = :id and mission.guestUserId = :guestUserId")
+    fun findByIdAndGuestUserIdForUpdate(
+        @Param("id") id: UUID,
+        @Param("guestUserId") guestUserId: Long,
+    ): Mission?
     fun findAllByStatusAndWeekEndsAtLessThanEqual(status: MissionStatus, cutoff: Instant): List<Mission>
 }
 
@@ -105,7 +113,14 @@ interface ManualMissionRepository : JpaRepository<ManualMission, UUID> {
     @Query("delete from ManualMission mission where mission.guestUserId = :guestUserId")
     fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
+    fun findAllByGuestUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): ManualMission?
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select mission from ManualMission mission where mission.id = :id and mission.guestUserId = :guestUserId")
+    fun findByIdAndGuestUserIdForUpdate(
+        @Param("id") id: UUID,
+        @Param("guestUserId") guestUserId: Long,
+    ): ManualMission?
     fun findAllByStatusAndWeekEndsAtLessThanEqual(status: MissionStatus, cutoff: Instant): List<ManualMission>
 }
 

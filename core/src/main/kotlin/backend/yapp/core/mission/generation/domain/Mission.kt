@@ -23,6 +23,9 @@ class Mission(
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 20)
     val category: MissionCategory,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_code", length = 40)
+    val item: MissionItem? = null,
     @Column(name = "title", nullable = false, length = 120)
     val title: String,
     @Column(name = "description", nullable = false, length = 500)
@@ -47,6 +50,8 @@ class Mission(
     val weekEndsAt: Instant,
     @Column(name = "completed_at")
     var completedAt: Instant? = null,
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant,
 ) {
@@ -63,6 +68,10 @@ class Mission(
         check(status == MissionStatus.ACTIVE)
         status = MissionStatus.INCOMPLETE
         return true
+    }
+
+    fun softDelete(now: Instant) {
+        if (deletedAt == null) deletedAt = now
     }
 }
 

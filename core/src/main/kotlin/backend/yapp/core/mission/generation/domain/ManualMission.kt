@@ -28,6 +28,8 @@ class ManualMission(
     val weekEndsAt: Instant,
     @Column(name = "completed_at")
     var completedAt: Instant? = null,
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant,
 ) {
@@ -44,5 +46,9 @@ class ManualMission(
         check(status == MissionStatus.ACTIVE)
         status = MissionStatus.INCOMPLETE
         return true
+    }
+
+    fun softDelete(now: Instant) {
+        if (deletedAt == null) deletedAt = now
     }
 }

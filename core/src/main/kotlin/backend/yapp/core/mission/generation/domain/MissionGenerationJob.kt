@@ -20,6 +20,16 @@ class MissionGenerationJob(
     @Column(name = "guest_user_id", nullable = false)
     val guestUserId: Long,
     @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 20)
+    val category: MissionCategory? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_code", length = 40)
+    val item: MissionItem? = null,
+    @Column(name = "baseline_frequency")
+    val baselineFrequency: Int? = null,
+    @Column(name = "baseline_amount_won")
+    val baselineAmountWon: Int? = null,
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     var status: MissionGenerationJobStatus = MissionGenerationJobStatus.PENDING,
     @Column(name = "active_generation_key", length = 20)

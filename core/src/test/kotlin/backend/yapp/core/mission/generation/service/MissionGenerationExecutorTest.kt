@@ -1,60 +1,56 @@
 package backend.yapp.core.mission.generation.service
 
-import backend.yapp.core.mission.generation.domain.MissionCategory
-import backend.yapp.core.mission.generation.domain.MissionMetricType
-import backend.yapp.core.mission.generation.port.MissionDraftCandidate
-import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
-import backend.yapp.core.mission.generation.port.MissionDraftContentRequest
+import backend.yapp.core.mission.generation.domain.MissionItem
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRequest
+import backend.yapp.core.mission.generation.port.MissionBlogSearchPort
+import backend.yapp.core.onboarding.domain.ResidentialArea
+import java.time.LocalDate
+import java.time.Clock
+import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class MissionGenerationExecutorTest {
     @Test
-    fun `failed content generation does not complete drafts or mark exposure shown`() {
+    fun `AI generation failure releases the claimed job for retry`() {
         val workService = mock(MissionGenerationWorkService::class.java)
-        val generator = mock(MissionDraftContentGenerator::class.java)
+        val searchPort = mock(MissionBlogSearchPort::class.java)
+        val generator = mock(MissionAlternativeGenerationPort::class.java)
         val jobId = UUID.randomUUID()
-        val leaseToken = UUID.randomUUID()
         val work = MissionGenerationWork(
-            jobId,
-            1,
-            listOf(
-                MissionDraftCandidate(
-                    templateId = 1,
-                    category = MissionCategory.MEAL,
-                    templateTitle = "제목",
-                    templateDescription = "설명",
-                    actionCode = "ACTION",
-                    metricType = MissionMetricType.COUNT,
-                    targetCount = 1,
-                    targetUnit = "TIMES_PER_WEEK",
-                    estimatedSavingsWon = 1000,
-                ),
-            ),
-            leaseToken,
+            jobId = jobId,
+            guestUserId = 1,
+            item = MissionItem.DELIVERY_FOOD,
+            baselineFrequency = 3,
+            baselineAmountWon = 30_000,
+            birthDate = LocalDate.of(2000, 1, 1),
+            address = ResidentialArea.SEOUL,
+            leaseToken = UUID.randomUUID(),
+        )
+        val clock = Clock.fixed(java.time.Instant.parse("2026-08-10T00:00:00Z"), ZoneOffset.UTC)
+        val query = MissionSearchQueryFactory.create(
+            work.item,
+            work.birthDate,
+            work.address,
+            LocalDate.now(clock),
+            work.jobId.hashCode(),
         )
         `when`(workService.prepare(jobId)).thenReturn(MissionGenerationPreparation.Claimed(work))
-        `when`(
-            generator.generate(
-                MissionDraftContentRequest(
-                    jobId = jobId,
-                    guestUserId = 1,
-                    candidates = work.candidates,
-                ),
-            ),
-        ).thenThrow(IllegalStateException("provider failed"))
+        `when`(workService.clock).thenReturn(clock)
+        `when`(searchPort.search(query, 15)).thenReturn(emptyList())
+        `when`(generator.generate(MissionAlternativeGenerationRequest(work.item, emptyList())))
+            .thenThrow(IllegalStateException("provider failed"))
 
         assertFailsWith<IllegalStateException> {
-            MissionGenerationExecutor(workService, generator).execute(jobId)
+            MissionGenerationExecutor(workService, searchPort, generator, 15).execute(jobId)
         }
 
         verify(workService).prepare(jobId)
         verify(workService).releaseOrFail(work)
-        verifyNoMoreInteractions(workService)
     }
 }
