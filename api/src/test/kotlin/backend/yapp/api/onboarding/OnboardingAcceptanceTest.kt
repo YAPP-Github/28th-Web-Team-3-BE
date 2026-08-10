@@ -25,7 +25,10 @@ class OnboardingAcceptanceTest(
     fun `full onboarding flow saves each step and completes the goal`() {
         val token = issueGuestToken()
 
-        patchProfile(token, """{"birthDate":"1998-03-01","address":"SEOUL"}""")
+        patchProfile(token, """{"birthDate":"1998-03-01"}""")
+        mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.address").value("SEOUL"))
         patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
         patchProfile(token, """{"netWorthManwon":1800}""")
         patchProfile(token, """{"goalPeriodMonths":24}""")
@@ -33,6 +36,7 @@ class OnboardingAcceptanceTest(
         mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+            .andExpect(jsonPath("$.address").value("SEOUL"))
             .andExpect(jsonPath("$.monthlySalaryManwon").value(350))
             .andExpect(jsonPath("$.goalPeriodMonths").value(24))
 
@@ -127,7 +131,7 @@ class OnboardingAcceptanceTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
             .andExpect(jsonPath("$.birthDate").value(null))
-            .andExpect(jsonPath("$.address").value(null))
+            .andExpect(jsonPath("$.address").value("SEOUL"))
             .andExpect(jsonPath("$.monthlySalaryManwon").value(null))
             .andExpect(jsonPath("$.monthlySavingManwon").value(null))
             .andExpect(jsonPath("$.netWorthManwon").value(null))

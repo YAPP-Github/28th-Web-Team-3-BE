@@ -30,6 +30,7 @@ interface OnboardingApi {
         description = "온보딩 입력 스텝(나이 / 월급·저축 / 순자산 / 목표기간)에서 입력한 값을 부분 저장(upsert)한다. <br>" +
             "한 번에 전부 보내지 않고, 각 스텝을 넘어갈 때마다 그 스텝의 필드만 담아 호출한다.<br><br>" +
             "1/4 나이: birthDate<br>" +
+            "거주지역 입력 기능 제공 전까지 address를 생략하면 SEOUL로 저장된다.<br>" +
             "2/4 월급·저축: monthlySalaryManwon, monthlySavingManwon<br>" +
             "3/4 순자산: netWorthManwon<br>" +
             "4/4 목표기간: goalPeriodMonths<br><br>" +
@@ -49,7 +50,7 @@ interface OnboardingApi {
         summary = "온보딩 프로필 조회",
         description = "온보딩 화면 재진입 시(미완료 상태로 재접속 등) 지금까지 저장된 입력값과 진행 상태(IN_PROGRESS / COMPLETED)를 반환한다.<br>" +
             "클라이언트는 이 값으로 마지막에 머문 스텝부터 이어서 진행한다.<br><br>" +
-            "아직 아무 입력도 저장되지 않았으면 모든 입력값이 null인 IN_PROGRESS 상태를 반환한다.",
+            "아직 아무 입력도 저장되지 않았으면 address는 임시 기본값 SEOUL, 나머지 입력값은 null인 IN_PROGRESS 상태를 반환한다.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = ProfileResponse::class))]),

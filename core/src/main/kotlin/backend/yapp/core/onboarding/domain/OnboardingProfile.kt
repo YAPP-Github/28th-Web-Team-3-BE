@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.PostLoad
+import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
 import java.time.Instant
 import java.time.LocalDate
@@ -20,7 +22,7 @@ class OnboardingProfile(
     var birthDate: LocalDate? = null,
     @Enumerated(EnumType.STRING)
     @Column(name = "address", length = 20)
-    var address: ResidentialArea? = null,
+    var address: ResidentialArea? = ResidentialArea.SEOUL,
     @Column(name = "monthly_salary_manwon")
     var monthlySalaryManwon: Int? = null,
     @Column(name = "monthly_saving_manwon")
@@ -39,6 +41,12 @@ class OnboardingProfile(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 ) {
+    @PostLoad
+    @PrePersist
+    internal fun defaultAddressIfMissing() {
+        if (address == null) address = ResidentialArea.SEOUL
+    }
+
     fun isReportReady(): Boolean =
         monthlySalaryManwon != null &&
             monthlySavingManwon != null &&

@@ -15,7 +15,11 @@ data class ProfilePatchRequest(
     @field:Schema(description = "생년월일(YYYY-MM-DD). 온보딩 1/4 '나이' 스텝.", example = "1998-03-01")
     @field:Past
     val birthDate: LocalDate? = null,
-    @field:Schema(description = "거주지역. 광주를 제외한 16개 시·도 중 하나.", example = "SEOUL")
+    @field:Schema(
+        description = "거주지역. 광주를 제외한 16개 시·도 중 하나. 주소 입력 기능 제공 전까지 생략 시 SEOUL로 저장된다.",
+        example = "SEOUL",
+        defaultValue = "SEOUL",
+    )
     val address: ResidentialArea? = null,
     @field:Schema(description = "월급(세후 실수령액, 만원). 0~650. 온보딩 2/4 스텝.", example = "300")
     @field:Min(0) @field:Max(650)
