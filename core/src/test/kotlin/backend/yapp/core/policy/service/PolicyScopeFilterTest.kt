@@ -17,12 +17,14 @@ class PolicyScopeFilterTest {
         medium: String? = null,
         applyPeriodText: String? = null,
         bizEndYmd: String? = null,
+        regionCode: String? = null,
     ) = ExternalYouthPolicy(
         externalId = "P1",
         title = title,
         mediumCategory = medium,
         applyPeriodText = applyPeriodText,
         bizEndYmd = bizEndYmd,
+        regionCode = regionCode,
     )
 
     @Test
@@ -95,6 +97,16 @@ class PolicyScopeFilterTest {
     @Test
     fun `resolveCategory returns null for out-of-scope medium`() {
         assertNull(PolicyScopeFilter.resolveCategory(policy(medium = "창업")))
+    }
+
+    @Test
+    fun `resolveRegionCodes normalizes zipCd sido prefixes to residential areas`() {
+        // 11=서울, 26=부산 → 정렬된 구분자 문자열
+        assertEquals(",SEOUL,BUSAN,", PolicyScopeFilter.resolveRegionCodes(policy(regionCode = "26110,11110,11140")))
+        // 12=전남광주통합특별시 → JEONNAM
+        assertEquals(",JEONNAM,", PolicyScopeFilter.resolveRegionCodes(policy(regionCode = "12110,12130")))
+        // 지역코드 없음 → null
+        assertNull(PolicyScopeFilter.resolveRegionCodes(policy(regionCode = null)))
     }
 
     @Test

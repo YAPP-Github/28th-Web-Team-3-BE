@@ -71,12 +71,13 @@ class PolicySyncService(
         val now = clock.instant()
         val deadline = PolicyScopeFilter.resolveEndDate(external)
         val category = PolicyScopeFilter.resolveCategory(external)?.label
+        val regionCodes = PolicyScopeFilter.resolveRegionCodes(external)
         val existing = repository.findByExternalId(external.externalId)
         if (existing != null) {
-            existing.apply(external, deadline, category, now)
+            existing.apply(external, deadline, category, regionCodes, now)
             repository.save(existing)
         } else {
-            repository.save(newPolicy(external, deadline, category, now))
+            repository.save(newPolicy(external, deadline, category, regionCodes, now))
         }
     }
 
@@ -84,6 +85,7 @@ class PolicySyncService(
         external: ExternalYouthPolicy,
         deadline: LocalDate?,
         category: String?,
+        regionCodes: String?,
         now: java.time.Instant,
     ) {
         title = external.title
@@ -92,6 +94,7 @@ class PolicySyncService(
         largeCategory = external.largeCategory
         mediumCategory = external.mediumCategory
         this.category = category
+        this.regionCodes = regionCodes
         supervisingOrg = external.supervisingOrg
         applyUrl = external.applyUrl
         applyPeriodText = external.applyPeriodText
@@ -110,6 +113,7 @@ class PolicySyncService(
         external: ExternalYouthPolicy,
         deadline: LocalDate?,
         category: String?,
+        regionCodes: String?,
         now: java.time.Instant,
     ): YouthPolicy =
         YouthPolicy(
@@ -120,6 +124,7 @@ class PolicySyncService(
             largeCategory = external.largeCategory,
             mediumCategory = external.mediumCategory,
             category = category,
+            regionCodes = regionCodes,
             supervisingOrg = external.supervisingOrg,
             applyUrl = external.applyUrl,
             applyPeriodText = external.applyPeriodText,
