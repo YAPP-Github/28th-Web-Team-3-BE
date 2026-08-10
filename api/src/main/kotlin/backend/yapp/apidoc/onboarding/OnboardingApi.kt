@@ -29,8 +29,10 @@ interface OnboardingApi {
         summary = "온보딩 프로필 부분 저장",
         description = "온보딩 입력 스텝(나이 / 월급·저축 / 순자산 / 목표기간)에서 입력한 값을 부분 저장(upsert)한다. <br>" +
             "한 번에 전부 보내지 않고, 각 스텝을 넘어갈 때마다 그 스텝의 필드만 담아 호출한다.<br><br>" +
-            "1/4 나이: birthDate<br>" +
-            "거주지역 입력 기능 제공 전까지 address를 생략하면 SEOUL로 저장된다.<br>" +
+            "1/4 나이: birthDate, 거주지역: address<br>" +
+            "address는 아래 16개(시·도) 중 하나이며, 생략 시 SEOUL로 저장된다(광주는 2026 개편으로 전남에 통합되어 제외).<br>" +
+            "SEOUL(서울), GYEONGGI(경기), INCHEON(인천), BUSAN(부산), DAEGU(대구), DAEJEON(대전), SEJONG(세종), ULSAN(울산), " +
+            "CHUNGNAM(충남), CHUNGBUK(충북), GYEONGNAM(경남), GYEONGBUK(경북), JEONNAM(전남), JEONBUK(전북), GANGWON(강원), JEJU(제주)<br>" +
             "2/4 월급·저축: monthlySalaryManwon, monthlySavingManwon<br>" +
             "3/4 순자산: netWorthManwon<br>" +
             "4/4 목표기간: goalPeriodMonths<br><br>" +
