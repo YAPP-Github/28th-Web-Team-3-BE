@@ -4,10 +4,11 @@ import backend.yapp.api.global.exception.ErrorResponseEntity
 import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
 import backend.yapp.core.auth.service.GuestAuthService
-import tools.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.MDC
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -21,7 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.filter.OncePerRequestFilter
-import org.springframework.beans.factory.annotation.Value
+import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableWebSecurity
@@ -78,7 +79,7 @@ class SecurityConfig(
     }
 }
 
-private class BearerTokenFilter(
+internal class BearerTokenFilter(
     private val guestAuthService: GuestAuthService,
     private val objectMapper: ObjectMapper,
     private val appRole: String,
@@ -93,16 +94,33 @@ private class BearerTokenFilter(
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authorization = request.getHeader("Authorization")
         if (authorization?.startsWith("Bearer ") == true) {
-            try {
-                val guestUserId = guestAuthService.authenticate(authorization.removePrefix("Bearer "))
-                SecurityContextHolder.getContext().authentication =
-                    UsernamePasswordAuthenticationToken(guestUserId, null, emptyList())
+            val guestUserId = try {
+                guestAuthService.authenticate(authorization.removePrefix("Bearer "))
             } catch (ex: BaseException) {
                 writeErrorResponse(response, objectMapper, ex.errorCode)
                 return
             }
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(guestUserId, null, emptyList())
+            withGuestUserMdc(guestUserId) {
+                filterChain.doFilter(request, response)
+            }
+            return
         }
         filterChain.doFilter(request, response)
+    }
+
+    private fun withGuestUserMdc(guestUserId: Long, action: () -> Unit) {
+        MDC.put(GUEST_USER_ID_MDC_KEY, guestUserId.toString())
+        try {
+            action()
+        } finally {
+            MDC.remove(GUEST_USER_ID_MDC_KEY)
+        }
+    }
+
+    companion object {
+        const val GUEST_USER_ID_MDC_KEY = "guest_user_id"
     }
 }
 
