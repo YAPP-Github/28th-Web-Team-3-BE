@@ -13,6 +13,7 @@ interface YouthPolicyRepository : JpaRepository<YouthPolicy, Long> {
      * 카테고리(4분류)·나이·지역 조건으로 정책을 검색한다. 각 조건이 null이면 해당 조건 미적용(전체).
      * - 나이: 정책의 대상 연령 범위가 사용자의 만 나이를 포함하면 대상(경계 미상=열림).
      * - 지역: 정책의 지역 목록(`,SEOUL,BUSAN,`)에 사용자의 거주지역이 포함되면 대상(전국 정책은 모든 지역 포함).
+     *   지역 정보가 없는 정책(region_codes=null)은 지역 무관으로 보고 모두에게 노출한다.
      */
     @Query(
         """
@@ -27,7 +28,8 @@ interface YouthPolicyRepository : JpaRepository<YouthPolicy, Long> {
           )
           AND (
               :regionToken IS NULL
-              OR (p.regionCodes IS NOT NULL AND p.regionCodes LIKE :regionToken)
+              OR p.regionCodes IS NULL
+              OR p.regionCodes LIKE :regionToken
           )
         """,
     )
