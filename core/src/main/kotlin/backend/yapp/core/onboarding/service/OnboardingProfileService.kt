@@ -38,7 +38,7 @@ class OnboardingProfileService(
     @Transactional(readOnly = true)
     fun get(guestUserId: Long): OnboardingProfile =
         profileRepository.findByGuestUserId(guestUserId)
-            ?: throw BaseException(ErrorCode.ONBOARDING_PROFILE_NOT_FOUND)
+            ?: OnboardingProfile(guestUserId = guestUserId)
 
     private fun validateRange(value: Int, min: Int, max: Int): Int {
         if (value < min || value > max) throw BaseException(ErrorCode.INVALID_ONBOARDING_INPUT)

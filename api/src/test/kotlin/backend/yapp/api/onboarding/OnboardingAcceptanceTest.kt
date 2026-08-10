@@ -121,11 +121,17 @@ class OnboardingAcceptanceTest(
     }
 
     @Test
-    fun `profile lookup without any data returns not found`() {
+    fun `profile lookup without any data returns an empty in progress profile`() {
         val token = issueGuestToken()
         mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.name").value("ONBOARDING_PROFILE_NOT_FOUND"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+            .andExpect(jsonPath("$.birthDate").value(null))
+            .andExpect(jsonPath("$.address").value(null))
+            .andExpect(jsonPath("$.monthlySalaryManwon").value(null))
+            .andExpect(jsonPath("$.monthlySavingManwon").value(null))
+            .andExpect(jsonPath("$.netWorthManwon").value(null))
+            .andExpect(jsonPath("$.goalPeriodMonths").value(null))
     }
 
     @Test

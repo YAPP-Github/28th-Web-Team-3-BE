@@ -49,12 +49,11 @@ interface OnboardingApi {
         summary = "온보딩 프로필 조회",
         description = "온보딩 화면 재진입 시(미완료 상태로 재접속 등) 지금까지 저장된 입력값과 진행 상태(IN_PROGRESS / COMPLETED)를 반환한다.<br>" +
             "클라이언트는 이 값으로 마지막에 머문 스텝부터 이어서 진행한다.<br><br>" +
-            "아직 아무 입력도 저장되지 않았으면 404(ONBOARDING_PROFILE_NOT_FOUND).",
+            "아직 아무 입력도 저장되지 않았으면 모든 입력값이 null인 IN_PROGRESS 상태를 반환한다.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
-        ApiResponse(responseCode = "404", description = "ONBOARDING_PROFILE_NOT_FOUND", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
     )
     fun getProfile(guestUserId: Long): ProfileResponse
 
