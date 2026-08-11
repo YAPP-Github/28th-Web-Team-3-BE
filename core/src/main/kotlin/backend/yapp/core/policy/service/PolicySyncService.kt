@@ -106,6 +106,7 @@ class PolicySyncService(
         earnCondition = external.earnCondition
         additionalQualification = external.additionalQualification
         externalModifiedAt = external.externalModifiedAt
+        viewCount = external.viewCount ?: 0
         updatedAt = now
     }
 
@@ -136,6 +137,7 @@ class PolicySyncService(
             earnCondition = external.earnCondition,
             additionalQualification = external.additionalQualification,
             externalModifiedAt = external.externalModifiedAt,
+            viewCount = external.viewCount ?: 0,
             createdAt = now,
             updatedAt = now,
         )

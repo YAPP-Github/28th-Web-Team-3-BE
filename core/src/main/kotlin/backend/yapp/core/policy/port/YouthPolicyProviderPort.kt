@@ -33,4 +33,6 @@ data class ExternalYouthPolicy(
     val externalModifiedAt: String? = null,
     /** 온통청년 지역코드(zipCd). 시군구 행정구역 코드 콤마 목록(앞 2자리=시도). */
     val regionCode: String? = null,
+    /** 온통청년 조회수(inqCnt). 정렬 기준. */
+    val viewCount: Int? = null,
 )
