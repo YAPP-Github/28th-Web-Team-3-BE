@@ -15,13 +15,14 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 혜택(청년정책) 목록 요약. 요약값 없이 정책명·카테고리·설명만 노출한다. */
+/** 혜택(청년정책) 목록 요약. 요약값 없이 정책명·카테고리·설명·조회수만 노출한다. */
 data class PolicySummary(
     val id: Long,
     val title: String,
     val category: String?,
     val largeCategory: String?,
     val description: String?,
+    val viewCount: Int,
     val bookmarked: Boolean,
 )
 
@@ -43,6 +44,7 @@ data class PolicyDetail(
     val targetMaxAge: Int?,
     val earnCondition: String?,
     val additionalQualification: String?,
+    val viewCount: Int,
     val bookmarked: Boolean,
 )
 
@@ -88,7 +90,7 @@ class PolicyQueryService(
     }
 
     private fun YouthPolicy.toSummary(bookmarked: Boolean) =
-        PolicySummary(id, title, category, largeCategory, description, bookmarked)
+        PolicySummary(id, title, category, largeCategory, description, viewCount, bookmarked)
 
     companion object {
         private val ZONE: ZoneId = ZoneId.of("Asia/Seoul")
@@ -112,6 +114,7 @@ class PolicyQueryService(
             targetMaxAge = targetMaxAge,
             earnCondition = earnCondition,
             additionalQualification = additionalQualification,
+            viewCount = viewCount,
             bookmarked = bookmarked,
         )
 }

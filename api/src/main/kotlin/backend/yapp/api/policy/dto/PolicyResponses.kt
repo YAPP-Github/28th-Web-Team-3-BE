@@ -10,6 +10,7 @@ data class PolicySummaryResponse(
     val category: String?,
     val largeCategory: String?,
     val description: String?,
+    val viewCount: Int,
     val bookmarked: Boolean,
 ) {
     companion object {
@@ -20,6 +21,7 @@ data class PolicySummaryResponse(
                 summary.category,
                 summary.largeCategory,
                 summary.description,
+                summary.viewCount,
                 summary.bookmarked,
             )
     }
@@ -42,6 +44,7 @@ data class PolicyDetailResponse(
     val targetMaxAge: Int?,
     val earnCondition: String?,
     val additionalQualification: String?,
+    val viewCount: Int,
     val bookmarked: Boolean,
 ) {
     companion object {
@@ -63,6 +66,7 @@ data class PolicyDetailResponse(
                 targetMaxAge = detail.targetMaxAge,
                 earnCondition = detail.earnCondition,
                 additionalQualification = detail.additionalQualification,
+                viewCount = detail.viewCount,
                 bookmarked = detail.bookmarked,
             )
     }

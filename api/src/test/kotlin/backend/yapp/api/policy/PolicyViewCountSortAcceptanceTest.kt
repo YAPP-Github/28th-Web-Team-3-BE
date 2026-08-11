@@ -51,8 +51,11 @@ class PolicyViewCountSortAcceptanceTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(3))
             .andExpect(jsonPath("$[0].title").value("높은 조회수"))
+            .andExpect(jsonPath("$[0].viewCount").value(1000))
             .andExpect(jsonPath("$[1].title").value("중간 조회수"))
+            .andExpect(jsonPath("$[1].viewCount").value(50))
             .andExpect(jsonPath("$[2].title").value("낮은 조회수"))
+            .andExpect(jsonPath("$[2].viewCount").value(5))
     }
 
     private fun issueGuestToken(): String {
