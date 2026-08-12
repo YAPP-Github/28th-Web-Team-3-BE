@@ -133,7 +133,7 @@ class MissionGenerationWorkService(
                 item = work.item,
                 titleTemplate = alternative.titleTemplate,
                 priorityOrder = index + 1,
-                title = MissionTitleRenderer.render(alternative.titleTemplate, allocation.targetCount).take(MAX_TITLE_LENGTH),
+                title = MissionTitleRenderer.render(alternative.titleTemplate, allocation.targetCount),
                 description = alternative.description.take(MAX_DESCRIPTION_LENGTH),
                 actionCode = work.item.name,
                 metricType = MissionMetricType.COUNT,
@@ -186,7 +186,6 @@ class MissionGenerationWorkService(
     companion object {
         private val DEFAULT_LEASE_DURATION: Duration = Duration.ofMinutes(10)
         private const val MAX_ALTERNATIVES = 3
-        private const val MAX_TITLE_LENGTH = 120
         private const val MAX_DESCRIPTION_LENGTH = 500
         private const val MAX_ATTEMPTS = 5
         private val DRAFT_TTL: Duration = Duration.ofHours(24)

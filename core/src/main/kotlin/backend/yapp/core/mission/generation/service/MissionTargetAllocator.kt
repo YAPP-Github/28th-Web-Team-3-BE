@@ -35,11 +35,27 @@ data class MissionTargetAllocation(
 
 object MissionTitleRenderer {
     const val COUNT_PLACEHOLDER = "{count}"
+    const val MAX_TEMPLATE_LENGTH = 120
+
+    private val actionCountPattern = Regex(
+        """\{count}\s*(?:회|번|차례)(?:의|로|으로|만|씩|을|를|은|는|도|에|까지|부터|정도|내외|이상|이하)?(?=\s|$|[,.!?·:;)\]])""",
+    )
+
+    fun validate(template: String) {
+        require(template.isNotBlank()) { "Mission title template must not be blank" }
+        require(template.length <= MAX_TEMPLATE_LENGTH) {
+            "Mission title template must not exceed $MAX_TEMPLATE_LENGTH characters"
+        }
+        require(template.windowed(COUNT_PLACEHOLDER.length).count { it == COUNT_PLACEHOLDER } == 1) {
+            "Mission title template must contain exactly one count placeholder"
+        }
+        require(actionCountPattern.containsMatchIn(template)) {
+            "Mission title count placeholder must represent an action frequency"
+        }
+    }
 
     fun render(template: String, targetCount: Int): String {
-        if (template.isBlank() || template.windowed(COUNT_PLACEHOLDER.length).count { it == COUNT_PLACEHOLDER } != 1) {
-            throw IllegalArgumentException("Mission title template must contain exactly one count placeholder")
-        }
+        validate(template)
         return template.replace(COUNT_PLACEHOLDER, targetCount.toString())
     }
 }
