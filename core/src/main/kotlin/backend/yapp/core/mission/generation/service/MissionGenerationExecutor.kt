@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 
 @Service
 class MissionGenerationExecutor(
@@ -48,11 +49,16 @@ class MissionGenerationExecutor(
                 today = LocalDate.now(workService.clock),
                 rotationSeed = work.jobId.hashCode(),
             )
-            val blogResults = try {
-                blogSearchPort.search(query, aiContextCount.coerceIn(1, 100))
-            } catch (_: Exception) {
-                emptyList()
+            val blogSearchOutcome = blogSearchPort.search(query, aiContextCount.coerceIn(1, 100))
+            val blogResults = when (blogSearchOutcome) {
+                is backend.yapp.core.mission.generation.port.MissionBlogSearchOutcome.Completed -> blogSearchOutcome.results
+                is backend.yapp.core.mission.generation.port.MissionBlogSearchOutcome.Failed -> emptyList()
             }
+            log.info(
+                "mission_generation.naver_blog_search.used category={} resultCount={}",
+                blogSearchOutcome.category,
+                blogResults.size,
+            )
             val generated = alternativeGenerator.generate(
                 MissionAlternativeGenerationRequest(work.item, blogResults.take(aiContextCount.coerceIn(1, 100))),
             )
@@ -62,6 +68,10 @@ class MissionGenerationExecutor(
             workService.releaseOrFail(work)
             throw exception
         }
+    }
+
+    companion object {
+        private val log = LoggerFactory.getLogger(MissionGenerationExecutor::class.java)
     }
 }
 
@@ -145,7 +155,13 @@ class MissionGenerationWorkService(
             )
         }
         draftRepository.saveAll(drafts)
-        saveBlogTips(work, blogResults, now)
+        val savedTips = saveBlogTips(work, blogResults, now)
+        log.info(
+            "mission_generation.naver_blog_tip.saved requestedCount={} createdCount={} updatedCount={}",
+            blogResults.size,
+            savedTips.createdCount,
+            savedTips.updatedCount,
+        )
         job.succeed(now, now.plus(DRAFT_TTL), generated.source)
     }
 
@@ -153,7 +169,9 @@ class MissionGenerationWorkService(
         work: MissionGenerationWork,
         results: List<MissionBlogSearchResult>,
         now: java.time.Instant,
-    ) {
+    ): MissionBlogTipSaveResult {
+        var createdCount = 0
+        var updatedCount = 0
         results.forEach { result ->
             val existing = blogTipRepository.findByGuestUserIdAndUrl(work.guestUserId, result.url)
             if (existing == null) {
@@ -168,14 +186,22 @@ class MissionGenerationWorkService(
                         searchedAt = now,
                     ),
                 )
+                createdCount++
             } else {
                 existing.item = work.item
                 existing.title = result.title
                 existing.source = result.source
                 existing.searchedAt = now
+                updatedCount++
             }
         }
+        return MissionBlogTipSaveResult(createdCount, updatedCount)
     }
+
+    private data class MissionBlogTipSaveResult(
+        val createdCount: Int,
+        val updatedCount: Int,
+    )
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun releaseOrFail(work: MissionGenerationWork) {
@@ -184,6 +210,7 @@ class MissionGenerationWorkService(
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(MissionGenerationWorkService::class.java)
         private val DEFAULT_LEASE_DURATION: Duration = Duration.ofMinutes(10)
         private const val MAX_ALTERNATIVES = 3
         private const val MAX_DESCRIPTION_LENGTH = 500

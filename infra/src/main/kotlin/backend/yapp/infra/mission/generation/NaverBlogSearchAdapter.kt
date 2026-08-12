@@ -1,20 +1,35 @@
 package backend.yapp.infra.mission.generation
 
 import backend.yapp.core.mission.generation.port.MissionBlogSearchPort
+import backend.yapp.core.mission.generation.port.MissionBlogSearchOutcome
+import backend.yapp.core.mission.generation.port.MissionBlogSearchOutcomeCategory
 import backend.yapp.core.mission.generation.port.MissionBlogSearchResult
 import java.net.URI
+import java.time.Duration
+import java.time.Instant
+import org.springframework.http.HttpStatusCode
+import org.springframework.http.converter.HttpMessageConversionException
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientResponseException
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.util.HtmlUtils
 
 class NaverBlogSearchAdapter(
     builder: RestClient.Builder,
     private val properties: NaverBlogSearchProperties,
+    private val telemetry: NaverBlogSearchTelemetry = NoopNaverBlogSearchTelemetry,
 ) : MissionBlogSearchPort {
     private val client = builder.baseUrl(properties.baseUrl).build()
 
-    override fun search(query: String, count: Int): List<MissionBlogSearchResult> {
-        require(properties.clientId.isNotBlank() && properties.clientSecret.isNotBlank()) {
-            "Naver Blog Search credentials are not configured"
+    override fun search(query: String, count: Int): MissionBlogSearchOutcome {
+        val startedAt = Instant.now()
+        if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
+            return MissionBlogSearchOutcome.Failed(
+                MissionBlogSearchOutcomeCategory.CREDENTIALS_MISSING,
+                attempts = 0,
+            ).also { outcome ->
+                telemetry.failed(outcome, credentialsConfigured = false, Duration.between(startedAt, Instant.now()))
+            }
         }
         var attempt = 1
         while (true) {
@@ -32,15 +47,31 @@ class NaverBlogSearchAdapter(
                     .header("X-NCP-APIGW-API-KEY-ID", properties.clientId)
                     .header("X-NCP-APIGW-API-KEY", properties.clientSecret)
                     .retrieve()
+                    .onStatus(HttpStatusCode::isError) { _, clientResponse ->
+                        throw NaverBlogHttpStatusException(clientResponse.statusCode.value())
+                    }
                     .body(NaverBlogSearchResponse::class.java)
-                    ?: return emptyList()
-                return response.items.asSequence()
+                    ?: NaverBlogSearchResponse()
+                val results = response.items.asSequence()
                     .mapNotNull(::normalize)
                     .distinctBy(MissionBlogSearchResult::url)
                     .take(count)
                     .toList()
+                val category = when {
+                    response.items.isEmpty() -> MissionBlogSearchOutcomeCategory.EMPTY_PROVIDER_RESULT
+                    results.isEmpty() -> MissionBlogSearchOutcomeCategory.ALL_NORMALIZED_OUT
+                    else -> MissionBlogSearchOutcomeCategory.SUCCESS
+                }
+                return MissionBlogSearchOutcome.Completed(category, response.items.size, results).also { outcome ->
+                    telemetry.completed(outcome, attempt, Duration.between(startedAt, Instant.now()))
+                }
             } catch (exception: Exception) {
-                if (attempt >= properties.maxAttempts) throw exception
+                val category = NaverBlogSearchFailureClassifier.classify(exception)
+                if (attempt >= properties.maxAttempts || !category.retryable) {
+                    return MissionBlogSearchOutcome.Failed(category.category, attempt).also { outcome ->
+                        telemetry.failed(outcome, credentialsConfigured = true, Duration.between(startedAt, Instant.now()))
+                    }
+                }
                 attempt++
             }
         }
@@ -64,6 +95,39 @@ class NaverBlogSearchAdapter(
     companion object {
         private val HTML_TAG = Regex("<[^>]+>")
         private val WHITESPACE = Regex("\\s+")
+    }
+}
+
+private class NaverBlogHttpStatusException(
+    val statusCode: Int,
+) : RuntimeException("Naver Blog Search returned HTTP $statusCode")
+
+private data class NaverBlogSearchFailureClassification(
+    val category: MissionBlogSearchOutcomeCategory,
+    val retryable: Boolean,
+)
+
+private object NaverBlogSearchFailureClassifier {
+    fun classify(error: Throwable): NaverBlogSearchFailureClassification {
+        val causes = generateSequence(error) { it.cause }.toList()
+        val statusCode = causes.filterIsInstance<NaverBlogHttpStatusException>().firstOrNull()?.statusCode
+            ?: causes.filterIsInstance<RestClientResponseException>().firstOrNull()?.statusCode?.value()
+        if (statusCode != null) return fromStatusCode(statusCode)
+        if (causes.any { it is HttpMessageConversionException }) {
+            return NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.RESPONSE_DESERIALIZATION, false)
+        }
+        if (causes.any { it is ResourceAccessException || it is java.io.IOException || it is java.net.SocketTimeoutException }) {
+            return NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.NETWORK_TIMEOUT, true)
+        }
+        return NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.UNEXPECTED_INTERNAL, false)
+    }
+
+    private fun fromStatusCode(statusCode: Int): NaverBlogSearchFailureClassification = when (statusCode) {
+        401, 403 -> NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.AUTHORIZATION, false)
+        429 -> NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.RATE_LIMIT, true)
+        in 400..499 -> NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.HTTP_4XX_OTHER, false)
+        in 500..599 -> NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.HTTP_5XX, true)
+        else -> NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.UNEXPECTED_INTERNAL, false)
     }
 }
 
