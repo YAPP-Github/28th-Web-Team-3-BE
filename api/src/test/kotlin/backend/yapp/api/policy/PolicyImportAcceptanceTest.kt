@@ -72,11 +72,21 @@ class PolicyImportAcceptanceTest(
             .andExpect(jsonPath("$[0].category").value("주거"))
 
         // category 필터: 금융 (소스 대분류는 '금융･복지･문화'였지만 중분류로 금융 정규화)
-        mockMvc.perform(get("/api/policies?category=금융").header("Authorization", "Bearer $token"))
+        val financeJson = mockMvc.perform(get("/api/policies?category=금융").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].title").value("청년 자산형성 지원"))
             .andExpect(jsonPath("$[0].category").value("금융"))
+            .andReturn().response.contentAsString
+
+        // applyUrl은 plcyNo(externalId) 기반 온통청년 상세링크로 통일됨
+        val id = JsonPath.read<Int>(financeJson, "$[0].id")
+        mockMvc.perform(get("/api/policies/$id").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(
+                jsonPath("$.applyUrl")
+                    .value("https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/UP3"),
+            )
     }
 
     private fun jsonFile() =
