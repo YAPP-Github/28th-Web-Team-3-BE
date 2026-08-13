@@ -129,8 +129,9 @@ data class YouthPolicyApiItem(
             bizEndYmd = bizPrdEndYmd.blankToNull(),
             applyMethod = plcyAplyMthdCn.blankToNull(),
             submitDocuments = sbmsnDcmntCn.blankToNull(),
-            targetMinAge = sprtTrgtMinAge.blankToNull()?.toIntOrNull(),
-            targetMaxAge = sprtTrgtMaxAge.blankToNull()?.toIntOrNull(),
+            // 온통청년은 0을 "연령 제한 없음"으로 사용하므로 0/음수는 경계 없음(null)으로 본다.
+            targetMinAge = sprtTrgtMinAge.toPositiveAgeOrNull(),
+            targetMaxAge = sprtTrgtMaxAge.toPositiveAgeOrNull(),
             earnCondition = earnEtcCn.blankToNull(),
             additionalQualification = addAplyQlfcCndCn.blankToNull(),
             externalModifiedAt = lastMdfcnDt.blankToNull(),
@@ -145,3 +146,6 @@ private const val POLICY_DETAIL_URL_PREFIX =
     "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/"
 
 private fun String?.blankToNull(): String? = this?.trim()?.ifBlank { null }
+
+/** 연령 파싱. 온통청년의 0(연령 무제한)·음수는 경계 없음(null)으로 취급한다. */
+private fun String?.toPositiveAgeOrNull(): Int? = this?.trim()?.toIntOrNull()?.takeIf { it > 0 }

@@ -32,10 +32,11 @@ class PolicyAgeFilterAcceptanceTest(
 ) {
     // 모두 '건강'(복지)이라 category=복지로 격리해 확인한다. 연령 범위만 다르게 둔다.
     private val ageJson = """
-        {"result":{"pagging":{"totCount":3},"youthPolicyList":[
+        {"result":{"pagging":{"totCount":4},"youthPolicyList":[
           {"plcyNo":"AGE_IN","plcyNm":"연령 해당 정책","mclsfNm":"건강","sprtTrgtMinAge":"19","sprtTrgtMaxAge":"34"},
           {"plcyNo":"AGE_OLD","plcyNm":"연령 초과 정책","mclsfNm":"건강","sprtTrgtMinAge":"30","sprtTrgtMaxAge":"39"},
-          {"plcyNo":"AGE_OPEN","plcyNm":"연령 무제한 정책","mclsfNm":"건강"}
+          {"plcyNo":"AGE_OPEN","plcyNm":"연령 무제한 정책","mclsfNm":"건강"},
+          {"plcyNo":"AGE_ZERO","plcyNm":"연령 0 정책","mclsfNm":"건강","sprtTrgtMinAge":"0","sprtTrgtMaxAge":"0"}
         ]}}
     """.trimIndent()
 
@@ -51,7 +52,7 @@ class PolicyAgeFilterAcceptanceTest(
         val token = issueGuestToken()
         mockMvc.perform(get("/api/policies?category=복지").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$.length()").value(4))
     }
 
     @Test
@@ -61,25 +62,28 @@ class PolicyAgeFilterAcceptanceTest(
         val birthDate = LocalDate.now().minusYears(25).minusMonths(6)
         setBirthDate(token, birthDate)
 
-        // 25세: 30~39 정책 제외, 19~34 및 연령무제한 포함 → 2건
+        // 25세: 30~39 제외, 19~34·연령무제한·연령0(제한없음) 포함 → 3건
         mockMvc.perform(get("/api/policies?category=복지").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$.length()").value(3))
             .andExpect(jsonPath("$[?(@.title=='연령 해당 정책')]").exists())
             .andExpect(jsonPath("$[?(@.title=='연령 무제한 정책')]").exists())
+            .andExpect(jsonPath("$[?(@.title=='연령 0 정책')]").exists())
             .andExpect(jsonPath("$[?(@.title=='연령 초과 정책')]").doesNotExist())
     }
 
     @Test
-    fun `older guest is excluded from youth-only policies`() {
+    fun `older guest is excluded from youth-only policies but sees no-limit ones`() {
         val token = issueGuestToken()
-        // 만 45세: 19~34, 30~39 모두 초과 → 연령무제한 1건만
+        // 만 45세: 19~34, 30~39 모두 초과 → 연령무제한 + 연령0(제한없음) 2건
         setBirthDate(token, LocalDate.now().minusYears(45).minusMonths(6))
 
         mockMvc.perform(get("/api/policies?category=복지").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].title").value("연령 무제한 정책"))
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[?(@.title=='연령 무제한 정책')]").exists())
+            .andExpect(jsonPath("$[?(@.title=='연령 0 정책')]").exists())
+            .andExpect(jsonPath("$[?(@.title=='연령 해당 정책')]").doesNotExist())
     }
 
     private fun setBirthDate(token: String, birthDate: LocalDate) {
