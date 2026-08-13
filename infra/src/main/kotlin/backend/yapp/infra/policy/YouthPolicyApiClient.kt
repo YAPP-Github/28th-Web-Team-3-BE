@@ -122,7 +122,9 @@ data class YouthPolicyApiItem(
             largeCategory = lclsfNm.blankToNull(),
             mediumCategory = mclsfNm.blankToNull(),
             supervisingOrg = sprvsnInstCdNm.blankToNull(),
-            applyUrl = aplyUrlAddr.blankToNull(),
+            // 원본 신청URL(aplyUrlAddr)은 빈 값·홈페이지 등으로 정책 매칭이 부정확해,
+            // plcyNo로 온통청년 정책 상세 페이지 링크를 생성해 통일한다.
+            applyUrl = POLICY_DETAIL_URL_PREFIX + id,
             applyPeriodText = aplyYmd.blankToNull(),
             bizEndYmd = bizPrdEndYmd.blankToNull(),
             applyMethod = plcyAplyMthdCn.blankToNull(),
@@ -137,5 +139,9 @@ data class YouthPolicyApiItem(
         )
     }
 }
+
+/** 온통청년 정책 상세 페이지 링크 접두. `{prefix}{plcyNo}` 형태로 정책마다 정확히 매칭된다. */
+private const val POLICY_DETAIL_URL_PREFIX =
+    "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/"
 
 private fun String?.blankToNull(): String? = this?.trim()?.ifBlank { null }
