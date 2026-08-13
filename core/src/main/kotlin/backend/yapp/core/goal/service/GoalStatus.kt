@@ -17,3 +17,16 @@ data class ThisMonthStatus(
     val progressPercent: Int,
     val dDay: Int,
 )
+
+/** 월별 저축 현황 항목(막대그래프용). 금액 단위는 만원. */
+data class MonthlySavingStatus(
+    val yearMonth: String,
+    val savedManwon: Int,
+    val current: Boolean,
+)
+
+/** 목표 상세(v2): 기존 현황 + 월별 저축 현황 시계열. */
+data class GoalDetailV2(
+    val status: GoalStatus,
+    val monthlySavings: List<MonthlySavingStatus>,
+)

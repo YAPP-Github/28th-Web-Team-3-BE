@@ -24,6 +24,13 @@ class GoalService(
     @Transactional
     fun status(guestUserId: Long): GoalStatus = computeStatus(getGoal(guestUserId))
 
+    /** 목표 상세(v2): 기존 현황 + 월별 저축 현황(막대그래프용). */
+    @Transactional
+    fun statusV2(guestUserId: Long): GoalDetailV2 {
+        val goal = getGoal(guestUserId)
+        return GoalDetailV2(computeStatus(goal), computeMonthlySavings(goal))
+    }
+
     /**
      * "현재 저축액 입력": 이번 달 저축액을 입력값으로 덮어쓴다(set). 총 저축액은 월별 합으로 재계산된다.
      */
@@ -96,6 +103,23 @@ class GoalService(
                 dDay = ChronoUnit.DAYS.between(today, lastDayOfMonth).toInt(),
             ),
         )
+    }
+
+    /** 목표 시작월부터 이번 달까지 각 달의 저축액(입력 없으면 0). 오름차순(과거 → 이번 달), 이번 달은 current=true. */
+    private fun computeMonthlySavings(goal: Goal): List<MonthlySavingStatus> {
+        val currentMonth = YearMonth.from(LocalDate.ofInstant(clock.instant(), ZONE))
+        val startMonth = minOf(YearMonth.from(LocalDate.ofInstant(goal.startedAt, ZONE)), currentMonth)
+        val savedByMonth = monthlySavingRepository.findByGuestUserId(goal.guestUserId)
+            .associate { it.yearMonth to it.savedAmountManwon }
+
+        val result = mutableListOf<MonthlySavingStatus>()
+        var month = startMonth
+        while (!month.isAfter(currentMonth)) {
+            val yearMonth = month.toString()
+            result += MonthlySavingStatus(yearMonth, savedByMonth[yearMonth] ?: 0, month == currentMonth)
+            month = month.plusMonths(1)
+        }
+        return result
     }
 
     private fun currentYearMonth(): String = YearMonth.from(LocalDate.ofInstant(clock.instant(), ZONE)).toString()

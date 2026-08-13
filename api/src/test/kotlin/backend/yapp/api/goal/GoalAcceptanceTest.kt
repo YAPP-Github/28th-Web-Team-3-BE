@@ -55,6 +55,37 @@ class GoalAcceptanceTest(
     }
 
     @Test
+    fun `v2 goal detail includes monthly savings series`() {
+        val token = completeOnboarding()
+        val thisMonth = java.time.YearMonth.now(java.time.ZoneId.of("Asia/Seoul")).toString()
+
+        // 시작월=이번 달 → 월별 현황 1건(이번 달, 저축 0), 기존 현황 필드도 함께 반환
+        mockMvc.perform(get("/api/v2/goal").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.targetAmountManwon").value(2760))
+            .andExpect(jsonPath("$.thisMonth.targetManwon").value(100))
+            .andExpect(jsonPath("$.monthlySavings.length()").value(1))
+            .andExpect(jsonPath("$.monthlySavings[0].yearMonth").value(thisMonth))
+            .andExpect(jsonPath("$.monthlySavings[0].savedManwon").value(0))
+            .andExpect(jsonPath("$.monthlySavings[0].current").value(true))
+
+        // 이번 달 저축 입력이 월별 현황에도 반영됨
+        setSaving(token, 55)
+        mockMvc.perform(get("/api/v2/goal").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.totalSavedManwon").value(55))
+            .andExpect(jsonPath("$.monthlySavings[0].savedManwon").value(55))
+            .andExpect(jsonPath("$.monthlySavings[0].current").value(true))
+    }
+
+    @Test
+    fun `v2 goal without completed onboarding is rejected`() {
+        val token = issueGuestToken()
+        mockMvc.perform(get("/api/v2/goal").header("Authorization", "Bearer $token"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.name").value("GOAL_ONBOARDING_REQUIRED"))
+    }
+
+    @Test
     fun `goal without completed onboarding is rejected`() {
         val token = issueGuestToken()
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
