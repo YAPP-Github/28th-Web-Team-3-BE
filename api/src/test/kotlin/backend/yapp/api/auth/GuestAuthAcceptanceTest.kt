@@ -297,7 +297,9 @@ class GuestAuthAcceptanceTest(
             INSERT INTO mission_recommendation_snapshot (id, guest_user_id, algorithm_version, semantic_provider, semantic_model_version, eligible_candidate_ids, retrieved_candidate_ids, weekly_context_snapshot, created_at)
             VALUES ('$snapshotId', $guestUserId, 'V1', 'TEST', 'V1', '[]', '[]', '{}', CURRENT_TIMESTAMP);
             INSERT INTO mission_recommendation_candidate (id, snapshot_id, template_id, rank_position, raw_score, adjusted_score, retrieved, exploration_applied, applied_penalties, shown)
-            VALUES ('${UUID.randomUUID()}', '$snapshotId', $templateId, 1, 1.0, 1.0, TRUE, FALSE, '[]', FALSE)
+            VALUES ('${UUID.randomUUID()}', '$snapshotId', $templateId, 1, 1.0, 1.0, TRUE, FALSE, '[]', FALSE);
+            INSERT INTO content_bookmark (guest_user_id, content_type, content_id, created_at)
+            VALUES ($guestUserId, 'POLICY', 1, CURRENT_TIMESTAMP)
             """.trimIndent(),
         )
     }
@@ -401,6 +403,7 @@ class GuestAuthAcceptanceTest(
             "manual_mission",
             "mission_outcome_event",
             "mission_recommendation_snapshot",
+            "content_bookmark",
         )
     }
 }

@@ -4,6 +4,7 @@ import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
 import backend.yapp.core.auth.domain.GuestUserRepository
 import backend.yapp.core.auth.domain.RefreshTokenRepository
+import backend.yapp.core.bookmark.domain.ContentBookmarkRepository
 import backend.yapp.core.goal.domain.GoalRepository
 import backend.yapp.core.goal.domain.MonthlySavingRepository
 import backend.yapp.core.mission.generation.domain.ManualMissionRepository
@@ -39,11 +40,13 @@ class GuestWithdrawalService(
     private val missionOutcomeEventRepository: MissionOutcomeEventRepository,
     private val missionRecommendationSnapshotRepository: MissionRecommendationSnapshotRepository,
     private val missionRecommendationCandidateTraceRepository: MissionRecommendationCandidateTraceRepository,
+    private val contentBookmarkRepository: ContentBookmarkRepository,
 ) {
     @Transactional
     fun withdraw(guestUserId: Long) {
         if (!guestUserRepository.existsById(guestUserId)) throw BaseException(ErrorCode.UNAUTHORIZED)
 
+        contentBookmarkRepository.deleteByGuestUserId(guestUserId)
         missionOutcomeEventRepository.deleteByGuestUserId(guestUserId)
         missionWeeklyCompletionRepository.deleteByGuestUserId(guestUserId)
         missionBlogTipRepository.deleteByGuestUserId(guestUserId)
