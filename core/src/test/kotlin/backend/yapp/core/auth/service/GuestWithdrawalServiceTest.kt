@@ -2,6 +2,7 @@ package backend.yapp.core.auth.service
 
 import backend.yapp.core.auth.domain.GuestUserRepository
 import backend.yapp.core.auth.domain.RefreshTokenRepository
+import backend.yapp.core.bookmark.domain.ContentBookmarkRepository
 import backend.yapp.core.goal.domain.GoalRepository
 import backend.yapp.core.goal.domain.MonthlySavingRepository
 import backend.yapp.core.mission.generation.domain.ManualMissionRepository
@@ -42,14 +43,16 @@ class GuestWithdrawalServiceTest {
         val blogTips = mock(MissionBlogTipRepository::class.java)
         val snapshots = mock(MissionRecommendationSnapshotRepository::class.java)
         val candidates = mock(MissionRecommendationCandidateTraceRepository::class.java)
+        val bookmarks = mock(ContentBookmarkRepository::class.java)
         GuestWithdrawalService(
             users, tokens, profiles, onboardingGoals, goals, savings, surveys, jobs, drafts,
-            missions, manuals, weeklyCompletions, blogTips, outcomes, snapshots, candidates,
+            missions, manuals, weeklyCompletions, blogTips, outcomes, snapshots, candidates, bookmarks,
         ).withdraw(7)
         val order = inOrder(
-            outcomes, weeklyCompletions, blogTips, manuals, missions, candidates, snapshots, drafts, jobs, surveys, savings,
+            bookmarks, outcomes, weeklyCompletions, blogTips, manuals, missions, candidates, snapshots, drafts, jobs, surveys, savings,
             goals, onboardingGoals, profiles, tokens, users,
         )
+        order.verify(bookmarks).deleteByGuestUserId(7)
         order.verify(outcomes).deleteByGuestUserId(7)
         order.verify(weeklyCompletions).deleteByGuestUserId(7)
         order.verify(blogTips).deleteByGuestUserId(7)
