@@ -16,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -35,6 +36,13 @@ class OnboardingController(
         @Valid @RequestBody request: ProfilePatchRequest,
     ): ProfileResponse =
         ProfileResponse.from(profileService.patch(guestUserId, request.toCommand()))
+
+    @PutMapping("/profile")
+    override fun updateProfile(
+        @AuthenticationPrincipal guestUserId: Long,
+        @Valid @RequestBody request: ProfilePatchRequest,
+    ): ProfileResponse =
+        ProfileResponse.from(profileService.update(guestUserId, request.toCommand()))
 
     @GetMapping("/profile")
     override fun getProfile(@AuthenticationPrincipal guestUserId: Long): ProfileResponse =

@@ -49,6 +49,19 @@ interface OnboardingApi {
     fun patchProfile(guestUserId: Long, request: ProfilePatchRequest): ProfileResponse
 
     @Operation(
+        summary = "내 정보 수정",
+        description = "'내 정보' 화면에서 생년월일·월급·월저축액·순자산·목표기간(및 거주지역)을 수정한다. <br>" +
+            "온보딩 완료(COMPLETED) 후에도 사용 가능하다(온보딩 스텝 저장용 PATCH와 달리 상태 제한 없음). <br>" +
+            "보낸 필드만 갱신하며, 월저축액이 월급을 초과하면 400(INVALID_ONBOARDING_INPUT).",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "수정 성공", content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
+        ApiResponse(responseCode = "400", description = "INVALID_ONBOARDING_INPUT 또는 VALIDATION_FAILED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+    )
+    fun updateProfile(guestUserId: Long, request: ProfilePatchRequest): ProfileResponse
+
+    @Operation(
         summary = "온보딩 프로필 조회",
         description = "온보딩 화면 재진입 시(미완료 상태로 재접속 등) 지금까지 저장된 입력값과 진행 상태(IN_PROGRESS / COMPLETED)를 반환한다.<br>" +
             "클라이언트는 이 값으로 마지막에 머문 스텝부터 이어서 진행한다.<br><br>" +

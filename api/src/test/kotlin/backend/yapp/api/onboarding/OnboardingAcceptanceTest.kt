@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -100,6 +101,45 @@ class OnboardingAcceptanceTest(
         mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("COMPLETED"))
+    }
+
+    @Test
+    fun `my info can be updated after onboarding is completed`() {
+        val token = issueGuestToken()
+        patchProfile(token, """{"birthDate":"1998-03-01","address":"SEOUL"}""")
+        patchProfile(token, """{"monthlySalaryManwon":350,"monthlySavingManwon":100}""")
+        patchProfile(token, """{"netWorthManwon":1800}""")
+        patchProfile(token, """{"goalPeriodMonths":24}""")
+        mockMvc.perform(
+            post("/api/onboarding/goal").header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON).content("""{"plan":"PLAN_1"}"""),
+        ).andExpect(status().isCreated)
+
+        // PATCH(스텝 저장)는 완료 후 막힘, PUT(내 정보 수정)은 허용
+        mockMvc.perform(
+            put("/api/onboarding/profile").header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"birthDate":"2002-10-24","monthlySalaryManwon":500,"monthlySavingManwon":150,"netWorthManwon":5000,"goalPeriodMonths":36}"""),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.monthlySalaryManwon").value(500))
+            .andExpect(jsonPath("$.goalPeriodMonths").value(36))
+
+        mockMvc.perform(get("/api/onboarding/profile").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.birthDate").value("2002-10-24"))
+            .andExpect(jsonPath("$.monthlySavingManwon").value(150))
+            .andExpect(jsonPath("$.netWorthManwon").value(5000))
+    }
+
+    @Test
+    fun `my info update rejects saving greater than salary`() {
+        val token = issueGuestToken()
+        mockMvc.perform(
+            put("/api/onboarding/profile").header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"monthlySalaryManwon":100,"monthlySavingManwon":200}"""),
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("INVALID_ONBOARDING_INPUT"))
     }
 
     @Test

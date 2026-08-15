@@ -22,7 +22,23 @@ class OnboardingProfileService(
         if (profile.status == OnboardingStatus.COMPLETED) {
             throw BaseException(ErrorCode.ONBOARDING_ALREADY_COMPLETED)
         }
+        applyFields(profile, command)
+        return profileRepository.save(profile)
+    }
 
+    /**
+     * 내 정보 수정: 온보딩 완료 여부와 무관하게 프로필 값을 수정한다(스텝 저장용 patch와 달리 상태 제한 없음).
+     * 저장된 프로필이 없으면 새로 만든다.
+     */
+    @Transactional
+    fun update(guestUserId: Long, command: ProfilePatchCommand): OnboardingProfile {
+        val profile = profileRepository.findByGuestUserId(guestUserId)
+            ?: OnboardingProfile(guestUserId = guestUserId)
+        applyFields(profile, command)
+        return profileRepository.save(profile)
+    }
+
+    private fun applyFields(profile: OnboardingProfile, command: ProfilePatchCommand) {
         command.birthDate?.let { profile.birthDate = validateBirthDate(it) }
         command.address?.let { profile.address = it }
         command.monthlySalaryManwon?.let { profile.monthlySalaryManwon = validateRange(it, 0, MAX_MONEY_MANWON) }
@@ -30,9 +46,7 @@ class OnboardingProfileService(
         command.netWorthManwon?.let { profile.netWorthManwon = validateRange(it, 0, MAX_NET_WORTH_MANWON) }
         command.goalPeriodMonths?.let { profile.goalPeriodMonths = validateRange(it, MIN_MONTHS, MAX_MONTHS) }
         validateSavingWithinSalary(profile)
-
         profile.updatedAt = clock.instant()
-        return profileRepository.save(profile)
     }
 
     @Transactional(readOnly = true)
