@@ -4,6 +4,8 @@ package backend.yapp.core.goal.service
 data class GoalStatus(
     val targetAmountManwon: Int,
     val periodMonths: Int,
+    /** 순자산(목표 확정 시점 스냅샷). 목표액에 포함되며 totalSavedManwon에 이미 반영되어 있다. */
+    val baseAmountManwon: Int,
     val totalSavedManwon: Int,
     val progressPercent: Int,
     val usageMonths: Int,

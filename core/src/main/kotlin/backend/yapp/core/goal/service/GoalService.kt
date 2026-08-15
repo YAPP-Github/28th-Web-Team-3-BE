@@ -81,7 +81,9 @@ class GoalService(
         val monthEndExclusive = today.withDayOfMonth(1).plusMonths(1)
         val lastDayOfMonth = monthEndExclusive.minusDays(1)
 
-        val totalSaved = monthlySavingRepository.sumSavedByGuestUserId(goal.guestUserId).toInt()
+        // 목표액에 순자산(baseAmount)이 포함되므로, 누적/진행률에도 순자산을 이미 채워진 금액으로 반영한다.
+        val savedSum = monthlySavingRepository.sumSavedByGuestUserId(goal.guestUserId).toInt()
+        val totalSaved = goal.baseAmountManwon + savedSum
         val thisMonthSaved = monthlySavingRepository
             .findByGuestUserIdAndYearMonth(goal.guestUserId, currentYearMonth())
             ?.savedAmountManwon ?: 0
@@ -92,6 +94,7 @@ class GoalService(
         return GoalStatus(
             targetAmountManwon = goal.targetAmountManwon,
             periodMonths = goal.periodMonths,
+            baseAmountManwon = goal.baseAmountManwon,
             totalSavedManwon = totalSaved,
             progressPercent = cappedPercent(totalSaved, goal.targetAmountManwon),
             usageMonths = ChronoUnit.MONTHS.between(startedDate, today).toInt() + 1,
