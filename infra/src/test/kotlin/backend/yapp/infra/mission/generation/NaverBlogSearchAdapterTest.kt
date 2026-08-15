@@ -18,11 +18,14 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.util.UriComponentsBuilder
+import tools.jackson.databind.json.JsonMapper
 
 class NaverBlogSearchAdapterTest {
+    private val objectMapper = JsonMapper.builder().findAndAddModules().build()
+
     @Test
     fun `does not send a request when either credential is blank`() {
-        val adapter = NaverBlogSearchAdapter(
+        val adapter = adapter(
             RestClient.builder(),
             NaverBlogSearchProperties(
                 baseUrl = "http://127.0.0.1:1",
@@ -43,7 +46,7 @@ class NaverBlogSearchAdapterTest {
     fun `trims surrounding whitespace from credentials before creating HTTP headers`() {
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = NaverBlogSearchAdapter(
+        val adapter = adapter(
             builder,
             NaverBlogSearchProperties(
                 baseUrl = "https://naver.example.test",
@@ -64,7 +67,7 @@ class NaverBlogSearchAdapterTest {
     fun `classifies a non-empty provider response as success after normalization`() {
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = NaverBlogSearchAdapter(builder, properties())
+        val adapter = adapter(builder)
         server.expect(naverRequest())
             .andRespond(
                 withSuccess(
@@ -82,11 +85,31 @@ class NaverBlogSearchAdapterTest {
     }
 
     @Test
+    fun `parses a JSON provider response served as text plain`() {
+        val builder = RestClient.builder()
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val adapter = adapter(builder)
+        server.expect(naverRequest())
+            .andRespond(
+                withSuccess(
+                    """{"items":[{"title":"절약 팁","link":"https://blog.example.test/1","description":"설명","bloggername":"작성자"}]}""",
+                    MediaType.parseMediaType("text/plain;charset=UTF-8"),
+                ),
+            )
+
+        val outcome = adapter.search("query", 15)
+
+        assertEquals(MissionBlogSearchOutcomeCategory.SUCCESS, outcome.category)
+        assertEquals(1, (outcome as MissionBlogSearchOutcome.Completed).results.size)
+        server.verify()
+    }
+
+    @Test
     fun `encodes the Korean mission query before sending the request`() {
         val query = "20대 서울 배달음식 절약 팁"
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = NaverBlogSearchAdapter(builder, properties())
+        val adapter = adapter(builder)
         server.expect(naverRequest(query))
             .andRespond(withSuccess("""{"items":[]}""", MediaType.APPLICATION_JSON))
 
@@ -100,7 +123,7 @@ class NaverBlogSearchAdapterTest {
     fun `deserializes the complete provider response including metadata fields`() {
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = NaverBlogSearchAdapter(builder, properties())
+        val adapter = adapter(builder)
         server.expect(naverRequest())
             .andRespond(
                 withSuccess(
@@ -135,7 +158,7 @@ class NaverBlogSearchAdapterTest {
     fun `keeps valid results when optional provider fields are null or another item is malformed`() {
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = NaverBlogSearchAdapter(builder, properties())
+        val adapter = adapter(builder)
         server.expect(naverRequest())
             .andRespond(
                 withSuccess(
@@ -177,7 +200,7 @@ class NaverBlogSearchAdapterTest {
         val emptyServer = MockRestServiceServer.bindTo(emptyBuilder).build()
         emptyServer.expect(naverRequest())
             .andRespond(withSuccess("""{"items":[]}""", MediaType.APPLICATION_JSON))
-        val emptyOutcome = NaverBlogSearchAdapter(emptyBuilder, properties()).search("query", 15)
+        val emptyOutcome = adapter(emptyBuilder).search("query", 15)
 
         assertEquals(MissionBlogSearchOutcomeCategory.EMPTY_PROVIDER_RESULT, emptyOutcome.category)
         emptyServer.verify()
@@ -191,7 +214,7 @@ class NaverBlogSearchAdapterTest {
                     MediaType.APPLICATION_JSON,
                 ),
             )
-        val invalidOutcome = NaverBlogSearchAdapter(invalidBuilder, properties()).search("query", 15)
+        val invalidOutcome = adapter(invalidBuilder).search("query", 15)
 
         assertEquals(MissionBlogSearchOutcomeCategory.ALL_NORMALIZED_OUT, invalidOutcome.category)
         invalidServer.verify()
@@ -204,7 +227,7 @@ class NaverBlogSearchAdapterTest {
         server.expect(naverRequest())
             .andRespond(withStatus(HttpStatus.UNAUTHORIZED))
 
-        val outcome = NaverBlogSearchAdapter(builder, properties(maxAttempts = 2)).search("query", 15)
+        val outcome = adapter(builder, properties(maxAttempts = 2)).search("query", 15)
 
         assertEquals(
             MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.AUTHORIZATION, attempts = 1),
@@ -220,7 +243,7 @@ class NaverBlogSearchAdapterTest {
         server.expect(naverRequest())
             .andRespond(withStatus(HttpStatus.FORBIDDEN))
 
-        val outcome = NaverBlogSearchAdapter(builder, properties(maxAttempts = 2)).search("query", 15)
+        val outcome = adapter(builder, properties(maxAttempts = 2)).search("query", 15)
 
         assertEquals(
             MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.AUTHORIZATION, attempts = 1),
@@ -236,7 +259,7 @@ class NaverBlogSearchAdapterTest {
         rateServer.expect(naverRequest()).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
         rateServer.expect(naverRequest()).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
 
-        val rateOutcome = NaverBlogSearchAdapter(rateBuilder, properties(maxAttempts = 2)).search("query", 15)
+        val rateOutcome = adapter(rateBuilder, properties(maxAttempts = 2)).search("query", 15)
 
         assertEquals(MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.RATE_LIMIT, 2), rateOutcome)
         rateServer.verify()
@@ -246,7 +269,7 @@ class NaverBlogSearchAdapterTest {
         server.expect(naverRequest()).andRespond(withStatus(HttpStatus.BAD_GATEWAY))
         server.expect(naverRequest()).andRespond(withStatus(HttpStatus.BAD_GATEWAY))
 
-        val serverOutcome = NaverBlogSearchAdapter(serverBuilder, properties(maxAttempts = 2)).search("query", 15)
+        val serverOutcome = adapter(serverBuilder, properties(maxAttempts = 2)).search("query", 15)
 
         assertEquals(MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.HTTP_5XX, 2), serverOutcome)
         server.verify()
@@ -264,7 +287,7 @@ class NaverBlogSearchAdapterTest {
             ),
         )
 
-        val retryOutcome = NaverBlogSearchAdapter(retryBuilder, properties(maxAttempts = 2)).search("query", 15)
+        val retryOutcome = adapter(retryBuilder, properties(maxAttempts = 2)).search("query", 15)
 
         assertEquals(MissionBlogSearchOutcomeCategory.SUCCESS, retryOutcome.category)
         retryServer.verify()
@@ -273,7 +296,7 @@ class NaverBlogSearchAdapterTest {
         val invalidServer = MockRestServiceServer.bindTo(invalidBuilder).build()
         invalidServer.expect(naverRequest()).andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON))
 
-        val invalidOutcome = NaverBlogSearchAdapter(invalidBuilder, properties()).search("query", 15)
+        val invalidOutcome = adapter(invalidBuilder).search("query", 15)
 
         assertEquals(
             MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.RESPONSE_DESERIALIZATION, 1),
@@ -289,7 +312,7 @@ class NaverBlogSearchAdapterTest {
         contentServer.expect(naverRequest())
             .andRespond(withSuccess("not-json", MediaType.TEXT_PLAIN))
 
-        val contentOutcome = NaverBlogSearchAdapter(contentBuilder, properties()).search("query", 15)
+        val contentOutcome = adapter(contentBuilder).search("query", 15)
 
         assertEquals(
             MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.RESPONSE_DESERIALIZATION, 1),
@@ -301,7 +324,7 @@ class NaverBlogSearchAdapterTest {
         val defectServer = MockRestServiceServer.bindTo(defectBuilder).build()
         defectServer.expect(naverRequest()).andRespond { throw RestClientException("client defect") }
 
-        val defectOutcome = NaverBlogSearchAdapter(defectBuilder, properties()).search("query", 15)
+        val defectOutcome = adapter(defectBuilder).search("query", 15)
 
         assertEquals(
             MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.UNEXPECTED_INTERNAL, 1),
@@ -316,6 +339,11 @@ class NaverBlogSearchAdapterTest {
         clientSecret = "client-secret",
         maxAttempts = maxAttempts,
     )
+
+    private fun adapter(
+        builder: RestClient.Builder,
+        properties: NaverBlogSearchProperties = properties(),
+    ) = NaverBlogSearchAdapter(builder, properties, objectMapper)
 
     private fun naverRequest(expectedQuery: String = "query") = RequestMatcher { request ->
         assertEquals(HttpMethod.GET, request.method)

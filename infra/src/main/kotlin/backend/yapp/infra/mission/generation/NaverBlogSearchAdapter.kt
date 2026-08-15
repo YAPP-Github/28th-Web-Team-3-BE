@@ -14,10 +14,13 @@ import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.UnknownContentTypeException
 import org.springframework.web.util.HtmlUtils
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.ObjectMapper
 
 class NaverBlogSearchAdapter(
     builder: RestClient.Builder,
     private val properties: NaverBlogSearchProperties,
+    private val objectMapper: ObjectMapper,
     private val telemetry: NaverBlogSearchTelemetry = NoopNaverBlogSearchTelemetry,
 ) : MissionBlogSearchPort {
     private val client = builder.baseUrl(properties.baseUrl).build()
@@ -37,7 +40,7 @@ class NaverBlogSearchAdapter(
         var attempt = 1
         while (true) {
             try {
-                val response = client.get()
+                val responseBody = client.get()
                     .uri { uriBuilder ->
                         uriBuilder.path("/search/v1/blog")
                             .queryParam("query", query)
@@ -53,8 +56,10 @@ class NaverBlogSearchAdapter(
                     .onStatus(HttpStatusCode::isError) { _, clientResponse ->
                         throw NaverBlogHttpStatusException(clientResponse.statusCode.value())
                     }
-                    .body(NaverBlogSearchResponse::class.java)
-                    ?: NaverBlogSearchResponse()
+                    .body(String::class.java)
+                val response = responseBody?.let {
+                    objectMapper.readValue(it, NaverBlogSearchResponse::class.java)
+                } ?: NaverBlogSearchResponse()
                 val results = response.items.asSequence()
                     .mapNotNull(::normalize)
                     .distinctBy(MissionBlogSearchResult::url)
@@ -122,7 +127,13 @@ private object NaverBlogSearchFailureClassifier {
         val statusCode = causes.filterIsInstance<NaverBlogHttpStatusException>().firstOrNull()?.statusCode
             ?: causes.filterIsInstance<RestClientResponseException>().firstOrNull()?.statusCode?.value()
         if (statusCode != null) return fromStatusCode(statusCode)
-        if (causes.any { it is HttpMessageConversionException || it is UnknownContentTypeException }) {
+        if (
+            causes.any { cause ->
+                cause is HttpMessageConversionException ||
+                    cause is UnknownContentTypeException ||
+                    cause is JacksonException
+            }
+        ) {
             return NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.RESPONSE_DESERIALIZATION, false)
         }
         if (causes.any { it is ResourceAccessException || it is java.io.IOException || it is java.net.SocketTimeoutException }) {
