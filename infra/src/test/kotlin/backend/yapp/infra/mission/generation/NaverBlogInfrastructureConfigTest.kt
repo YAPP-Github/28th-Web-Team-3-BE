@@ -8,11 +8,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import tools.jackson.databind.ObjectMapper
 
 class NaverBlogInfrastructureConfigTest {
     private val contextRunner = ApplicationContextRunner()
         .withUserConfiguration(NaverBlogInfrastructureConfig::class.java)
         .withBean(MeterRegistry::class.java, { SimpleMeterRegistry() })
+        .withBean(ObjectMapper::class.java, { ObjectMapper() })
 
     @Test
     fun `binds Naver properties and exposes the search adapter through its port`() {
