@@ -12,6 +12,7 @@ import org.springframework.http.converter.HttpMessageConversionException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.ResourceAccessException
+import org.springframework.web.client.UnknownContentTypeException
 import org.springframework.web.util.HtmlUtils
 
 class NaverBlogSearchAdapter(
@@ -20,10 +21,12 @@ class NaverBlogSearchAdapter(
     private val telemetry: NaverBlogSearchTelemetry = NoopNaverBlogSearchTelemetry,
 ) : MissionBlogSearchPort {
     private val client = builder.baseUrl(properties.baseUrl).build()
+    private val clientId = properties.clientId.trim()
+    private val clientSecret = properties.clientSecret.trim()
 
     override fun search(query: String, count: Int): MissionBlogSearchOutcome {
         val startedAt = Instant.now()
-        if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
+        if (clientId.isBlank() || clientSecret.isBlank()) {
             return MissionBlogSearchOutcome.Failed(
                 MissionBlogSearchOutcomeCategory.CREDENTIALS_MISSING,
                 attempts = 0,
@@ -44,8 +47,8 @@ class NaverBlogSearchAdapter(
                             .queryParam("format", "json")
                             .build()
                     }
-                    .header("X-NCP-APIGW-API-KEY-ID", properties.clientId)
-                    .header("X-NCP-APIGW-API-KEY", properties.clientSecret)
+                    .header("X-NCP-APIGW-API-KEY-ID", clientId)
+                    .header("X-NCP-APIGW-API-KEY", clientSecret)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError) { _, clientResponse ->
                         throw NaverBlogHttpStatusException(clientResponse.statusCode.value())
@@ -69,7 +72,12 @@ class NaverBlogSearchAdapter(
                 val category = NaverBlogSearchFailureClassifier.classify(exception)
                 if (attempt >= properties.maxAttempts || !category.retryable) {
                     return MissionBlogSearchOutcome.Failed(category.category, attempt).also { outcome ->
-                        telemetry.failed(outcome, credentialsConfigured = true, Duration.between(startedAt, Instant.now()))
+                        telemetry.failed(
+                            outcome,
+                            credentialsConfigured = true,
+                            Duration.between(startedAt, Instant.now()),
+                            cause = exception,
+                        )
                     }
                 }
                 attempt++
@@ -78,13 +86,14 @@ class NaverBlogSearchAdapter(
     }
 
     private fun normalize(item: NaverBlogSearchItem): MissionBlogSearchResult? {
-        val uri = runCatching { URI(item.link) }.getOrNull() ?: return null
+        val link = item.link?.trim().orEmpty()
+        val uri = runCatching { URI(link) }.getOrNull() ?: return null
         if (uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) return null
-        val title = clean(item.title).take(300)
-        val description = clean(item.description).take(1000)
-        val source = clean(item.bloggername).take(200)
-        if (title.isBlank() || item.link.length > 1000) return null
-        return MissionBlogSearchResult(title, description, source.ifBlank { uri.host }, item.link)
+        val title = clean(item.title.orEmpty()).take(300)
+        val description = clean(item.description.orEmpty()).take(1000)
+        val source = clean(item.bloggername.orEmpty()).take(200)
+        if (title.isBlank() || link.length > 1000) return null
+        return MissionBlogSearchResult(title, description, source.ifBlank { uri.host }, link)
     }
 
     private fun clean(value: String): String =
@@ -113,7 +122,7 @@ private object NaverBlogSearchFailureClassifier {
         val statusCode = causes.filterIsInstance<NaverBlogHttpStatusException>().firstOrNull()?.statusCode
             ?: causes.filterIsInstance<RestClientResponseException>().firstOrNull()?.statusCode?.value()
         if (statusCode != null) return fromStatusCode(statusCode)
-        if (causes.any { it is HttpMessageConversionException }) {
+        if (causes.any { it is HttpMessageConversionException || it is UnknownContentTypeException }) {
             return NaverBlogSearchFailureClassification(MissionBlogSearchOutcomeCategory.RESPONSE_DESERIALIZATION, false)
         }
         if (causes.any { it is ResourceAccessException || it is java.io.IOException || it is java.net.SocketTimeoutException }) {
@@ -134,8 +143,8 @@ private object NaverBlogSearchFailureClassifier {
 data class NaverBlogSearchResponse(val items: List<NaverBlogSearchItem> = emptyList())
 
 data class NaverBlogSearchItem(
-    val title: String = "",
-    val link: String = "",
-    val description: String = "",
-    val bloggername: String = "",
+    val title: String? = null,
+    val link: String? = null,
+    val description: String? = null,
+    val bloggername: String? = null,
 )

@@ -22,10 +22,49 @@ import kotlin.test.assertEquals
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class MissionGenerationWorkServiceTest {
+    @Test
+    fun `completes generation without writing blog tips when search results are empty`() {
+        val jobs = mock(MissionGenerationJobRepository::class.java)
+        val profiles = mock(OnboardingProfileRepository::class.java)
+        val templates = mock(MissionDraftTemplateRepository::class.java)
+        val drafts = mock(MissionDraftRepository::class.java)
+        val blogTips = mock(MissionBlogTipRepository::class.java)
+        val clock = Clock.fixed(Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC)
+        val service = MissionGenerationWorkService(jobs, profiles, templates, drafts, blogTips, clock)
+        val work = MissionGenerationWork(
+            jobId = UUID.randomUUID(),
+            guestUserId = 1,
+            item = MissionItem.DELIVERY_FOOD,
+            baselineFrequency = 1,
+            baselineAmountWon = 10_000,
+            birthDate = java.time.LocalDate.of(2000, 1, 1),
+            address = null,
+            leaseToken = UUID.randomUUID(),
+        )
+        val job = mock(MissionGenerationJob::class.java)
+        val template = mock(MissionDraftTemplate::class.java)
+        `when`(jobs.findByIdForUpdate(work.jobId)).thenReturn(job)
+        `when`(job.ownsLease(work.leaseToken, clock.instant())).thenReturn(true)
+        `when`(templates.findByTargetCodeAndActiveTrue(work.item.name)).thenReturn(template)
+        `when`(template.id).thenReturn(1L)
+
+        service.complete(
+            work,
+            MissionAlternativeGenerationResult(
+                listOf(MissionAlternativeTemplate("{count}회 대체하기", "설명")),
+                MissionDraftGenerationSource.AI,
+            ),
+            emptyList(),
+        )
+
+        verifyNoInteractions(blogTips)
+    }
+
     @Test
     fun `persists newly searched blog tips and updates an existing URL`() {
         val jobs = mock(MissionGenerationJobRepository::class.java)

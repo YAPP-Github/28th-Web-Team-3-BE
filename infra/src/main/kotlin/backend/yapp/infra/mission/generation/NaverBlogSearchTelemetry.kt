@@ -17,6 +17,7 @@ interface NaverBlogSearchTelemetry {
         outcome: MissionBlogSearchOutcome.Failed,
         credentialsConfigured: Boolean,
         duration: Duration,
+        cause: Throwable? = null,
     )
 }
 
@@ -27,6 +28,7 @@ object NoopNaverBlogSearchTelemetry : NaverBlogSearchTelemetry {
         outcome: MissionBlogSearchOutcome.Failed,
         credentialsConfigured: Boolean,
         duration: Duration,
+        cause: Throwable?,
     ) = Unit
 }
 
@@ -56,6 +58,7 @@ class MicrometerNaverBlogSearchTelemetry(
         outcome: MissionBlogSearchOutcome.Failed,
         credentialsConfigured: Boolean,
         duration: Duration,
+        cause: Throwable?,
     ) {
         meterRegistry.counter(
             OUTCOMES,
@@ -66,11 +69,15 @@ class MicrometerNaverBlogSearchTelemetry(
             .tag("outcome", outcome.category.name)
             .register(meterRegistry)
             .record(duration)
+        val rootCause = generateSequence(cause) { it.cause }.lastOrNull()
         log.warn(
-            "mission_generation.naver_blog_search.failed category={} attemptCount={} credentialsConfigured={}",
+            "mission_generation.naver_blog_search.failed category={} attemptCount={} credentialsConfigured={} " +
+                "exceptionType={} rootCauseType={}",
             outcome.category,
             outcome.attempts,
             credentialsConfigured,
+            cause?.javaClass?.simpleName ?: NONE,
+            rootCause?.javaClass?.simpleName ?: NONE,
         )
     }
 
@@ -79,5 +86,6 @@ class MicrometerNaverBlogSearchTelemetry(
 
         const val OUTCOMES = "mission_generation_naver_blog_search_outcomes_total"
         const val DURATION = "mission_generation_naver_blog_search_duration_seconds"
+        private const val NONE = "NONE"
     }
 }

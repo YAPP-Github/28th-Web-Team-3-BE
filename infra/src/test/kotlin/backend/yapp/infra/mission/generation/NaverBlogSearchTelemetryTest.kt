@@ -10,6 +10,7 @@ import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.slf4j.LoggerFactory
 
 class NaverBlogSearchTelemetryTest {
@@ -26,6 +27,7 @@ class NaverBlogSearchTelemetryTest {
                 MissionBlogSearchOutcome.Failed(MissionBlogSearchOutcomeCategory.AUTHORIZATION, attempts = 1),
                 credentialsConfigured = true,
                 duration = Duration.ofMillis(10),
+                cause = IllegalStateException("secret Authorization query"),
             )
 
             assertEquals(
@@ -40,6 +42,8 @@ class NaverBlogSearchTelemetryTest {
             assertFalse(messages.contains("secret"))
             assertFalse(messages.contains("Authorization"))
             assertFalse(messages.contains("query"))
+            assertTrue(messages.contains("exceptionType=IllegalStateException"))
+            assertTrue(messages.contains("rootCauseType=IllegalStateException"))
         } finally {
             logger.detachAppender(appender)
             appender.stop()
