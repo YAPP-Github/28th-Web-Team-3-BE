@@ -35,4 +35,6 @@ data class ExternalYouthPolicy(
     val regionCode: String? = null,
     /** 온통청년 조회수(inqCnt). 정렬 기준. */
     val viewCount: Int? = null,
+    /** 온통청년 신청기간 구분코드(aplyPrdSeCd): 0057001 특정기간 / 0057002 상시 / 0057003 마감. */
+    val applyPeriodType: String? = null,
 )

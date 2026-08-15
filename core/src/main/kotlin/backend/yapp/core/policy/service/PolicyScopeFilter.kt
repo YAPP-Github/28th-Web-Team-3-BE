@@ -28,6 +28,9 @@ object PolicyScopeFilter {
     private const val EMPLOYMENT_MEDIUM = "취업"
     private const val CERTIFICATE_KEYWORD = "자격증"
 
+    /** 온통청년 신청기간 구분코드(aplyPrdSeCd) 중 "마감". 날짜가 비어 있어도 마감이면 제외한다. */
+    private const val CLOSED_PERIOD_CODE = "0057003"
+
     private val DATE_REGEX = Regex("""(\d{4})[-.]?(\d{2})[-.]?(\d{2})""")
 
     /**
@@ -72,6 +75,7 @@ object PolicyScopeFilter {
 
     fun isInScope(policy: ExternalYouthPolicy, today: LocalDate): Boolean {
         if (resolveCategory(policy) == null) return false
+        if (policy.applyPeriodType == CLOSED_PERIOD_CODE) return false
         val end = resolveEndDate(policy)
         return end == null || !end.isBefore(today)
     }
