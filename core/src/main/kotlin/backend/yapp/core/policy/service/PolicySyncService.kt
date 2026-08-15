@@ -49,9 +49,12 @@ class PolicySyncService(
     /**
      * 온통청년 API 응답에서 파싱한 정책 목록을 스코프 필터 후 upsert 한다.
      * 클라우드 IP 차단으로 서버가 직접 호출하지 못할 때, 사람이 받아온 데이터를 업로드해 갱신하는 경로에서 사용한다.
+     *
+     * @param replace true면 기존 정책을 모두 삭제하고 이 목록만 남긴다(큐레이션셋으로 교체). 기본은 upsert(추가/갱신).
      */
     @Transactional
-    fun ingest(policies: List<ExternalYouthPolicy>): PolicySyncResult {
+    fun ingest(policies: List<ExternalYouthPolicy>, replace: Boolean = false): PolicySyncResult {
+        if (replace) repository.deleteAllInBatch()
         val today = LocalDate.ofInstant(clock.instant(), ZONE)
         val upserted = upsertInScope(policies, today)
         return PolicySyncResult(fetched = policies.size, upserted = upserted, skipped = policies.size - upserted)

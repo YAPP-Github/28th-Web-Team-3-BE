@@ -32,7 +32,7 @@ class PolicyImportAcceptanceTest(
         {"result":{"pagging":{"totCount":3},"youthPolicyList":[
           {"plcyNo":"UP1","plcyNm":"업로드 월세 지원","lclsfNm":"주거","mclsfNm":"전월세 및 주거급여 지원","plcyExplnCn":"업로드로 저장"},
           {"plcyNo":"UP2","plcyNm":"창업 지원","mclsfNm":"창업"},
-          {"plcyNo":"UP3","plcyNm":"청년 자산형성 지원","lclsfNm":"금융･복지･문화","mclsfNm":"취약계층 및 금융지원","plcyExplnCn":"금융 카테고리"}
+          {"plcyNo":"UP3","plcyNm":"청년 자산형성 지원","lclsfNm":"금융･복지･문화","mclsfNm":"취약계층 및 금융지원","plcyExplnCn":"금융 카테고리","aplyUrlAddr":"https://fill4young.kinfa.or.kr/yfs/main"}
         ]}}
     """.trimIndent()
 
@@ -46,8 +46,10 @@ class PolicyImportAcceptanceTest(
 
     @Test
     fun `import parses json, filters out-of-scope, upserts, and serves policies`() {
-        // 스코프 밖(창업) 제외 → 주거·금융 2건 저장
-        mockMvc.perform(multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token"))
+        // 다른 테스트와 DB를 공유하므로 replace로 깨끗한 상태에서 시작. 스코프 밖(창업) 제외 → 주거·금융 2건 저장
+        mockMvc.perform(
+            multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token").param("replace", "true"),
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.fetched").value(3))
             .andExpect(jsonPath("$.upserted").value(2))
@@ -79,14 +81,46 @@ class PolicyImportAcceptanceTest(
             .andExpect(jsonPath("$[0].category").value("금융"))
             .andReturn().response.contentAsString
 
-        // applyUrl은 plcyNo(externalId) 기반 온통청년 상세링크로 통일됨
+        // applyUrl은 데이터의 안내 URL(aplyUrlAddr)을 그대로 사용
         val id = JsonPath.read<Int>(financeJson, "$[0].id")
         mockMvc.perform(get("/api/policies/$id").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(
-                jsonPath("$.applyUrl")
-                    .value("https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/UP3"),
-            )
+            .andExpect(jsonPath("$.applyUrl").value("https://fill4young.kinfa.or.kr/yfs/main"))
+    }
+
+    @Test
+    fun `import without applyUrl falls back to 온통청년 detail link`() {
+        mockMvc.perform(multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token"))
+            .andExpect(status().isOk)
+        val token = issueGuestToken()
+        // UP1(주거)은 aplyUrlAddr 없음 → plcyNo 기반 온통청년 상세 폴백
+        val housingJson = mockMvc.perform(get("/api/policies?category=주거").header("Authorization", "Bearer $token"))
+            .andReturn().response.contentAsString
+        val id = JsonPath.read<Int>(housingJson, "$[0].id")
+        mockMvc.perform(get("/api/policies/$id").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.applyUrl").value("https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/UP1"))
+    }
+
+    @Test
+    fun `replace mode clears existing policies and keeps only uploaded ones`() {
+        // 최초 업로드(2건 저장)
+        mockMvc.perform(multipart("/api/admin/policies/import").file(jsonFile()).header("X-Admin-Token", "test-token"))
+            .andExpect(status().isOk)
+        // replace=true로 다른 단일 정책 업로드 → 기존 비우고 이것만
+        val other = """
+            {"result":{"pagging":{"totCount":1},"youthPolicyList":[
+              {"plcyNo":"NEW1","plcyNm":"교체된 정책","mclsfNm":"건강","plcyExplnCn":"replace"}
+            ]}}
+        """.trimIndent()
+        val newFile = MockMultipartFile("file", "new.json", MediaType.APPLICATION_JSON_VALUE, other.toByteArray())
+        mockMvc.perform(
+            multipart("/api/admin/policies/import").file(newFile).header("X-Admin-Token", "test-token").param("replace", "true"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.upserted").value(1))
+
+        val token = issueGuestToken()
+        mockMvc.perform(get("/api/policies").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].title").value("교체된 정책"))
     }
 
     private fun jsonFile() =
