@@ -2,6 +2,7 @@ package backend.yapp.api.onboarding.controller
 
 import backend.yapp.api.onboarding.dto.GoalConfirmRequest
 import backend.yapp.api.onboarding.dto.GoalPlansResponse
+import backend.yapp.api.onboarding.dto.GoalPreviewResponse
 import backend.yapp.api.onboarding.dto.GoalResponse
 import backend.yapp.api.onboarding.dto.ProfilePatchRequest
 import backend.yapp.api.onboarding.dto.ProfileResponse
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -56,11 +58,18 @@ class OnboardingController(
     override fun goalPlans(@AuthenticationPrincipal guestUserId: Long): GoalPlansResponse =
         GoalPlansResponse.from(goalService.plans(guestUserId))
 
+    @GetMapping("/goal-preview")
+    override fun goalPreview(
+        @AuthenticationPrincipal guestUserId: Long,
+        @RequestParam(required = false) monthlySavingManwon: Int?,
+    ): GoalPreviewResponse =
+        GoalPreviewResponse.from(goalService.preview(guestUserId, monthlySavingManwon))
+
     @PostMapping("/goal")
     @ResponseStatus(HttpStatus.CREATED)
     override fun confirmGoal(
         @AuthenticationPrincipal guestUserId: Long,
         @Valid @RequestBody request: GoalConfirmRequest,
     ): GoalResponse =
-        GoalResponse.from(goalService.confirm(guestUserId, request.plan))
+        GoalResponse.from(goalService.confirm(guestUserId, request.plan, request.monthlySavingManwon))
 }

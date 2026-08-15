@@ -48,9 +48,14 @@ data class ProfilePatchRequest(
         )
 }
 
-/** 목표 확정("이 목표로 시작") 요청. */
+/** 목표 확정("이 목표로 시작") 요청. monthlySavingManwon(슬라이더 값) 또는 plan 중 하나로 확정한다. */
 data class GoalConfirmRequest(
-    @field:Schema(description = "확정할 목표안. PLAN_1=확실하게(기본), PLAN_2=여유롭게.", example = "PLAN_1")
-    @field:NotNull
-    val plan: GoalPlan,
+    @field:Schema(description = "매달 모을 금액(만원). 슬라이더로 선택한 값. 지정 시 이 값으로 목표 확정.", example = "115")
+    @field:Min(0) @field:Max(650)
+    val monthlySavingManwon: Int? = null,
+    @field:Schema(
+        description = "(구) 확정할 목표안. monthlySavingManwon 미지정 시 이 안의 권장 상향폭으로 확정. PLAN_1=확실하게, PLAN_2=여유롭게.",
+        example = "PLAN_1",
+    )
+    val plan: GoalPlan? = null,
 )

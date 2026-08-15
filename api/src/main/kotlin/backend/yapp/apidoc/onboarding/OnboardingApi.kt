@@ -3,6 +3,7 @@ package backend.yapp.apidoc.onboarding
 import backend.yapp.api.global.exception.ErrorResponseEntity
 import backend.yapp.api.onboarding.dto.GoalConfirmRequest
 import backend.yapp.api.onboarding.dto.GoalPlansResponse
+import backend.yapp.api.onboarding.dto.GoalPreviewResponse
 import backend.yapp.api.onboarding.dto.GoalResponse
 import backend.yapp.api.onboarding.dto.ProfilePatchRequest
 import backend.yapp.api.onboarding.dto.ProfileResponse
@@ -111,12 +112,29 @@ interface OnboardingApi {
     fun goalPlans(guestUserId: Long): GoalPlansResponse
 
     @Operation(
+        summary = "목표 저축 미리보기(슬라이더)",
+        description = "'얼마를 목표로 저축할까요?' 화면. 슬라이더로 고른 매달 모을 금액(monthlySavingManwon)으로 " +
+            "저축 예상 금액을 재계산해 반환한다. <br>" +
+            "예상 금액 = 순자산(baseAmountManwon) + 추가 저축액(매달 모을 금액 × 개월). <br>" +
+            "monthlySavingManwon 미지정 시 권장값(현재 저축액 + 권장 상향폭)으로 계산한다. <br>" +
+            "슬라이더 범위: min(=현재 저축액) ~ max, 기본 위치는 recommendedMonthlySavingManwon. <br>" +
+            "현재 저축액 미만이거나 최대 초과면 400, 월저축액·목표기간이 없으면 409(ONBOARDING_INCOMPLETE).",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "조회 성공", content = [Content(schema = Schema(implementation = GoalPreviewResponse::class))]),
+        ApiResponse(responseCode = "400", description = "INVALID_ONBOARDING_INPUT", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+        ApiResponse(responseCode = "409", description = "ONBOARDING_INCOMPLETE", content = [Content(schema = Schema(implementation = ErrorResponseEntity::class))]),
+    )
+    fun goalPreview(guestUserId: Long, monthlySavingManwon: Int?): GoalPreviewResponse
+
+    @Operation(
         summary = "목표 확정",
-        description = "목표 선택 화면의 '이 목표로 시작' 동작. 사용자가 고른 안(PLAN_1 확실하게 / PLAN_2 여유롭게)으로 " +
-            "목표를 확정 저장하고, 온보딩을 완료(COMPLETED) 처리한다. <br>" +
-                "확정된 목표 금액·기간을 반환한다. <br>" +
-            "이미 온보딩을 완료했다면 409(ONBOARDING_ALREADY_COMPLETED). <br><br> " +
-                "월저축액·목표기간이 없으면 409(ONBOARDING_INCOMPLETE).",
+        description = "'이 목표로 시작' 동작. 슬라이더로 고른 매달 모을 금액(monthlySavingManwon)으로 목표를 확정하고 온보딩을 완료(COMPLETED) 처리한다. <br>" +
+            "목표 금액 = 순자산 + (매달 모을 금액 × 목표기간). <br>" +
+            "monthlySavingManwon 미지정 시 plan(구 방식)의 권장 상향폭으로 확정. 둘 다 없으면 400(INVALID_ONBOARDING_INPUT). <br>" +
+            "확정된 목표 금액·기간을 반환한다. <br>" +
+            "이미 온보딩을 완료했다면 409(ONBOARDING_ALREADY_COMPLETED). 월저축액·목표기간이 없으면 409(ONBOARDING_INCOMPLETE).",
     )
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "확정 성공", content = [Content(schema = Schema(implementation = GoalResponse::class))]),
