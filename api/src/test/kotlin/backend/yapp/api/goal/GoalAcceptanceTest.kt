@@ -27,22 +27,24 @@ class GoalAcceptanceTest(
         val token = completeOnboarding()
 
         // 이번달 목표 = 매달 모을 금액(100×1.15=115), 목표액 = 순자산 1800 + 115×24 = 4560
+        // 순자산은 이미 채워진 금액이므로 totalSaved 시작값 = 순자산 1800
         mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(4560))
             .andExpect(jsonPath("$.periodMonths").value(24))
-            .andExpect(jsonPath("$.totalSavedManwon").value(0))
+            .andExpect(jsonPath("$.baseAmountManwon").value(1800))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1800))
             .andExpect(jsonPath("$.thisMonth.targetManwon").value(115))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(0))
             .andExpect(jsonPath("$.thisMonth.dDay").isNumber)
             .andExpect(jsonPath("$.thisMonth.dday").doesNotExist())
 
-        // 저축액 입력은 이번 달 값을 덮어쓴다(누적 아님).
+        // 저축액 입력은 이번 달 값을 덮어쓴다(누적 아님). totalSaved = 순자산 1800 + 이번 달 20 = 1820
         setSaving(token, 30)
         mockMvc.perform(put("/api/goal/savings").header("Authorization", "Bearer $token")
             .contentType(MediaType.APPLICATION_JSON).content("""{"savedAmountManwon":20}"""))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.totalSavedManwon").value(20))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1820))
             .andExpect(jsonPath("$.thisMonth.savedManwon").value(20))
 
         // 목표 금액/기간 수정
@@ -51,7 +53,7 @@ class GoalAcceptanceTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.targetAmountManwon").value(5000))
             .andExpect(jsonPath("$.periodMonths").value(36))
-            .andExpect(jsonPath("$.totalSavedManwon").value(20))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1820))
     }
 
     @Test
@@ -69,10 +71,11 @@ class GoalAcceptanceTest(
             .andExpect(jsonPath("$.monthlySavings[0].savedManwon").value(0))
             .andExpect(jsonPath("$.monthlySavings[0].current").value(true))
 
-        // 이번 달 저축 입력이 월별 현황에도 반영됨
+        // 이번 달 저축 입력이 월별 현황에도 반영됨. totalSaved = 순자산 1800 + 55 = 1855
         setSaving(token, 55)
         mockMvc.perform(get("/api/v2/goal").header("Authorization", "Bearer $token"))
-            .andExpect(jsonPath("$.totalSavedManwon").value(55))
+            .andExpect(jsonPath("$.totalSavedManwon").value(1855))
+            .andExpect(jsonPath("$.baseAmountManwon").value(1800))
             .andExpect(jsonPath("$.monthlySavings[0].savedManwon").value(55))
             .andExpect(jsonPath("$.monthlySavings[0].current").value(true))
     }
