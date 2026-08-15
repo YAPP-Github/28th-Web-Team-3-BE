@@ -132,6 +132,56 @@ class OnboardingAcceptanceTest(
     }
 
     @Test
+    fun `goal preview recalculates expected amount with net worth and chosen monthly`() {
+        val token = issueGuestToken()
+        patchProfile(token, """{"monthlySalaryManwon":500,"monthlySavingManwon":100}""")
+        patchProfile(token, """{"netWorthManwon":2500}""")
+        patchProfile(token, """{"goalPeriodMonths":24}""")
+
+        // 슬라이더 115만원 → 예상 = 순자산 2500 + 115×24(2760) = 5260 (화면과 동일)
+        mockMvc.perform(get("/api/onboarding/goal-preview?monthlySavingManwon=115").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.monthlySavingManwon").value(115))
+            .andExpect(jsonPath("$.baseAmountManwon").value(2500))
+            .andExpect(jsonPath("$.additionalSavingManwon").value(2760))
+            .andExpect(jsonPath("$.expectedAmountManwon").value(5260))
+            .andExpect(jsonPath("$.extraMonthlyManwon").value(15))
+            .andExpect(jsonPath("$.extraPercent").value(15))
+            .andExpect(jsonPath("$.minMonthlySavingManwon").value(100))
+            .andExpect(jsonPath("$.maxMonthlySavingManwon").value(150))
+            .andExpect(jsonPath("$.recommendedMonthlySavingManwon").value(115))
+
+        // 파라미터 없으면 권장값(현재+15%=115)로 계산
+        mockMvc.perform(get("/api/onboarding/goal-preview").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.monthlySavingManwon").value(115))
+
+        // 현재 저축액 미만/슬라이더 최대 초과는 400
+        mockMvc.perform(get("/api/onboarding/goal-preview?monthlySavingManwon=90").header("Authorization", "Bearer $token"))
+            .andExpect(status().isBadRequest)
+        mockMvc.perform(get("/api/onboarding/goal-preview?monthlySavingManwon=200").header("Authorization", "Bearer $token"))
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `confirm with chosen monthly saving includes net worth in target`() {
+        val token = issueGuestToken()
+        patchProfile(token, """{"monthlySalaryManwon":500,"monthlySavingManwon":100}""")
+        patchProfile(token, """{"netWorthManwon":2500}""")
+        patchProfile(token, """{"goalPeriodMonths":24}""")
+
+        // 슬라이더 130만원 확정 → 목표액 = 순자산 2500 + 130×24 = 5620
+        mockMvc.perform(post("/api/onboarding/goal").header("Authorization", "Bearer $token")
+            .contentType(MediaType.APPLICATION_JSON).content("""{"monthlySavingManwon":130}"""))
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.targetAmountManwon").value(5620))
+
+        mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
+            .andExpect(jsonPath("$.targetAmountManwon").value(5620))
+            .andExpect(jsonPath("$.thisMonth.targetManwon").value(130))
+    }
+
+    @Test
     fun `my info update rejects saving greater than salary`() {
         val token = issueGuestToken()
         mockMvc.perform(
