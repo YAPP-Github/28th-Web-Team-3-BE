@@ -123,9 +123,9 @@ data class YouthPolicyApiItem(
             largeCategory = lclsfNm.blankToNull(),
             mediumCategory = mclsfNm.blankToNull(),
             supervisingOrg = sprvsnInstCdNm.blankToNull(),
-            // 원본 신청URL(aplyUrlAddr)은 빈 값·홈페이지 등으로 정책 매칭이 부정확해,
-            // plcyNo로 온통청년 정책 상세 페이지 링크를 생성해 통일한다.
-            applyUrl = POLICY_DETAIL_URL_PREFIX + id,
+            // 안내 URL이 있으면 그대로 사용(큐레이션 데이터가 기관 안내/개요 페이지를 담음),
+            // 없으면 plcyNo 기반 온통청년 정책 상세(개요) 링크로 폴백한다.
+            applyUrl = aplyUrlAddr.blankToNull()?.takeIf { it.startsWith("http") } ?: (POLICY_DETAIL_URL_PREFIX + id),
             applyPeriodText = aplyYmd.blankToNull(),
             bizEndYmd = bizPrdEndYmd.blankToNull(),
             applyMethod = plcyAplyMthdCn.blankToNull(),

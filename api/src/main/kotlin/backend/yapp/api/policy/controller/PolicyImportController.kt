@@ -12,6 +12,7 @@ import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
@@ -31,17 +32,19 @@ class PolicyImportController(
 ) {
     @Operation(
         summary = "청년정책 JSON 업로드",
-        description = "온통청년 목록조회 API 응답(JSON) 파일을 업로드한다. pageSize를 크게(예: 3000) 호출하면 전체를 한 파일로 받을 수 있다.",
+        description = "온통청년 목록조회 API 응답(JSON) 파일을 업로드한다. pageSize를 크게(예: 3000) 호출하면 전체를 한 파일로 받을 수 있다. " +
+            "replace=true면 기존 정책을 모두 비우고 이 파일 내용만 남긴다(큐레이션셋 교체용). 기본은 upsert(추가/갱신).",
     )
     @PostMapping("/import", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun import(
         @RequestHeader("X-Admin-Token") token: String?,
         @RequestPart("file") file: MultipartFile,
+        @RequestParam(defaultValue = "false") replace: Boolean,
     ): PolicySyncResponse {
         verifyToken(token)
         val json = String(file.bytes, Charsets.UTF_8)
         val policies = responseParser.parse(json)
-        return PolicySyncResponse.from(policySyncService.ingest(policies))
+        return PolicySyncResponse.from(policySyncService.ingest(policies, replace))
     }
 
     private fun verifyToken(token: String?) {
