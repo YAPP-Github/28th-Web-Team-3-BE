@@ -97,6 +97,68 @@ class OnboardingGoalService(
         return onboardingGoal
     }
 
+    /**
+     * (v2) 목표 저축 미리보기(슬라이더). v1과 달리 슬라이더 최댓값에 월급 상한을 적용한다.
+     * 슬라이더 최댓값 = MIN(월저축액 × 1.5, 월급). 월급 미입력 시 상한 없음.
+     */
+    @Transactional(readOnly = true)
+    fun previewV2(guestUserId: Long, requestedMonthly: Int?): GoalPreview {
+        val profile = readGoalReadyProfile(guestUserId)
+        val config = configPort.current()
+        val current = profile.monthlySavingManwon!!
+        val max = sliderMax(current, profile.monthlySalaryManwon)
+        val chosen = resolveMonthlyCapped(requestedMonthly, current, max, config)
+        return buildPreviewCapped(profile, chosen, max, config)
+    }
+
+    /**
+     * (v2) 목표 확정("이 목표로 시작"). plan 개념 없이 슬라이더로 고른 매달 모을 금액으로만 확정한다.
+     * 목표 금액 = 순자산 + (매달 모을 금액 × 목표기간). 슬라이더 최댓값 = MIN(월저축액 × 1.5, 월급).
+     */
+    @Transactional
+    fun confirmV2(guestUserId: Long, monthlySavingManwon: Int): OnboardingGoal {
+        val profile = readGoalReadyProfile(guestUserId)
+        if (profile.status == OnboardingStatus.COMPLETED) {
+            throw BaseException(ErrorCode.ONBOARDING_ALREADY_COMPLETED)
+        }
+        val config = configPort.current()
+        val current = profile.monthlySavingManwon!!
+        val months = profile.goalPeriodMonths!!
+        val base = profile.netWorthManwon ?: 0
+        val max = sliderMax(current, profile.monthlySalaryManwon)
+
+        val chosenMonthly = resolveMonthlyCapped(monthlySavingManwon, current, max, config)
+        val upliftPermille = if (current > 0) ((chosenMonthly - current).toLong() * 1000 / current).toInt() else 0
+        val targetAmount = base + chosenMonthly * months
+
+        val onboardingGoal = onboardingGoalRepository.save(
+            OnboardingGoal(
+                guestUserId = guestUserId,
+                plan = GoalPlan.PLAN_1,
+                periodMonths = months,
+                monthlySavingManwon = chosenMonthly,
+                upliftPermille = upliftPermille,
+                targetAmountManwon = targetAmount,
+                configVersion = config.version,
+                createdAt = clock.instant(),
+            ),
+        )
+        goalRepository.save(
+            Goal(
+                guestUserId = guestUserId,
+                targetAmountManwon = targetAmount,
+                periodMonths = months,
+                monthlyTargetManwon = chosenMonthly,
+                baseAmountManwon = base,
+                startedAt = onboardingGoal.createdAt,
+            ),
+        )
+        profile.status = OnboardingStatus.COMPLETED
+        profile.updatedAt = clock.instant()
+        profileRepository.save(profile)
+        return onboardingGoal
+    }
+
     private fun buildPreview(profile: OnboardingProfile, chosen: Int, config: OnboardingConfig): GoalPreview {
         val current = profile.monthlySavingManwon!!
         val months = profile.goalPeriodMonths!!
@@ -123,6 +185,41 @@ class OnboardingGoalService(
         val max = applyRate(current, SLIDER_MAX_EXTRA_RATE)
         if (chosen < current || chosen > max) throw BaseException(ErrorCode.INVALID_ONBOARDING_INPUT)
         return chosen
+    }
+
+    /** (v2) 슬라이더 최댓값 = MIN(월저축액 × 1.5, 월급). 월급 미입력 시 상한 없이 월저축액 × 1.5. */
+    private fun sliderMax(current: Int, salary: Int?): Int {
+        val uplifted = applyRate(current, SLIDER_MAX_EXTRA_RATE)
+        return if (salary != null) minOf(uplifted, salary) else uplifted
+    }
+
+    /** (v2) 매달 모을 금액 결정(월급 상한 반영). null이면 권장값(최댓값으로 clamp). 범위(현재~최댓값) 밖이면 400. */
+    private fun resolveMonthlyCapped(requested: Int?, current: Int, max: Int, config: OnboardingConfig): Int {
+        val recommended = minOf(applyRate(current, config.plan1.single), max)
+        val chosen = requested ?: recommended
+        if (chosen < current || chosen > max) throw BaseException(ErrorCode.INVALID_ONBOARDING_INPUT)
+        return chosen
+    }
+
+    /** (v2) 미리보기 구성(월급 상한 반영). 최댓값·권장값에 [max] 상한을 적용한다. */
+    private fun buildPreviewCapped(profile: OnboardingProfile, chosen: Int, max: Int, config: OnboardingConfig): GoalPreview {
+        val current = profile.monthlySavingManwon!!
+        val months = profile.goalPeriodMonths!!
+        val base = profile.netWorthManwon ?: 0
+        val additional = chosen * months
+        return GoalPreview(
+            monthlySavingManwon = chosen,
+            currentMonthlySavingManwon = current,
+            minMonthlySavingManwon = current,
+            maxMonthlySavingManwon = max,
+            recommendedMonthlySavingManwon = minOf(applyRate(current, config.plan1.single), max),
+            periodMonths = months,
+            baseAmountManwon = base,
+            additionalSavingManwon = additional,
+            expectedAmountManwon = base + additional,
+            extraMonthlyManwon = chosen - current,
+            extraPercent = if (current > 0) Math.round((chosen - current) * 100.0 / current).toInt() else 0,
+        )
     }
 
     /** value × (1 + rate) 를 만원 단위로 반올림 없이 퍼밀 정수 연산으로 계산. */
