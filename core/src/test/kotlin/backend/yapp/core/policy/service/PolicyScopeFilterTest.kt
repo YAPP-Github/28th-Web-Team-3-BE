@@ -18,6 +18,7 @@ class PolicyScopeFilterTest {
         applyPeriodText: String? = null,
         bizEndYmd: String? = null,
         regionCode: String? = null,
+        applyPeriodType: String? = null,
     ) = ExternalYouthPolicy(
         externalId = "P1",
         title = title,
@@ -25,6 +26,7 @@ class PolicyScopeFilterTest {
         applyPeriodText = applyPeriodText,
         bizEndYmd = bizEndYmd,
         regionCode = regionCode,
+        applyPeriodType = applyPeriodType,
     )
 
     @Test
@@ -56,6 +58,17 @@ class PolicyScopeFilterTest {
     @Test
     fun `policy with unknown period is included`() {
         assertTrue(PolicyScopeFilter.isInScope(policy(medium = "건강", applyPeriodText = null, bizEndYmd = null), today))
+    }
+
+    @Test
+    fun `closed policy is excluded even when period is unknown`() {
+        // aplyPrdSeCd=0057003(마감)이면 날짜가 비어 있어도 제외
+        assertFalse(
+            PolicyScopeFilter.isInScope(
+                policy(medium = "건강", applyPeriodText = null, bizEndYmd = null, applyPeriodType = "0057003"),
+                today,
+            ),
+        )
     }
 
     @Test

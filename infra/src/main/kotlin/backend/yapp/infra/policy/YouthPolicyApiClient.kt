@@ -110,6 +110,7 @@ data class YouthPolicyApiItem(
     val lastMdfcnDt: String? = null,
     val zipCd: String? = null,
     val inqCnt: String? = null,
+    val aplyPrdSeCd: String? = null,
 ) {
     fun toExternal(): ExternalYouthPolicy? {
         val id = plcyNo.blankToNull() ?: return null
@@ -137,6 +138,7 @@ data class YouthPolicyApiItem(
             externalModifiedAt = lastMdfcnDt.blankToNull(),
             regionCode = zipCd.blankToNull(),
             viewCount = inqCnt.blankToNull()?.toIntOrNull(),
+            applyPeriodType = aplyPrdSeCd.blankToNull(),
         )
     }
 }
