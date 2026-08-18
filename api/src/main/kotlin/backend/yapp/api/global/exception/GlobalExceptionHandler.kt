@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.multipart.support.MissingServletRequestPartException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.NoHandlerFoundException
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -48,6 +49,13 @@ class GlobalExceptionHandler {
     fun handleNoHandlerFound(ex: NoHandlerFoundException): ResponseEntity<ErrorResponseEntity> {
         val errorCode = ErrorCode.NO_HANDLER_FOUND
         val message = "${errorCode.message} (${ex.requestURL})"
+        return ErrorResponseEntity.toResponseEntity(errorCode, message, null)
+    }
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleNoResourceFound(ex: NoResourceFoundException): ResponseEntity<ErrorResponseEntity> {
+        val errorCode = ErrorCode.NO_HANDLER_FOUND
+        val message = "${errorCode.message} (${ex.resourcePath})"
         return ErrorResponseEntity.toResponseEntity(errorCode, message, null)
     }
 
