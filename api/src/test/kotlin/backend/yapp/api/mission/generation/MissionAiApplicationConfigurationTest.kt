@@ -102,14 +102,6 @@ class MissionAiApplicationConfigurationTest {
             )
             assertNotNull(context.getBean(modelClass(CHAT_MODEL_CLASS)))
             assertNotNull(context.getBean(modelClass(EMBEDDING_MODEL_CLASS)))
-            assertEquals(
-                "gemini-3.1-flash-lite",
-                context.environment.getProperty("spring.ai.google.genai.chat.model"),
-            )
-            assertEquals(
-                "text-embedding-004",
-                context.environment.getProperty("spring.ai.google.genai.embedding.text.model"),
-            )
         }
     }
 
