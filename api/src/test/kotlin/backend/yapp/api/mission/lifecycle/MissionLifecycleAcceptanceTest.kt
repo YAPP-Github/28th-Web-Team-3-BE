@@ -38,7 +38,7 @@ class MissionLifecycleAcceptanceTest(
             .andExpect(jsonPath("$.totalCount").value(1))
 
         mockMvc.perform(
-            patch("/api/missions/MANUAL/$missionId/complete").header(AUTHORIZATION, "Bearer $token"),
+            patch("/api/missions/manual/$missionId/complete").header(AUTHORIZATION, "Bearer $token"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("COMPLETED"))
 
@@ -61,7 +61,7 @@ class MissionLifecycleAcceptanceTest(
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            delete("/api/missions/MANUAL/$missionId").header(AUTHORIZATION, "Bearer $token"),
+            delete("/api/missions/manual/$missionId").header(AUTHORIZATION, "Bearer $token"),
         ).andExpect(status().isNoContent)
         mockMvc.perform(get("/api/missions").header(AUTHORIZATION, "Bearer $token"))
             .andExpect(status().isOk).andExpect(jsonPath("$.missions.length()").value(0))
@@ -87,6 +87,28 @@ class MissionLifecycleAcceptanceTest(
                 }
             }
         }
+    }
+
+    @Test
+    fun `mission source path accepts both cases and rejects unknown values`() {
+        val token = guestToken()
+        val missionId = JsonPath.read<String>(createManual(token), "$.id")
+
+        mockMvc.perform(
+            delete("/api/missions/MANUAL/$missionId").header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isNoContent)
+
+        mockMvc.perform(
+            delete("/api/missions/recommended/${UUID.randomUUID()}")
+                .header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.name").value("MISSION_NOT_FOUND"))
+
+        mockMvc.perform(
+            delete("/api/missions/unknown/${UUID.randomUUID()}")
+                .header(AUTHORIZATION, "Bearer $token"),
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("VALIDATION_FAILED"))
     }
 
     @Test
