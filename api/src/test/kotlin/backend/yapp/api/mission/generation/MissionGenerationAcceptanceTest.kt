@@ -117,7 +117,7 @@ class MissionGenerationAcceptanceTest(
     }
 
     @Test
-    fun `six active knowledge candidates are verified then recorded as five selections`() {
+    fun `six active knowledge candidates are verified then recorded as one selection`() {
         val token = readyGuestToken()
         val response = request(
             token,
@@ -140,8 +140,8 @@ class MissionGenerationAcceptanceTest(
                     result.next()
                     assertEquals(6, result.getInt("candidate_count"))
                     assertEquals(6, result.getInt("verified_count"))
-                    assertEquals(5, result.getString("selected_knowledge_ids").split(",").size)
-                    assertEquals("DETERMINISTIC_RANDOM_5", result.getString("selection_policy"))
+                    assertEquals(1, result.getString("selected_knowledge_ids").split(",").size)
+                    assertEquals("DETERMINISTIC_RANDOM_1", result.getString("selection_policy"))
                 }
             }
         }

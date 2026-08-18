@@ -60,7 +60,7 @@ class MissionGenerationExecutorTest {
     }
 
     @Test
-    fun `all candidates are verified before deterministic random selection`() {
+    fun `all candidates are verified before one knowledge is selected`() {
         val fixture = fixture()
         val candidates = (1L..6L).map { id ->
             MissionKnowledge(id, "지식 $id", null, null, null, null)
@@ -88,7 +88,7 @@ class MissionGenerationExecutorTest {
                 6,
                 6,
                 selected.map { it.id },
-                MissionKnowledgeSelectionPolicy.DETERMINISTIC_RANDOM_5,
+                MissionKnowledgeSelectionPolicy.DETERMINISTIC_RANDOM_1,
             ),
         )
     }

@@ -41,7 +41,7 @@ data class MissionKnowledgeRetrievalResult(
 enum class MissionKnowledgeSelectionPolicy {
     EMPTY,
     ALL,
-    DETERMINISTIC_RANDOM_5,
+    DETERMINISTIC_RANDOM_1,
 }
 
 data class MissionKnowledge(
