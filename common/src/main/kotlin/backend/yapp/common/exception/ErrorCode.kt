@@ -44,8 +44,6 @@ enum class ErrorCode(
     MISSION_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "미션을 찾을 수 없습니다."),
     MISSION_STATUS_CONFLICT(HttpStatus.CONFLICT, 409, "현재 상태에서는 미션을 완료할 수 없습니다."),
     MANUAL_MISSION_INVALID(HttpStatus.BAD_REQUEST, 400, "수동 미션 입력값이 올바르지 않습니다."),
-    MISSION_HISTORY_INVALID_PERIOD(HttpStatus.BAD_REQUEST, 400, "미션 히스토리 조회 기간이 올바르지 않습니다."),
-    MISSION_HISTORY_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, 400, "해당 기간의 미션 히스토리를 제공하지 않습니다."),
 
     // Goal
     INVALID_GOAL_INPUT(HttpStatus.BAD_REQUEST, 400, "목표 입력값이 올바르지 않습니다."),

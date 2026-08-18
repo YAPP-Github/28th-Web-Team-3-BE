@@ -38,10 +38,5 @@ interface MissionWeeklyCompletionRepository : JpaRepository<MissionWeeklyComplet
         weekStartDate: LocalDate,
     ): List<MissionWeeklyCompletion>
 
-    fun findAllByGuestUserIdAndWeekStartDateIn(
-        guestUserId: Long,
-        weekStartDates: Collection<LocalDate>,
-    ): List<MissionWeeklyCompletion>
-
     fun deleteByGuestUserId(guestUserId: Long): Int
 }
