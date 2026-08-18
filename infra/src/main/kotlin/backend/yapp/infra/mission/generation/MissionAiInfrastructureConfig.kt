@@ -4,6 +4,7 @@ import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalPort
+import backend.yapp.core.mission.generation.port.MissionKnowledgeTracePort
 import backend.yapp.core.mission.generation.port.MissionKnowledgeVerificationPort
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.ai.chat.client.ChatClient
@@ -23,17 +24,16 @@ class MissionAiInfrastructureConfig {
     @Bean
     fun missionKnowledgeRetriever(
         jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-        embeddingModelProvider: ObjectProvider<EmbeddingModel>,
-        properties: MissionGenerationProperties,
     ): MissionKnowledgeRetrievalPort = jdbcTemplateProvider.ifAvailable
-        ?.let { jdbcTemplate ->
-            PgVectorMissionKnowledgeRetriever(
-                jdbcTemplate = jdbcTemplate,
-                embeddingModel = embeddingModelProvider.ifAvailable,
-                embeddingModelVersion = properties.recommendation.embedding.modelVersion,
-            )
-        }
+        ?.let(::DatabaseMissionKnowledgeRetriever)
         ?: EmptyMissionKnowledgeRetriever()
+
+    @Bean
+    fun missionKnowledgeTraceRecorder(
+        jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    ): MissionKnowledgeTracePort = jdbcTemplateProvider.ifAvailable
+        ?.let(::DatabaseMissionKnowledgeTraceRecorder)
+        ?: NoopMissionKnowledgeTraceRecorder()
 
     @Bean
     @ConditionalOnProperty(

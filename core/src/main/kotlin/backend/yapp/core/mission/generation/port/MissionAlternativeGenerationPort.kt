@@ -11,6 +11,7 @@ interface MissionAlternativeGenerationPort {
 data class MissionAlternativeGenerationRequest(
     val item: MissionItem,
     val knowledgeContexts: List<MissionKnowledge>,
+    val personalizationContext: String = "",
 )
 
 data class MissionAlternativeTemplate(
@@ -28,23 +29,19 @@ interface MissionKnowledgeRetrievalPort {
 }
 
 data class MissionKnowledgeRetrievalRequest(
-    val jobId: UUID,
     val item: MissionItem,
-    val queryText: String,
     val today: LocalDate,
 )
 
 data class MissionKnowledgeRetrievalResult(
     val knowledge: List<MissionKnowledge>,
     val candidateCount: Int,
-    val policy: MissionKnowledgeSelectionPolicy,
 )
 
 enum class MissionKnowledgeSelectionPolicy {
     EMPTY,
     ALL,
-    SEMANTIC_TOP_5,
-    FALLBACK_TOP_5,
+    DETERMINISTIC_RANDOM_5,
 }
 
 data class MissionKnowledge(
@@ -54,10 +51,22 @@ data class MissionKnowledge(
     val officialSourceUrl: String?,
     val validFrom: LocalDate?,
     val validUntil: LocalDate?,
-    val similarityScore: Double? = null,
 )
 
 interface MissionKnowledgeVerificationPort {
     /** Returns only knowledge that is safe to use after resolving contradictory subject groups. */
     fun verify(knowledge: List<MissionKnowledge>): List<MissionKnowledge>
 }
+
+interface MissionKnowledgeTracePort {
+    fun record(trace: MissionKnowledgeTrace)
+}
+
+data class MissionKnowledgeTrace(
+    val jobId: UUID,
+    val item: MissionItem,
+    val candidateCount: Int,
+    val verifiedCount: Int,
+    val selectedKnowledgeIds: List<Long>,
+    val selectionPolicy: MissionKnowledgeSelectionPolicy,
+)

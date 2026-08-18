@@ -13,6 +13,8 @@ import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRes
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalPort
 import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalRequest
+import backend.yapp.core.mission.generation.port.MissionKnowledgeTrace
+import backend.yapp.core.mission.generation.port.MissionKnowledgeTracePort
 import backend.yapp.core.mission.generation.port.MissionKnowledgeVerificationPort
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.ResidentialArea
@@ -30,6 +32,7 @@ class MissionGenerationExecutor(
     private val workService: MissionGenerationWorkService,
     private val knowledgeRetrievalPort: MissionKnowledgeRetrievalPort,
     private val knowledgeVerificationPort: MissionKnowledgeVerificationPort,
+    private val knowledgeTracePort: MissionKnowledgeTracePort,
     private val alternativeGenerator: MissionAlternativeGenerationPort,
 ) {
     fun execute(jobId: UUID): MissionGenerationExecutionResult {
@@ -39,7 +42,7 @@ class MissionGenerationExecutor(
             MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
         }
         try {
-            val query = MissionSearchQueryFactory.create(
+            val personalizationContext = MissionSearchQueryFactory.create(
                 item = work.item,
                 birthDate = work.birthDate,
                 address = work.address,
@@ -50,9 +53,7 @@ class MissionGenerationExecutor(
             val retrieved = runCatching {
                 knowledgeRetrievalPort.retrieve(
                     MissionKnowledgeRetrievalRequest(
-                        jobId = work.jobId,
                         item = work.item,
-                        queryText = query,
                         today = LocalDate.now(workService.clock),
                     ),
                 )
@@ -65,20 +66,36 @@ class MissionGenerationExecutor(
             }.onFailure { exception ->
                 log.warn("mission_generation.knowledge_verification.failed item={}", work.item, exception)
             }.getOrDefault(emptySet())
-            val verifiedKnowledge = retrieved?.knowledge.orEmpty()
-                .filter { it.id in verifiedIds }
-                .take(MAX_KNOWLEDGE_CONTEXTS)
-            if (retrieved != null) {
-                log.info(
-                    "mission_generation.knowledge.used item={} candidateCount={} selectedCount={} policy={}",
-                    work.item,
-                    retrieved.candidateCount,
-                    verifiedKnowledge.size,
-                    retrieved.policy,
+            val verifiedKnowledge = retrieved?.knowledge.orEmpty().filter { it.id in verifiedIds }
+            val selection = MissionKnowledgeSelector.select(work.jobId, verifiedKnowledge)
+            runCatching {
+                knowledgeTracePort.record(
+                    MissionKnowledgeTrace(
+                        jobId = work.jobId,
+                        item = work.item,
+                        candidateCount = retrieved?.candidateCount ?: 0,
+                        verifiedCount = verifiedKnowledge.size,
+                        selectedKnowledgeIds = selection.knowledge.map { it.id },
+                        selectionPolicy = selection.policy,
+                    ),
                 )
+            }.onFailure { exception ->
+                log.warn("mission_generation.knowledge_trace.failed item={}", work.item, exception)
             }
+            log.info(
+                "mission_generation.knowledge.used item={} candidateCount={} verifiedCount={} selectedCount={} policy={}",
+                work.item,
+                retrieved?.candidateCount ?: 0,
+                verifiedKnowledge.size,
+                selection.knowledge.size,
+                selection.policy,
+            )
             val generated = alternativeGenerator.generate(
-                MissionAlternativeGenerationRequest(work.item, verifiedKnowledge),
+                MissionAlternativeGenerationRequest(
+                    item = work.item,
+                    knowledgeContexts = selection.knowledge,
+                    personalizationContext = personalizationContext,
+                ),
             )
             workService.complete(work, generated)
             return MissionGenerationExecutionResult.COMPLETED
@@ -90,7 +107,6 @@ class MissionGenerationExecutor(
 
     companion object {
         private val log = LoggerFactory.getLogger(MissionGenerationExecutor::class.java)
-        private const val MAX_KNOWLEDGE_CONTEXTS = 5
     }
 }
 

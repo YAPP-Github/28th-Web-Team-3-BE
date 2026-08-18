@@ -8,9 +8,6 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
-    placeholders:
-      mission_knowledge_extension_setup: ""
-      mission_knowledge_vector_type: "VARCHAR(10000)"
 
 app:
   server:

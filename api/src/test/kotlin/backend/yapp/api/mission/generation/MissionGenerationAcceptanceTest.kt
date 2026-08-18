@@ -116,6 +116,37 @@ class MissionGenerationAcceptanceTest(
         }
     }
 
+    @Test
+    fun `six active knowledge candidates are verified then recorded as five selections`() {
+        val token = readyGuestToken()
+        val response = request(
+            token,
+            """{"category":"LIVING","item":"HOUSEHOLD_GOODS","baselineFrequency":3,"baselineAmountWon":30000}""",
+        ).andExpect(status().isAccepted).andReturn().response.contentAsString
+        val jobId = JsonPath.read<String>(response, "$.jobId")
+
+        executor.execute(UUID.fromString(jobId))
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(
+                """
+                    SELECT candidate_count, verified_count, selected_knowledge_ids, selection_policy
+                    FROM mission_knowledge_retrieval_trace
+                    WHERE job_id = ?
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setObject(1, UUID.fromString(jobId))
+                statement.executeQuery().use { result ->
+                    result.next()
+                    assertEquals(6, result.getInt("candidate_count"))
+                    assertEquals(6, result.getInt("verified_count"))
+                    assertEquals(5, result.getString("selected_knowledge_ids").split(",").size)
+                    assertEquals("DETERMINISTIC_RANDOM_5", result.getString("selection_policy"))
+                }
+            }
+        }
+    }
+
     private fun requestJob(token: String): String {
         val body = request(token, VALID_BODY).andExpect(status().isAccepted)
             .andReturn().response.contentAsString

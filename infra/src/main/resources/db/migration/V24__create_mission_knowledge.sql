@@ -1,5 +1,3 @@
-${mission_knowledge_extension_setup}
-
 CREATE TABLE mission_knowledge (
     id                  BIGSERIAL PRIMARY KEY,
     category            VARCHAR(20) NOT NULL,
@@ -13,10 +11,6 @@ CREATE TABLE mission_knowledge (
     active              BOOLEAN NOT NULL DEFAULT TRUE,
     verification_status VARCHAR(20) NOT NULL DEFAULT 'CURATED',
     verified_at         TIMESTAMP WITH TIME ZONE,
-    embedding           ${mission_knowledge_vector_type},
-    embedded_content    VARCHAR(1000),
-    embedding_model     VARCHAR(100),
-    embedded_at         TIMESTAMP WITH TIME ZONE,
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_mission_knowledge_category CHECK (category IN ('MEAL', 'LIVING', 'HOBBY')),
@@ -35,12 +29,10 @@ CREATE TABLE mission_knowledge_retrieval_trace (
     id                    BIGSERIAL PRIMARY KEY,
     job_id                UUID NOT NULL REFERENCES mission_generation_job (id),
     item_code             VARCHAR(40) NOT NULL,
-    query_text            VARCHAR(1000) NOT NULL,
     candidate_count       INTEGER NOT NULL,
+    verified_count        INTEGER NOT NULL,
     selected_knowledge_ids VARCHAR(1000) NOT NULL,
-    selected_similarity_scores VARCHAR(1000) NOT NULL,
     selection_policy      VARCHAR(30) NOT NULL,
-    embedding_model       VARCHAR(100),
     created_at            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_mission_knowledge_trace_job UNIQUE (job_id)
 );
