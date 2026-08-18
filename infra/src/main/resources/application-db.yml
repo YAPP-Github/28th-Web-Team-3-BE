@@ -12,5 +12,10 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  flyway:
+    placeholders:
+      mission_knowledge_extension_setup: "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;"
+      mission_knowledge_vector_type: "extensions.vector(256)"
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE}

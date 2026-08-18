@@ -44,6 +44,7 @@ class MissionLifecycleService(
                 manualRepository.findAllByGuestUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(guestUserId)
                     .map { it.toSnapshot(completedKeys.contains(MissionSource.MANUAL.name to it.id), weekStart) }
             ).asSequence()
+            .filter { it.item?.active != false }
             .filter { category == null || it.category == category }
             .filter { status == null || it.status == status }
             .sortedByDescending { it.createdAt }
@@ -132,7 +133,7 @@ class MissionLifecycleService(
 
     private fun activeMission(guestUserId: Long, missionId: UUID): Mission =
         missionRepository.findByIdAndGuestUserIdForUpdate(missionId, guestUserId)
-            ?.takeIf { it.deletedAt == null }
+            ?.takeIf { it.deletedAt == null && it.item?.active != false }
             ?: throw BaseException(ErrorCode.MISSION_NOT_FOUND)
 
     private fun activeManualMission(guestUserId: Long, missionId: UUID): ManualMission =

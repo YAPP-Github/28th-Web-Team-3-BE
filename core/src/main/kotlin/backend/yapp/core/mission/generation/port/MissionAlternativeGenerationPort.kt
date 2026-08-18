@@ -1,6 +1,8 @@
 package backend.yapp.core.mission.generation.port
 
 import backend.yapp.core.mission.generation.domain.MissionItem
+import java.time.LocalDate
+import java.util.UUID
 
 interface MissionAlternativeGenerationPort {
     fun generate(request: MissionAlternativeGenerationRequest): MissionAlternativeGenerationResult
@@ -8,7 +10,7 @@ interface MissionAlternativeGenerationPort {
 
 data class MissionAlternativeGenerationRequest(
     val item: MissionItem,
-    val blogContexts: List<MissionBlogSearchResult>,
+    val knowledgeContexts: List<MissionKnowledge>,
 )
 
 data class MissionAlternativeTemplate(
@@ -21,58 +23,41 @@ data class MissionAlternativeGenerationResult(
     val source: MissionDraftGenerationSource,
 )
 
-interface MissionBlogSearchPort {
-    fun search(query: String, count: Int): MissionBlogSearchOutcome
+interface MissionKnowledgeRetrievalPort {
+    fun retrieve(request: MissionKnowledgeRetrievalRequest): MissionKnowledgeRetrievalResult
 }
 
-sealed interface MissionBlogSearchOutcome {
-    val category: MissionBlogSearchOutcomeCategory
-
-    data class Completed(
-        override val category: MissionBlogSearchOutcomeCategory,
-        val providerItemCount: Int,
-        val results: List<MissionBlogSearchResult>,
-    ) : MissionBlogSearchOutcome {
-        init {
-            require(category in COMPLETED_CATEGORIES)
-        }
-    }
-
-    data class Failed(
-        override val category: MissionBlogSearchOutcomeCategory,
-        val attempts: Int,
-    ) : MissionBlogSearchOutcome {
-        init {
-            require(category !in COMPLETED_CATEGORIES)
-        }
-    }
-
-    companion object {
-        private val COMPLETED_CATEGORIES = setOf(
-            MissionBlogSearchOutcomeCategory.SUCCESS,
-            MissionBlogSearchOutcomeCategory.EMPTY_PROVIDER_RESULT,
-            MissionBlogSearchOutcomeCategory.ALL_NORMALIZED_OUT,
-        )
-    }
-}
-
-enum class MissionBlogSearchOutcomeCategory {
-    SUCCESS,
-    CREDENTIALS_MISSING,
-    AUTHORIZATION,
-    RATE_LIMIT,
-    HTTP_4XX_OTHER,
-    HTTP_5XX,
-    NETWORK_TIMEOUT,
-    RESPONSE_DESERIALIZATION,
-    EMPTY_PROVIDER_RESULT,
-    ALL_NORMALIZED_OUT,
-    UNEXPECTED_INTERNAL,
-}
-
-data class MissionBlogSearchResult(
-    val title: String,
-    val description: String,
-    val source: String,
-    val url: String,
+data class MissionKnowledgeRetrievalRequest(
+    val jobId: UUID,
+    val item: MissionItem,
+    val queryText: String,
+    val today: LocalDate,
 )
+
+data class MissionKnowledgeRetrievalResult(
+    val knowledge: List<MissionKnowledge>,
+    val candidateCount: Int,
+    val policy: MissionKnowledgeSelectionPolicy,
+)
+
+enum class MissionKnowledgeSelectionPolicy {
+    EMPTY,
+    ALL,
+    SEMANTIC_TOP_5,
+    FALLBACK_TOP_5,
+}
+
+data class MissionKnowledge(
+    val id: Long,
+    val content: String,
+    val subjectKey: String?,
+    val officialSourceUrl: String?,
+    val validFrom: LocalDate?,
+    val validUntil: LocalDate?,
+    val similarityScore: Double? = null,
+)
+
+interface MissionKnowledgeVerificationPort {
+    /** Returns only knowledge that is safe to use after resolving contradictory subject groups. */
+    fun verify(knowledge: List<MissionKnowledge>): List<MissionKnowledge>
+}

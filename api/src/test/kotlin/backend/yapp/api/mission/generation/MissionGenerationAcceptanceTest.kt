@@ -6,6 +6,7 @@ import com.nimbusds.jwt.SignedJWT
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -76,6 +77,11 @@ class MissionGenerationAcceptanceTest(
             ready,
             """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":0,"baselineAmountWon":50000}""",
         ).andExpect(status().isBadRequest)
+        request(
+            ready,
+            """{"category":"LIVING","item":"SELF_DEVELOPMENT","baselineFrequency":5,"baselineAmountWon":50000}""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("MISSION_GENERATION_INPUT_INVALID"))
     }
 
     @Test
@@ -90,6 +96,24 @@ class MissionGenerationAcceptanceTest(
             .andExpect(jsonPath("$.paths['$GENERATION_PATH'].post").exists())
             .andExpect(jsonPath("$.components.schemas.MissionGenerationCreateRequest.properties.item").exists())
             .andExpect(jsonPath("$.paths['/api/missions/surveys']").doesNotExist())
+    }
+
+    @Test
+    fun `mission knowledge seed preserves slash-delimited rows`() {
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM mission_knowledge").use { result ->
+                    result.next()
+                    assertEquals(27, result.getInt(1))
+                }
+                statement.executeQuery(
+                    "SELECT COUNT(*) FROM mission_knowledge WHERE item_code = 'HOUSEHOLD_GOODS'",
+                ).use { result ->
+                    result.next()
+                    assertEquals(6, result.getInt(1))
+                }
+            }
+        }
     }
 
     private fun requestJob(token: String): String {

@@ -3,6 +3,8 @@ package backend.yapp.infra.mission.generation
 import backend.yapp.core.mission.generation.port.MissionDraftContentGenerator
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
 import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
+import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalPort
+import backend.yapp.core.mission.generation.port.MissionKnowledgeVerificationPort
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.embedding.EmbeddingModel
@@ -12,11 +14,48 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.jdbc.core.JdbcTemplate
 import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableConfigurationProperties(MissionGenerationProperties::class)
 class MissionAiInfrastructureConfig {
+    @Bean
+    fun missionKnowledgeRetriever(
+        jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+        embeddingModelProvider: ObjectProvider<EmbeddingModel>,
+        properties: MissionGenerationProperties,
+    ): MissionKnowledgeRetrievalPort = jdbcTemplateProvider.ifAvailable
+        ?.let { jdbcTemplate ->
+            PgVectorMissionKnowledgeRetriever(
+                jdbcTemplate = jdbcTemplate,
+                embeddingModel = embeddingModelProvider.ifAvailable,
+                embeddingModelVersion = properties.recommendation.embedding.modelVersion,
+            )
+        }
+        ?: EmptyMissionKnowledgeRetriever()
+
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "off",
+        matchIfMissing = true,
+    )
+    fun conservativeMissionKnowledgeVerifier(): MissionKnowledgeVerificationPort =
+        ConservativeMissionKnowledgeVerifier()
+
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "on",
+    )
+    fun officialSourceMissionKnowledgeVerifier(
+        chatClientBuilder: ChatClient.Builder,
+    ): MissionKnowledgeVerificationPort =
+        OfficialSourceMissionKnowledgeVerifier(chatClientBuilder.build())
+
     @Bean
     @ConditionalOnProperty(
         prefix = "mission.generation",
