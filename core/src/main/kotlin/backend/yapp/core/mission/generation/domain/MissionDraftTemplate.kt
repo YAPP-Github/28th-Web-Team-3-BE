@@ -72,6 +72,7 @@ enum class MissionCategory {
 enum class MissionItem(
     val category: MissionCategory,
     val label: String,
+    val active: Boolean = true,
 ) {
     DELIVERY_FOOD(MissionCategory.MEAL, "배달음식"),
     DINING_OUT(MissionCategory.MEAL, "외식"),
@@ -83,15 +84,15 @@ enum class MissionItem(
     COSMETICS(MissionCategory.LIVING, "화장품"),
     HOUSEHOLD_GOODS(MissionCategory.LIVING, "생활용품"),
     BEAUTY(MissionCategory.LIVING, "미용"),
-    SELF_DEVELOPMENT(MissionCategory.LIVING, "자기계발"),
-    HOBBY_GOODS(MissionCategory.HOBBY, "용품&굿즈"),
+    SELF_DEVELOPMENT(MissionCategory.LIVING, "자기계발", active = false),
+    HOBBY_GOODS(MissionCategory.HOBBY, "용품&굿즈", active = false),
     GAME(MissionCategory.HOBBY, "게임"),
-    DIGITAL_CONTENT(MissionCategory.HOBBY, "디지털 콘텐츠"),
+    DIGITAL_CONTENT(MissionCategory.HOBBY, "디지털 콘텐츠", active = false),
     CLASS(MissionCategory.HOBBY, "수업&클래스"),
     PERFORMANCE_TICKET(MissionCategory.HOBBY, "공연&전시&티켓"),
-    CLUB_GATHERING(MissionCategory.HOBBY, "동호회&모임"),
-    EQUIPMENT_RENTAL(MissionCategory.HOBBY, "장비 대여"),
-    SPACE_USE(MissionCategory.HOBBY, "공간 이용"),
+    CLUB_GATHERING(MissionCategory.HOBBY, "동호회&모임", active = false),
+    EQUIPMENT_RENTAL(MissionCategory.HOBBY, "장비 대여", active = false),
+    SPACE_USE(MissionCategory.HOBBY, "공간 이용", active = false),
 }
 
 enum class MissionMetricType {

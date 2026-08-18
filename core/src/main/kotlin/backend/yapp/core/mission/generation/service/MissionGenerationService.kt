@@ -43,7 +43,9 @@ class MissionGenerationService(
         baselineFrequency: Int,
         baselineAmountWon: Int,
     ): MissionGenerationJobSnapshot {
-        if (!category.active || item.category != category || baselineFrequency !in 1..10 || baselineAmountWon !in 1..2_000_000) {
+        if (!category.active || !item.active || item.category != category ||
+            baselineFrequency !in 1..10 || baselineAmountWon !in 1..2_000_000
+        ) {
             throw BaseException(ErrorCode.MISSION_GENERATION_INPUT_INVALID)
         }
         val profile = onboardingProfileRepository.findByGuestUserIdForUpdate(guestUserId)

@@ -1,7 +1,5 @@
 package backend.yapp.core.mission.generation.service
 
-import backend.yapp.core.mission.generation.domain.MissionBlogTip
-import backend.yapp.core.mission.generation.domain.MissionBlogTipRepository
 import backend.yapp.core.mission.generation.domain.MissionDraft
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
@@ -12,16 +10,18 @@ import backend.yapp.core.mission.generation.domain.MissionMetricType
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRequest
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationResult
-import backend.yapp.core.mission.generation.port.MissionBlogSearchPort
-import backend.yapp.core.mission.generation.port.MissionBlogSearchResult
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
+import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalPort
+import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalRequest
+import backend.yapp.core.mission.generation.port.MissionKnowledgeTrace
+import backend.yapp.core.mission.generation.port.MissionKnowledgeTracePort
+import backend.yapp.core.mission.generation.port.MissionKnowledgeVerificationPort
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.ResidentialArea
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
 import java.util.UUID
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -30,10 +30,10 @@ import org.slf4j.LoggerFactory
 @Service
 class MissionGenerationExecutor(
     private val workService: MissionGenerationWorkService,
-    private val blogSearchPort: MissionBlogSearchPort,
+    private val knowledgeRetrievalPort: MissionKnowledgeRetrievalPort,
+    private val knowledgeVerificationPort: MissionKnowledgeVerificationPort,
+    private val knowledgeTracePort: MissionKnowledgeTracePort,
     private val alternativeGenerator: MissionAlternativeGenerationPort,
-    @Value("\${mission.generation.naver-blog.ai-context-count:15}")
-    private val aiContextCount: Int,
 ) {
     fun execute(jobId: UUID): MissionGenerationExecutionResult {
         val work = when (val preparation = workService.prepare(jobId)) {
@@ -42,27 +42,62 @@ class MissionGenerationExecutor(
             MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
         }
         try {
-            val query = MissionSearchQueryFactory.create(
+            val personalizationContext = MissionSearchQueryFactory.create(
                 item = work.item,
                 birthDate = work.birthDate,
                 address = work.address,
                 today = LocalDate.now(workService.clock),
-                rotationSeed = work.jobId.hashCode(),
+                baselineFrequency = work.baselineFrequency,
+                baselineAmountWon = work.baselineAmountWon,
             )
-            val blogSearchOutcome = blogSearchPort.search(query, aiContextCount.coerceIn(1, 100))
-            val blogResults = when (blogSearchOutcome) {
-                is backend.yapp.core.mission.generation.port.MissionBlogSearchOutcome.Completed -> blogSearchOutcome.results
-                is backend.yapp.core.mission.generation.port.MissionBlogSearchOutcome.Failed -> emptyList()
+            val retrieved = runCatching {
+                knowledgeRetrievalPort.retrieve(
+                    MissionKnowledgeRetrievalRequest(
+                        item = work.item,
+                        today = LocalDate.now(workService.clock),
+                    ),
+                )
+            }.onFailure { exception ->
+                log.warn("mission_generation.knowledge_retrieval.failed item={}", work.item, exception)
+            }.getOrNull()
+            val verifiedIds = runCatching {
+                knowledgeVerificationPort.verify(retrieved?.knowledge.orEmpty())
+                    .mapTo(mutableSetOf()) { it.id }
+            }.onFailure { exception ->
+                log.warn("mission_generation.knowledge_verification.failed item={}", work.item, exception)
+            }.getOrDefault(emptySet())
+            val verifiedKnowledge = retrieved?.knowledge.orEmpty().filter { it.id in verifiedIds }
+            val selection = MissionKnowledgeSelector.select(work.jobId, verifiedKnowledge)
+            runCatching {
+                knowledgeTracePort.record(
+                    MissionKnowledgeTrace(
+                        jobId = work.jobId,
+                        item = work.item,
+                        candidateCount = retrieved?.candidateCount ?: 0,
+                        verifiedCount = verifiedKnowledge.size,
+                        selectedKnowledgeIds = selection.knowledge.map { it.id },
+                        selectionPolicy = selection.policy,
+                    ),
+                )
+            }.onFailure { exception ->
+                log.warn("mission_generation.knowledge_trace.failed item={}", work.item, exception)
             }
             log.info(
-                "mission_generation.naver_blog_search.used category={} resultCount={}",
-                blogSearchOutcome.category,
-                blogResults.size,
+                "mission_generation.knowledge.used item={} candidateCount={} verifiedCount={} selectedCount={} policy={}",
+                work.item,
+                retrieved?.candidateCount ?: 0,
+                verifiedKnowledge.size,
+                selection.knowledge.size,
+                selection.policy,
             )
             val generated = alternativeGenerator.generate(
-                MissionAlternativeGenerationRequest(work.item, blogResults.take(aiContextCount.coerceIn(1, 100))),
+                MissionAlternativeGenerationRequest(
+                    item = work.item,
+                    knowledgeContexts = selection.knowledge,
+                    personalizationContext = personalizationContext,
+                ),
             )
-            workService.complete(work, generated, blogResults)
+            workService.complete(work, generated)
             return MissionGenerationExecutionResult.COMPLETED
         } catch (exception: Exception) {
             workService.releaseOrFail(work)
@@ -81,7 +116,6 @@ class MissionGenerationWorkService(
     private val profileRepository: OnboardingProfileRepository,
     private val templateRepository: MissionDraftTemplateRepository,
     private val draftRepository: MissionDraftRepository,
-    private val blogTipRepository: MissionBlogTipRepository,
     val clock: Clock,
 ) {
     @Transactional
@@ -116,7 +150,6 @@ class MissionGenerationWorkService(
     fun complete(
         work: MissionGenerationWork,
         generated: MissionAlternativeGenerationResult,
-        blogResults: List<MissionBlogSearchResult>,
     ) {
         val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
         if (!job.ownsLease(work.leaseToken, clock.instant())) return
@@ -155,53 +188,8 @@ class MissionGenerationWorkService(
             )
         }
         draftRepository.saveAll(drafts)
-        val savedTips = saveBlogTips(work, blogResults, now)
-        log.info(
-            "mission_generation.naver_blog_tip.saved requestedCount={} createdCount={} updatedCount={}",
-            blogResults.size,
-            savedTips.createdCount,
-            savedTips.updatedCount,
-        )
         job.succeed(now, now.plus(DRAFT_TTL), generated.source)
     }
-
-    private fun saveBlogTips(
-        work: MissionGenerationWork,
-        results: List<MissionBlogSearchResult>,
-        now: java.time.Instant,
-    ): MissionBlogTipSaveResult {
-        var createdCount = 0
-        var updatedCount = 0
-        results.forEach { result ->
-            val existing = blogTipRepository.findByGuestUserIdAndUrl(work.guestUserId, result.url)
-            if (existing == null) {
-                blogTipRepository.save(
-                    MissionBlogTip(
-                        id = UUID.randomUUID(),
-                        guestUserId = work.guestUserId,
-                        item = work.item,
-                        title = result.title,
-                        source = result.source,
-                        url = result.url,
-                        searchedAt = now,
-                    ),
-                )
-                createdCount++
-            } else {
-                existing.item = work.item
-                existing.title = result.title
-                existing.source = result.source
-                existing.searchedAt = now
-                updatedCount++
-            }
-        }
-        return MissionBlogTipSaveResult(createdCount, updatedCount)
-    }
-
-    private data class MissionBlogTipSaveResult(
-        val createdCount: Int,
-        val updatedCount: Int,
-    )
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun releaseOrFail(work: MissionGenerationWork) {

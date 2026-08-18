@@ -23,7 +23,7 @@ data class MissionCatalogResponse(
             listOf(MissionCategory.MEAL, MissionCategory.LIVING, MissionCategory.HOBBY).map { category ->
                 MissionCategoryCatalogResponse(
                     category = category,
-                    items = MissionItem.entries.filter { it.category == category }
+                    items = MissionItem.entries.filter { it.category == category && it.active }
                         .map { MissionItemResponse(it, it.label) },
                 )
             },

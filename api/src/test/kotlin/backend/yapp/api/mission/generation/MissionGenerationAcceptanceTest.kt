@@ -6,6 +6,7 @@ import com.nimbusds.jwt.SignedJWT
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -76,6 +77,11 @@ class MissionGenerationAcceptanceTest(
             ready,
             """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":0,"baselineAmountWon":50000}""",
         ).andExpect(status().isBadRequest)
+        request(
+            ready,
+            """{"category":"LIVING","item":"SELF_DEVELOPMENT","baselineFrequency":5,"baselineAmountWon":50000}""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.name").value("MISSION_GENERATION_INPUT_INVALID"))
     }
 
     @Test
@@ -90,6 +96,55 @@ class MissionGenerationAcceptanceTest(
             .andExpect(jsonPath("$.paths['$GENERATION_PATH'].post").exists())
             .andExpect(jsonPath("$.components.schemas.MissionGenerationCreateRequest.properties.item").exists())
             .andExpect(jsonPath("$.paths['/api/missions/surveys']").doesNotExist())
+    }
+
+    @Test
+    fun `mission knowledge seed preserves slash-delimited rows`() {
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM mission_knowledge").use { result ->
+                    result.next()
+                    assertEquals(27, result.getInt(1))
+                }
+                statement.executeQuery(
+                    "SELECT COUNT(*) FROM mission_knowledge WHERE item_code = 'HOUSEHOLD_GOODS'",
+                ).use { result ->
+                    result.next()
+                    assertEquals(6, result.getInt(1))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `six active knowledge candidates are verified then recorded as five selections`() {
+        val token = readyGuestToken()
+        val response = request(
+            token,
+            """{"category":"LIVING","item":"HOUSEHOLD_GOODS","baselineFrequency":3,"baselineAmountWon":30000}""",
+        ).andExpect(status().isAccepted).andReturn().response.contentAsString
+        val jobId = JsonPath.read<String>(response, "$.jobId")
+
+        executor.execute(UUID.fromString(jobId))
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(
+                """
+                    SELECT candidate_count, verified_count, selected_knowledge_ids, selection_policy
+                    FROM mission_knowledge_retrieval_trace
+                    WHERE job_id = ?
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setObject(1, UUID.fromString(jobId))
+                statement.executeQuery().use { result ->
+                    result.next()
+                    assertEquals(6, result.getInt("candidate_count"))
+                    assertEquals(6, result.getInt("verified_count"))
+                    assertEquals(5, result.getString("selected_knowledge_ids").split(",").size)
+                    assertEquals("DETERMINISTIC_RANDOM_5", result.getString("selection_policy"))
+                }
+            }
+        }
     }
 
     private fun requestJob(token: String): String {

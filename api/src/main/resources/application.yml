@@ -66,12 +66,6 @@ mission:
     scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:false}
   generation:
     ai-activation: ${AI_ACTIVATION:off}
-    naver-blog:
-      base-url: ${NAVER_BLOG_BASE_URL:https://naverapihub.apigw.ntruss.com}
-      client-id: ${NAVER_BLOG_CLIENT_ID:}
-      client-secret: ${NAVER_BLOG_CLIENT_SECRET:}
-      ai-context-count: ${NAVER_BLOG_AI_CONTEXT_COUNT:15}
-      max-attempts: ${NAVER_BLOG_MAX_ATTEMPTS:2}
     rate-limit-retry:
       max-attempts: ${MISSION_GENERATION_RATE_LIMIT_RETRY_MAX_ATTEMPTS:3}
       initial-backoff: ${MISSION_GENERATION_RATE_LIMIT_RETRY_INITIAL_BACKOFF:PT0.5S}
