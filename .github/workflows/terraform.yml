@@ -1,0 +1,265 @@
+name: Terraform
+
+run-name: "Terraform ${{ inputs.action }}: ${{ inputs.environment }} (${{ inputs.reason || 'no reason' }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "대상 환경"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      action:
+        description: "실행 작업"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+      reason:
+        description: "실행 사유"
+        required: true
+        type: string
+      allow_destructive_changes:
+        description: "삭제/교체가 포함된 apply를 명시적으로 허용"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: backend-${{ inputs.environment }}-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    name: Terraform plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_state_bucket_name: ${{ vars.TF_STATE_BUCKET }}
+      TF_VAR_bootstrap_image_uri: ${{ vars.TF_BOOTSTRAP_IMAGE_URI }}
+      TF_VAR_enable_runtime_services: ${{ vars.TF_ENABLE_RUNTIME_SERVICES || 'false' }}
+      TF_VAR_server_url: ${{ vars.SERVER_URL || '' }}
+      TF_VAR_jwt_issuer: ${{ vars.JWT_ISSUER }}
+      TF_VAR_jwt_audience: ${{ vars.JWT_AUDIENCE }}
+      TF_VAR_scheduler_paused: ${{ vars.SCHEDULER_PAUSED || 'true' }}
+      TF_VAR_enable_ai: ${{ vars.AI_ACTIVATION == 'on' }}
+      TF_VAR_enable_policy_import: ${{ vars.POLICY_IMPORT_ENABLED || 'false' }}
+      AI_ACTIVATION: ${{ vars.AI_ACTIVATION || 'off' }}
+      POLICY_IMPORT_ENABLED: ${{ vars.POLICY_IMPORT_ENABLED || 'false' }}
+      DATABASE_ISOLATION_CONFIRMED: ${{ vars.DATABASE_ISOLATION_CONFIRMED || 'false' }}
+      TERRAFORM_SERVICE_ACCOUNT: ${{ vars.TERRAFORM_SERVICE_ACCOUNT }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+
+    steps:
+      - name: Validate selected branch
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          if [[ "${TARGET_ENVIRONMENT}" == "prod" ]]; then
+            expected_ref="refs/heads/main"
+          else
+            expected_ref="refs/heads/dev"
+          fi
+          if [[ "${GITHUB_REF}" != "${expected_ref}" ]]; then
+            echo "Terraform ${TARGET_ENVIRONMENT} must run from ${expected_ref}." >&2
+            exit 1
+          fi
+          if [[ "${TARGET_ENVIRONMENT}" == "dev" && "${DATABASE_ISOLATION_CONFIRMED}" != "true" ]]; then
+            echo "Dev Terraform requires DATABASE_ISOLATION_CONFIRMED=true." >&2
+            exit 1
+          fi
+          if [[ "${TF_STATE_BUCKET}" != "${TARGET_ENVIRONMENT}-"* ]]; then
+            echo "TF_STATE_BUCKET must start with the environment prefix." >&2
+            exit 1
+          fi
+          if [[ "${TERRAFORM_SERVICE_ACCOUNT}" != *"@${TF_VAR_project_id}.iam.gserviceaccount.com" ]]; then
+            echo "TERRAFORM_SERVICE_ACCOUNT must belong to the selected GCP project." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.TERRAFORM_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.TERRAFORM_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.14.9
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform/environments/${{ inputs.environment }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${{ vars.TF_STATE_PREFIX || format('backend/{0}', inputs.environment) }}"
+
+      - name: Terraform validate
+        working-directory: infrastructure/terraform/environments/${{ inputs.environment }}
+        run: terraform validate
+
+      - name: Verify required GCP secret versions
+        if: vars.TF_ENABLE_RUNTIME_SERVICES == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(SPRING_DATABASE_URL SPRING_DATABASE_USER SPRING_DATABASE_PASSWORD JWT_SECRET)
+          if [[ "${AI_ACTIVATION}" == "on" ]]; then
+            required+=(GOOGLE_GENAI_API_KEY NAVER_BLOG_CLIENT_ID NAVER_BLOG_CLIENT_SECRET)
+          fi
+          if [[ "${POLICY_IMPORT_ENABLED}" == "true" ]]; then
+            required+=(POLICY_IMPORT_TOKEN YOUTH_POLICY_API_KEY)
+          fi
+          for secret_id in "${required[@]}"; do
+            version_count="$(gcloud secrets versions list "${secret_id}" \
+              --project "${TF_VAR_project_id}" \
+              --filter='state=ENABLED' \
+              --format='value(name)' \
+              --limit=1 | wc -l | tr -d ' ')"
+            if [[ "${version_count}" != "1" ]]; then
+              echo "No enabled version exists for required secret ${secret_id}." >&2
+              exit 1
+            fi
+          done
+
+      - name: Terraform plan
+        id: plan
+        working-directory: infrastructure/terraform/environments/${{ inputs.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan_file="${RUNNER_TEMP}/terraform-${{ inputs.environment }}.tfplan"
+          log_file="${RUNNER_TEMP}/terraform-${{ inputs.environment }}.log"
+          if ! terraform plan -out="${plan_file}" -no-color >"${log_file}" 2>&1; then
+            echo "Terraform plan failed. Run locally with the same non-secret variables for details." >&2
+            exit 1
+          fi
+          terraform show -json "${plan_file}" > "${RUNNER_TEMP}/terraform-${{ inputs.environment }}.json"
+          jq -r '.resource_changes[]? | "- `\(.address)`: `\(.change.actions | join("/"))`"' \
+            "${RUNNER_TEMP}/terraform-${{ inputs.environment }}.json" >> "${GITHUB_STEP_SUMMARY}"
+          destructive_count="$(jq '[.resource_changes[]? | select((.change.actions | index("delete")) != null)] | length' \
+            "${RUNNER_TEMP}/terraform-${{ inputs.environment }}.json")"
+          if [[ "${destructive_count}" != "0" && "${{ inputs.allow_destructive_changes }}" != "true" ]]; then
+            echo "Plan contains delete/replace actions. Re-run only after explicit destructive-change approval." >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.action }}" == "apply" ]]; then
+            foundation_changes="$(jq -r '
+              [
+                .resource_changes[]?
+                | select(
+                    (.change.actions | index("create") != null or index("update") != null or index("delete") != null)
+                    and (
+                      .type == "google_artifact_registry_repository"
+                      or .type == "google_project_service"
+                      or .type == "google_service_account"
+                      or .type == "google_service_account_iam_member"
+                      or .type == "google_iam_workload_identity_pool"
+                      or .type == "google_iam_workload_identity_pool_provider"
+                      or .type == "google_secret_manager_secret"
+                      or .type == "google_secret_manager_secret_iam_member"
+                    )
+                  )
+                | .address
+              ]
+              | join(", ")
+            ' "${RUNNER_TEMP}/terraform-${{ inputs.environment }}.json")"
+            if [[ -n "${foundation_changes}" ]]; then
+              echo "Plan includes foundation changes that must be applied by the local bootstrap administrator: ${foundation_changes}" >&2
+              exit 1
+            fi
+          fi
+          echo "destructive_count=${destructive_count}" >> "${GITHUB_OUTPUT}"
+          echo "plan_file=${plan_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload immutable reviewed plan
+        if: inputs.action == 'apply'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraform-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.plan.outputs.plan_file }}
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    name: Approve and apply reviewed plan (${{ inputs.environment }})
+    needs: plan
+    if: inputs.action == 'apply'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Checkout exact planned commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.TERRAFORM_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.TERRAFORM_SERVICE_ACCOUNT }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.14.9
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform/environments/${{ inputs.environment }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${{ vars.TF_STATE_PREFIX || format('backend/{0}', inputs.environment) }}"
+
+      - name: Download reviewed plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: terraform-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reviewed-plan
+
+      - name: Terraform apply reviewed plan
+        working-directory: infrastructure/terraform/environments/${{ inputs.environment }}
+        shell: bash
+        env:
+          PLAN_FILE: ${{ runner.temp }}/reviewed-plan/terraform-${{ inputs.environment }}.tfplan
+        run: |
+          set -euo pipefail
+          log_file="${RUNNER_TEMP}/terraform-apply-${{ inputs.environment }}.log"
+          if ! terraform apply -auto-approve "${PLAN_FILE}" >"${log_file}" 2>&1; then
+            echo "Terraform apply failed. Inspect GCP audit logs or reproduce locally; raw output is suppressed to protect infrastructure details." >&2
+            exit 1
+          fi
+          echo "Terraform apply completed for ${{ inputs.environment }}."
