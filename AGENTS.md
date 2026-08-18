@@ -31,8 +31,6 @@ AI Agent는 아래 우선순위를 따른다.
 
 - Production branch: `main`
 - Development branch: `dev`
-- Pull Request target/base branch: `main` only
-- Every Pull Request must target `main`. The existence of `dev` as the development branch does not make it a Pull Request target/base branch.
 - Feature and task branches use this format:
 
 ```text
@@ -49,6 +47,18 @@ fix/12-login-error
 
 The branch prefix must follow the commit type list below.
 The feature name after the issue number must be written in English.
+
+### Pull Request And Deployment Flow
+
+The project uses `dev` as the integration branch and `main` as the production-release branch.
+
+1. Create feature and task branches from `dev`.
+2. Open feature and task Pull Requests with `dev` as the base branch.
+3. Merge approved Pull Requests into `dev`, then use the development server for development QA and stabilization.
+4. After the changes on `dev` have passed the required QA and stabilization, open a release Pull Request from `dev` to `main`.
+5. Merge the approved release Pull Request into `main` to deploy the code to the production service.
+
+Agents must not open a feature or task Pull Request directly to `main`. A Pull Request targeting `main` is reserved for promoting the stabilized `dev` branch to production, unless the user explicitly directs an exceptional production-hotfix flow.
 
 ### Commit Types
 
@@ -168,6 +178,9 @@ Repository rules:
 ## CI/CD
 
 CI/CD is managed with GitHub Actions.
+
+- Changes merged into `dev` are deployed to the development server for QA and stabilization.
+- Changes merged into `main` are deployed to the production service.
 
 Agent should use the `ci` commit type for changes to GitHub Actions workflows, pipeline scripts, deployment automation, or CI/CD configuration.
 
