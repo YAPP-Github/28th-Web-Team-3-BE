@@ -2,6 +2,7 @@ package backend.yapp.core.onboarding.service
 
 import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
+import backend.yapp.core.goal.domain.GoalRepository
 import backend.yapp.core.onboarding.domain.OnboardingProfile
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.OnboardingStatus
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class OnboardingProfileService(
     private val profileRepository: OnboardingProfileRepository,
+    private val goalRepository: GoalRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
@@ -35,7 +37,27 @@ class OnboardingProfileService(
         val profile = profileRepository.findByGuestUserId(guestUserId)
             ?: OnboardingProfile(guestUserId = guestUserId)
         applyFields(profile, command)
-        return profileRepository.save(profile)
+        val saved = profileRepository.save(profile)
+        syncGoalFromProfile(saved)
+        return saved
+    }
+
+    /**
+     * 내 정보 수정 값을 확정된 목표(Goal)에 반영한다: 순자산→base, 목표기간→기간, 월저축액→매달 모을 금액.
+     * 목표금액 = 순자산 + (매달 모을 금액 × 목표기간)으로 재계산한다.
+     * 아직 목표가 없으면(온보딩 미확정) 아무것도 하지 않는다.
+     */
+    private fun syncGoalFromProfile(profile: OnboardingProfile) {
+        val goal = goalRepository.findByGuestUserId(profile.guestUserId) ?: return
+        val monthly = profile.monthlySavingManwon ?: goal.monthlyTargetManwon
+        val period = profile.goalPeriodMonths ?: goal.periodMonths
+        val base = profile.netWorthManwon ?: 0
+        goal.baseAmountManwon = base
+        goal.periodMonths = period
+        goal.monthlyTargetManwon = monthly
+        goal.targetAmountManwon = base + monthly * period
+        goal.updatedAt = clock.instant()
+        goalRepository.save(goal)
     }
 
     private fun applyFields(profile: OnboardingProfile, command: ProfilePatchCommand) {

@@ -23,9 +23,9 @@ class Goal(
     @Column(name = "period_months", nullable = false)
     var periodMonths: Int,
     @Column(name = "monthly_target_manwon", nullable = false)
-    val monthlyTargetManwon: Int,
+    var monthlyTargetManwon: Int,
     @Column(name = "base_amount_manwon", nullable = false)
-    val baseAmountManwon: Int,
+    var baseAmountManwon: Int,
     @Column(name = "started_at", nullable = false)
     val startedAt: Instant,
     @Column(name = "created_at", nullable = false)
