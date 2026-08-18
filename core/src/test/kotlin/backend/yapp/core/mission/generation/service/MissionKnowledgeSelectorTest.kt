@@ -16,8 +16,8 @@ class MissionKnowledgeSelectorTest {
     }
 
     @Test
-    fun `five or fewer candidates are all selected in their original order`() {
-        val candidates = (1L..5L).map(::knowledge)
+    fun `one candidate is selected as is`() {
+        val candidates = listOf(knowledge(1))
 
         val selection = MissionKnowledgeSelector.select(JOB_ID, candidates)
 
@@ -26,16 +26,16 @@ class MissionKnowledgeSelectorTest {
     }
 
     @Test
-    fun `more than five candidates select the same unique five for the same job`() {
+    fun `more than one candidate selects the same one for the same job`() {
         val candidates = (1L..9L).map(::knowledge)
 
         val first = MissionKnowledgeSelector.select(JOB_ID, candidates)
         val retry = MissionKnowledgeSelector.select(JOB_ID, candidates.reversed())
 
-        assertEquals(5, first.knowledge.size)
-        assertEquals(5, first.knowledge.distinctBy { it.id }.size)
+        assertEquals(1, first.knowledge.size)
+        assertEquals(1, first.knowledge.distinctBy { it.id }.size)
         assertEquals(first.knowledge, retry.knowledge)
-        assertEquals(MissionKnowledgeSelectionPolicy.DETERMINISTIC_RANDOM_5, first.policy)
+        assertEquals(MissionKnowledgeSelectionPolicy.DETERMINISTIC_RANDOM_1, first.policy)
     }
 
     private fun knowledge(id: Long) = MissionKnowledge(id, "지식 $id", null, null, null, null)
