@@ -12,8 +12,11 @@ import backend.yapp.core.mission.generation.domain.MissionStatus
 import backend.yapp.core.mission.generation.domain.MissionWeeklyCompletion
 import backend.yapp.core.mission.generation.domain.MissionWeeklyCompletionRepository
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,7 +27,6 @@ class MissionLifecycleService(
     private val manualRepository: ManualMissionRepository,
     private val weeklyCompletionRepository: MissionWeeklyCompletionRepository,
     private val clock: Clock,
-    private val weekCalendar: MissionWeekCalendar,
 ) {
     @Transactional(readOnly = true)
     fun list(
@@ -138,9 +140,10 @@ class MissionLifecycleService(
             ?.takeIf { it.deletedAt == null }
             ?: throw BaseException(ErrorCode.MISSION_NOT_FOUND)
 
-    private fun currentWeekStart(): LocalDate = weekCalendar.currentWeekStart()
+    private fun currentWeekStart(): LocalDate =
+        clock.instant().atZone(SEOUL).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
-    private fun weekEnd(weekStart: LocalDate): Instant = weekCalendar.weekEndExclusive(weekStart)
+    private fun weekEnd(weekStart: LocalDate): Instant = weekStart.plusWeeks(1).atStartOfDay(SEOUL).toInstant()
 
     private fun Mission.toSnapshot(completed: Boolean, weekStart: LocalDate) = LifecycleMissionSnapshot(
         id = id,
@@ -174,6 +177,7 @@ class MissionLifecycleService(
 
     companion object {
         private const val MAX_MANUAL_MISSION_TEXT_LENGTH = 30
+        private val SEOUL: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }
 

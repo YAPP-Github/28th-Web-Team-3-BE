@@ -98,17 +98,6 @@ interface MissionRepository : JpaRepository<Mission, UUID> {
     fun findAllByJobIdOrderByCreatedAtAsc(jobId: UUID): List<Mission>
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
     fun findAllByGuestUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(guestUserId: Long): List<Mission>
-    @Query(
-        "select mission from Mission mission " +
-            "where mission.guestUserId = :guestUserId " +
-            "and mission.createdAt < :rangeEnd " +
-            "and (mission.deletedAt is null or mission.deletedAt >= :rangeStart)",
-    )
-    fun findAllOverlappingHistoryPeriod(
-        @Param("guestUserId") guestUserId: Long,
-        @Param("rangeStart") rangeStart: Instant,
-        @Param("rangeEnd") rangeEnd: Instant,
-    ): List<Mission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): Mission?
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select mission from Mission mission where mission.id = :id and mission.guestUserId = :guestUserId")
@@ -125,17 +114,6 @@ interface ManualMissionRepository : JpaRepository<ManualMission, UUID> {
     fun deleteByGuestUserId(@Param("guestUserId") guestUserId: Long): Int
     fun findAllByGuestUserIdOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
     fun findAllByGuestUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(guestUserId: Long): List<ManualMission>
-    @Query(
-        "select mission from ManualMission mission " +
-            "where mission.guestUserId = :guestUserId " +
-            "and mission.createdAt < :rangeEnd " +
-            "and (mission.deletedAt is null or mission.deletedAt >= :rangeStart)",
-    )
-    fun findAllOverlappingHistoryPeriod(
-        @Param("guestUserId") guestUserId: Long,
-        @Param("rangeStart") rangeStart: Instant,
-        @Param("rangeEnd") rangeEnd: Instant,
-    ): List<ManualMission>
     fun findByIdAndGuestUserId(id: UUID, guestUserId: Long): ManualMission?
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select mission from ManualMission mission where mission.id = :id and mission.guestUserId = :guestUserId")
