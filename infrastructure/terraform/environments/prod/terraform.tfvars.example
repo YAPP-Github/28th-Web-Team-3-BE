@@ -1,0 +1,13 @@
+project_id          = "<prod-project-id>"
+region              = "<gcp-region>"
+state_bucket_name   = "prod-<globally-unique-state-bucket>"
+jwt_issuer          = "<prod-jwt-issuer>"
+jwt_audience        = "<prod-jwt-audience>"
+server_url          = ""
+bootstrap_image_uri = null
+
+# Set true only after required GitHub Environment Secrets have been synced.
+enable_runtime_services = false
+scheduler_paused        = true
+enable_ai              = true
+enable_policy_import   = true
