@@ -129,6 +129,14 @@ class OnboardingAcceptanceTest(
             .andExpect(jsonPath("$.birthDate").value("2002-10-24"))
             .andExpect(jsonPath("$.monthlySavingManwon").value(150))
             .andExpect(jsonPath("$.netWorthManwon").value(5000))
+
+        // 내 정보 수정이 메인 목표에도 반영된다: 순자산 5000, 매달 150, 36개월 → 목표 = 5000 + 150×36 = 10400
+        mockMvc.perform(get("/api/goal").header("Authorization", "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.targetAmountManwon").value(10400))
+            .andExpect(jsonPath("$.periodMonths").value(36))
+            .andExpect(jsonPath("$.baseAmountManwon").value(5000))
+            .andExpect(jsonPath("$.thisMonth.targetManwon").value(150))
     }
 
     @Test
