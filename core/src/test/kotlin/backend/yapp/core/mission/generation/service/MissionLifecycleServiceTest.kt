@@ -46,11 +46,13 @@ class MissionLifecycleServiceTest {
 
     private fun fixture(): Fixture {
         val missionRepository = mock(MissionRepository::class.java)
+        val clock = Clock.fixed(NOW, ZoneOffset.UTC)
         val service = MissionLifecycleService(
             missionRepository = missionRepository,
             manualRepository = mock(ManualMissionRepository::class.java),
             weeklyCompletionRepository = mock(MissionWeeklyCompletionRepository::class.java),
-            clock = Clock.fixed(NOW, ZoneOffset.UTC),
+            clock = clock,
+            weekCalendar = MissionWeekCalendar(clock),
         )
         return Fixture(service, missionRepository)
     }
