@@ -50,11 +50,11 @@ class MissionAlternativeGeneratorsTest {
         assertEquals("포장 주문으로 {count}번의 배달비 줄이기", result.alternatives.first().titleTemplate)
         assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "주간 실행 횟수")
         assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "{count}회 또는 {count}번")
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "세 대안 모두")
+        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "서로 다른 대안 1~3개")
     }
 
     @Test
-    fun `instructs the model to use one knowledge only for the first alternative`() {
+    fun `instructs the model to generate alternatives within provided knowledge`() {
         val model = StubChatModel(validAlternativesResponse())
         val generator = SpringAiMissionAlternativeGenerator(ChatClient.builder(model).build())
 
@@ -70,8 +70,7 @@ class MissionAlternativeGeneratorsTest {
 
         val systemMessage = checkNotNull(model.lastPrompt.getSystemMessage().text)
         val userMessage = checkNotNull(model.lastPrompt.getUserMessage().text)
-        assertContains(systemMessage, "첫 번째 대안만 그 지식에 근거")
-        assertContains(systemMessage, "두 번째와 세 번째 대안은")
+        assertContains(systemMessage, "제공된 지식이 있으면 그 범위 안에서 구체적인 미션을 생성")
         assertContains(userMessage, "knowledgeId=7")
         assertContains(userMessage, "항목=편의점 | 사용자=20대 서울 | 소비=3회 30000원")
     }
