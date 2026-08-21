@@ -23,6 +23,7 @@ import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.UUID
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -34,6 +35,7 @@ class MissionGenerationService(
     private val onboardingProfileRepository: OnboardingProfileRepository,
     private val clock: Clock,
     private val outboxRepository: MissionGenerationOutboxRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun request(
@@ -79,7 +81,7 @@ class MissionGenerationService(
                 createdAt = now,
             ),
         )
-        outboxRepository.save(
+        val outbox = outboxRepository.save(
             MissionGenerationOutbox(
                 id = UUID.randomUUID(),
                 jobId = job.id,
@@ -87,6 +89,7 @@ class MissionGenerationService(
                 createdAt = now,
             ),
         )
+        eventPublisher.publishEvent(MissionGenerationOutboxCreatedEvent(outbox.id))
         return job.toSnapshot()
     }
 

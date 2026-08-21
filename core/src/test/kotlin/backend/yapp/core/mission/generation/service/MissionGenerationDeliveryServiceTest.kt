@@ -90,6 +90,28 @@ class MissionGenerationDeliveryServiceTest {
         assertTrue(events.contains(MissionGenerationLatencyStage.DISPATCH to MissionGenerationLatencyOutcome.FAILED))
     }
 
+    @Test
+    fun `one-row immediate claim shares the scheduler outbox claim rule`() {
+        val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)
+        val outbox = MissionGenerationOutbox(
+            id = UUID.randomUUID(),
+            jobId = UUID.randomUUID(),
+            nextAttemptAt = now,
+            createdAt = now,
+        )
+        `when`(outboxRepository.findByIdForUpdate(outbox.id)).thenReturn(outbox)
+        val transactions = MissionGenerationDeliveryTransactions(
+            outboxRepository,
+            java.time.Clock.fixed(now, java.time.ZoneOffset.UTC),
+        )
+
+        val first = transactions.claimById(outbox.id)
+        val second = transactions.claimById(outbox.id)
+
+        assertTrue(first != null)
+        assertEquals(null, second)
+    }
+
     private fun fixture(attemptCount: Int): Fixture {
         val jobRepository = mock(MissionGenerationJobRepository::class.java)
         val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)

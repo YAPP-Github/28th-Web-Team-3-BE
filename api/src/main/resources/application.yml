@@ -79,6 +79,9 @@ mission:
       queue: ${MISSION_GENERATION_DELIVERY_QUEUE:mission-generation}
       worker-url: ${MISSION_GENERATION_WORKER_URL:}
       oidc-service-account: ${MISSION_GENERATION_TASKS_OIDC_SERVICE_ACCOUNT:}
+    immediate-delivery:
+      enabled: ${MISSION_GENERATION_IMMEDIATE_DELIVERY_ENABLED:false}
+      publish-deadline: ${MISSION_GENERATION_IMMEDIATE_DELIVERY_PUBLISH_DEADLINE:PT0.5S}
     prompt:
       version: ${MISSION_PROMPT_VERSION:mission-copy-v1}
       system-instruction: >-

@@ -2,13 +2,16 @@ package backend.yapp.infra.mission.generation
 
 import backend.yapp.core.mission.generation.port.MissionGenerationTaskPublisher
 import com.google.api.gax.rpc.AlreadyExistsException
+import com.google.api.gax.grpc.GrpcCallContext
 import com.google.cloud.tasks.v2.CloudTasksClient
+import com.google.cloud.tasks.v2.CreateTaskRequest
 import com.google.cloud.tasks.v2.HttpMethod
 import com.google.cloud.tasks.v2.HttpRequest
 import com.google.cloud.tasks.v2.OidcToken
 import com.google.cloud.tasks.v2.QueueName
 import com.google.cloud.tasks.v2.Task
 import com.google.protobuf.Duration
+import java.time.Duration as JavaDuration
 import java.util.UUID
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
@@ -25,7 +28,11 @@ class MissionGenerationDeliveryConfig {
     fun cloudTasksMissionGenerationPublisher(
         client: CloudTasksClient,
         properties: MissionGenerationProperties,
-    ): MissionGenerationTaskPublisher = CloudTasksMissionGenerationPublisher(client, properties.delivery)
+    ): MissionGenerationTaskPublisher = CloudTasksMissionGenerationPublisher(
+        client,
+        properties.delivery,
+        properties.immediateDelivery.publishDeadline,
+    )
 
     @Bean
     @ConditionalOnProperty(
@@ -41,6 +48,7 @@ class MissionGenerationDeliveryConfig {
 class CloudTasksMissionGenerationPublisher(
     private val client: CloudTasksClient,
     private val properties: DeliveryProperties,
+    private val publishDeadline: JavaDuration = JavaDuration.ofMillis(500),
 ) : MissionGenerationTaskPublisher {
     init {
         require(properties.projectId.isNotBlank()) { "Cloud Tasks project id is required" }
@@ -68,7 +76,10 @@ class CloudTasksMissionGenerationPublisher(
             .setDispatchDeadline(Duration.newBuilder().setSeconds(300))
             .build()
         try {
-            client.createTask(queueName, task)
+            client.createTaskCallable().call(
+                CreateTaskRequest.newBuilder().setParent(queueName.toString()).setTask(task).build(),
+                GrpcCallContext.createDefault().withTimeoutDuration(publishDeadline),
+            )
         } catch (_: AlreadyExistsException) {
             // A prior publish succeeded but its outbox acknowledgement was lost.
         }
