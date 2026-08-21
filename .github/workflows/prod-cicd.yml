@@ -288,11 +288,11 @@ jobs:
             --format='value(spec.timeoutSeconds)')"
           worker_env_json="$(gcloud run revisions describe "${worker_revision}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='json(spec.containers[0].env)')"
+            --format=json)"
           worker_hikari_max="$(printf '%s' "${worker_env_json}" | jq -er \
-            '.[] | select(.name == "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE") | .value')"
+            '.spec.containers[0].env[] | select(.name == "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE") | .value')"
           worker_hikari_min_idle="$(printf '%s' "${worker_env_json}" | jq -er \
-            '.[] | select(.name == "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE") | .value')"
+            '.spec.containers[0].env[] | select(.name == "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE") | .value')"
           worker_url="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(status.url)')"
@@ -307,7 +307,7 @@ jobs:
           test "${queue_concurrent_dispatches}" = "${MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES}"
           test "${worker_service_min}" = 1
           test "${worker_service_max}" = "${MISSION_WORKER_MAX_INSTANCES}"
-          test "${dispatcher_service_min}" = 0
+          test -z "${dispatcher_service_min}" || test "${dispatcher_service_min}" = 0
           test -z "${worker_revision_min}" || test "${worker_revision_min}" = 0
           test "${worker_cpu_boost}" = true
           test "${worker_concurrency}" = 1
