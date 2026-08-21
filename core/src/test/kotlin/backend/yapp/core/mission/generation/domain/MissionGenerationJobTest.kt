@@ -25,6 +25,8 @@ class MissionGenerationJobTest {
         assertEquals(MissionGenerationJobStatus.SUCCEEDED, job.status)
         assertEquals(null, job.activeGenerationKey)
         assertEquals(MissionDraftGenerationSource.MOCK, job.generationSource)
+        assertEquals(now.plusSeconds(1), job.workerStartedAt)
+        assertEquals(now.plusSeconds(2), job.completedAt)
         assertFalse(job.isExpired(now.plusSeconds(3_599)))
         assertTrue(job.isExpired(now.plusSeconds(3_600)))
     }
@@ -51,6 +53,7 @@ class MissionGenerationJobTest {
         assertEquals(MissionGenerationJobStatus.FAILED, job.status)
         assertEquals("FIRST", job.failureCode)
         assertEquals(null, job.activeGenerationKey)
+        assertEquals(now.plusSeconds(1), job.completedAt)
     }
 
     private fun job(): MissionGenerationJob =

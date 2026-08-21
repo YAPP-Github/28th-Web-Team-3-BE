@@ -42,6 +42,7 @@ class MissionGenerationWorkServiceTest {
         val job = mock(MissionGenerationJob::class.java)
         val template = mock(MissionDraftTemplate::class.java)
         `when`(jobs.findByIdForUpdate(work.jobId)).thenReturn(job)
+        `when`(job.createdAt).thenReturn(clock.instant())
         `when`(job.ownsLease(work.leaseToken, clock.instant())).thenReturn(true)
         `when`(templates.findByTargetCodeAndActiveTrue(work.item.name)).thenReturn(template)
         `when`(template.id).thenReturn(1L)

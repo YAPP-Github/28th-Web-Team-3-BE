@@ -32,7 +32,7 @@ class MissionGenerationAcceptanceTest(
     fun `one item request creates deterministic candidates and same item can be generated again`() {
         val token = readyGuestToken()
         val firstJobId = requestJob(token)
-        executor.execute(UUID.fromString(firstJobId))
+        executor.execute(UUID.fromString(firstJobId), 1)
 
         val draftsJson = mockMvc.perform(
             get("$GENERATION_PATH/$firstJobId/drafts").header(AUTHORIZATION, "Bearer $token"),
@@ -125,7 +125,7 @@ class MissionGenerationAcceptanceTest(
         ).andExpect(status().isAccepted).andReturn().response.contentAsString
         val jobId = JsonPath.read<String>(response, "$.jobId")
 
-        executor.execute(UUID.fromString(jobId))
+        executor.execute(UUID.fromString(jobId), 1)
 
         dataSource.connection.use { connection ->
             connection.prepareStatement(

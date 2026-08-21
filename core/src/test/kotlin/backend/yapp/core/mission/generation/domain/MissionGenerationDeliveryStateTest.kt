@@ -23,6 +23,7 @@ class MissionGenerationDeliveryStateTest {
         assertTrue(job.claim(now.plus(Duration.ofMinutes(10)), second, Duration.ofMinutes(10)))
         assertEquals(2, job.attemptCount)
         assertEquals(second, job.leaseToken)
+        assertEquals(now, job.workerStartedAt)
     }
 
     @Test
@@ -41,6 +42,7 @@ class MissionGenerationDeliveryStateTest {
         assertEquals(MissionGenerationJobStatus.FAILED, job.status)
         assertEquals("MISSION_GENERATION_RETRY_EXHAUSTED", job.failureCode)
         assertNull(job.activeGenerationKey)
+        assertEquals(now, job.completedAt)
     }
 
     @Test
@@ -54,6 +56,19 @@ class MissionGenerationDeliveryStateTest {
         assertEquals(MissionGenerationJobStatus.PENDING, job.status)
         assertNull(job.leaseToken)
         assertNull(job.leaseExpiresAt)
+    }
+
+    @Test
+    fun `retry does not overwrite the first worker start timestamp`() {
+        val job = MissionGenerationJob(UUID.randomUUID(), 1L, createdAt = now)
+        val firstToken = UUID.randomUUID()
+        val secondToken = UUID.randomUUID()
+
+        assertTrue(job.claim(now, firstToken, Duration.ofMinutes(10)))
+        assertTrue(job.releaseOrFail(firstToken, now.plusSeconds(1), 5))
+        assertTrue(job.claim(now.plusSeconds(2), secondToken, Duration.ofMinutes(10)))
+
+        assertEquals(now, job.workerStartedAt)
     }
 
     @Test
@@ -73,6 +88,7 @@ class MissionGenerationDeliveryStateTest {
 
         assertEquals(MissionGenerationJobStatus.FAILED, job.status)
         assertEquals("MISSION_GENERATION_RETRY_EXHAUSTED", job.failureCode)
+        assertEquals(now, job.completedAt)
     }
 
     @Test

@@ -55,6 +55,7 @@ class CloudTasksMissionGenerationPublisher(
         val request = HttpRequest.newBuilder()
             .setHttpMethod(HttpMethod.POST)
             .setUrl("${properties.workerUrl.trimEnd('/')}/internal/mission-generation/jobs/$jobId/execute")
+            .putHeaders("X-Mission-Generation", generation.toString())
             .setOidcToken(
                 OidcToken.newBuilder()
                     .setServiceAccountEmail(properties.oidcServiceAccount)

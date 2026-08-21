@@ -41,6 +41,7 @@ class MissionGenerationDispatchService(
 class MissionGenerationDeliveryTransactions(
     private val outboxRepository: MissionGenerationOutboxRepository,
     private val clock: Clock,
+    private val latencyRecorder: MissionGenerationLatencyRecorder = NoopMissionGenerationLatencyRecorder,
 ) {
     @Transactional
     fun claimDue(): List<MissionGenerationOutboxTask> {
@@ -55,12 +56,34 @@ class MissionGenerationDeliveryTransactions(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun markPublished(id: UUID, claimToken: UUID, taskName: String) {
-        outboxRepository.findByIdForUpdate(id)?.published(claimToken, taskName, clock.instant())
+        val now = clock.instant()
+        outboxRepository.findByIdForUpdate(id)
+            ?.takeIf { it.published(claimToken, taskName, now) }
+            ?.let { outbox ->
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.DISPATCH,
+                    MissionGenerationLatencyOutcome.SUCCEEDED,
+                    null,
+                    Duration.between(outbox.createdAt, now),
+                    outbox.jobId,
+                )
+            }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun markRetry(id: UUID, claimToken: UUID, error: String) {
-        outboxRepository.findByIdForUpdate(id)?.retry(claimToken, error, clock.instant(), OUTBOX_RETRY_DELAY)
+        val now = clock.instant()
+        outboxRepository.findByIdForUpdate(id)
+            ?.takeIf { it.retry(claimToken, error, now, OUTBOX_RETRY_DELAY) }
+            ?.let { outbox ->
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.DISPATCH,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    null,
+                    Duration.between(outbox.createdAt, now),
+                    outbox.jobId,
+                )
+            }
     }
 
     companion object {

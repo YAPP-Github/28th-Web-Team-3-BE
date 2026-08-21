@@ -10,6 +10,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -62,6 +63,31 @@ class MissionGenerationDeliveryServiceTest {
         assertEquals(1, result.requeued)
         verify(transaction, times(1)).reconcile(first, now)
         verify(transaction, times(1)).reconcile(second, now)
+    }
+
+    @Test
+    fun `failed task publication records a bounded dispatch failure duration`() {
+        val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)
+        val outbox = MissionGenerationOutbox(
+            id = UUID.randomUUID(),
+            jobId = UUID.randomUUID(),
+            nextAttemptAt = now,
+            createdAt = now.minusSeconds(2),
+        )
+        val token = UUID.randomUUID()
+        assertTrue(outbox.claim(now, Duration.ofMinutes(2), token))
+        `when`(outboxRepository.findByIdForUpdate(outbox.id)).thenReturn(outbox)
+        val events = mutableListOf<Pair<MissionGenerationLatencyStage, MissionGenerationLatencyOutcome>>()
+        val recorder = MissionGenerationLatencyRecorder { stage, outcome, _, _, _ -> events += stage to outcome }
+        val transactions = MissionGenerationDeliveryTransactions(
+            outboxRepository,
+            java.time.Clock.fixed(now.plusSeconds(1), java.time.ZoneOffset.UTC),
+            recorder,
+        )
+
+        transactions.markRetry(outbox.id, token, "provider unavailable")
+
+        assertTrue(events.contains(MissionGenerationLatencyStage.DISPATCH to MissionGenerationLatencyOutcome.FAILED))
     }
 
     private fun fixture(attemptCount: Int): Fixture {

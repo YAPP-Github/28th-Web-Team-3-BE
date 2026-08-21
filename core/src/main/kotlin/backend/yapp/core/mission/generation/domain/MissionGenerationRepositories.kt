@@ -45,7 +45,7 @@ interface MissionGenerationJobRepository : JpaRepository<MissionGenerationJob, U
     @Modifying
     @Query(
         "update MissionGenerationJob job set job.status = :failed, job.failureCode = :failureCode, " +
-            "job.activeGenerationKey = null, job.updatedAt = :now, " +
+            "job.activeGenerationKey = null, job.completedAt = coalesce(job.completedAt, :now), job.updatedAt = :now, " +
             "job.version = job.version + 1 " +
             "where job.status in :activeStatuses and job.updatedAt < :cutoff",
     )

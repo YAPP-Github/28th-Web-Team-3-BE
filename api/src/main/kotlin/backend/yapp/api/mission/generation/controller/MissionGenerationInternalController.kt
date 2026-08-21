@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -20,8 +21,11 @@ class MissionGenerationWorkerController(
     private val executor: MissionGenerationExecutor,
 ) {
     @PostMapping("/jobs/{jobId}/execute")
-    fun execute(@PathVariable jobId: UUID): ResponseEntity<Void> {
-        return when (executor.execute(jobId)) {
+    fun execute(
+        @PathVariable jobId: UUID,
+        @RequestHeader("X-Mission-Generation") generation: Int,
+    ): ResponseEntity<Void> {
+        return when (executor.execute(jobId, generation)) {
             MissionGenerationExecutionResult.ACTIVE_LEASE ->
                 ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build()
             MissionGenerationExecutionResult.COMPLETED,

@@ -22,6 +22,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -43,7 +44,7 @@ class MissionGenerationExecutorTest {
             .thenReturn(fixture.generated)
 
         executor(fixture)
-            .execute(fixture.work.jobId)
+            .execute(fixture.work.jobId, 1)
 
         verify(fixture.traceRecorder).record(
             MissionKnowledgeTrace(
@@ -77,7 +78,7 @@ class MissionGenerationExecutorTest {
         )
         `when`(fixture.generator.generate(generationRequest)).thenReturn(fixture.generated)
 
-        executor(fixture).execute(fixture.work.jobId)
+        executor(fixture).execute(fixture.work.jobId, 1)
 
         verify(fixture.verifier).verify(candidates)
         verify(fixture.generator).generate(generationRequest)
@@ -107,7 +108,7 @@ class MissionGenerationExecutorTest {
             .thenReturn(fixture.generated)
 
         executor(fixture)
-            .execute(fixture.work.jobId)
+            .execute(fixture.work.jobId, 1)
 
         verify(fixture.workService).complete(fixture.work, fixture.generated)
     }
@@ -126,12 +127,49 @@ class MissionGenerationExecutorTest {
         )
         `when`(fixture.generator.generate(generationRequest))
             .thenThrow(IllegalStateException("provider failed"))
+        `when`(fixture.workService.releaseOrFail(fixture.work))
+            .thenReturn(MissionGenerationReleaseResult(MissionGenerationLatencyOutcome.RETRY))
 
         assertFailsWith<IllegalStateException> {
-            executor(fixture).execute(fixture.work.jobId)
+            executor(fixture).execute(fixture.work.jobId, 1)
         }
 
         verify(fixture.workService).releaseOrFail(fixture.work)
+    }
+
+    @Test
+    fun `records bounded success stage durations without personal data`() {
+        val fixture = fixture()
+        val events = mutableListOf<MissionGenerationLatencyStage>()
+        val recorder = MissionGenerationLatencyRecorder { stage, _, _, duration, _ ->
+            assertTrue(duration.toMillis() >= 0)
+            events += stage
+        }
+        `when`(fixture.retriever.retrieve(fixture.request)).thenReturn(MissionKnowledgeRetrievalResult(emptyList(), 0))
+        `when`(fixture.verifier.verify(emptyList())).thenReturn(emptyList())
+        `when`(
+            fixture.generator.generate(
+                MissionAlternativeGenerationRequest(fixture.work.item, emptyList(), fixture.personalizationContext),
+            ),
+        ).thenReturn(fixture.generated)
+
+        MissionGenerationExecutor(
+            fixture.workService,
+            fixture.retriever,
+            fixture.verifier,
+            fixture.traceRecorder,
+            fixture.generator,
+            latencyRecorder = recorder,
+        ).execute(fixture.work.jobId, 1)
+
+        assertTrue(events.containsAll(listOf(
+            MissionGenerationLatencyStage.QUEUE,
+            MissionGenerationLatencyStage.RETRIEVAL,
+            MissionGenerationLatencyStage.VERIFICATION,
+            MissionGenerationLatencyStage.AI_GENERATION,
+            MissionGenerationLatencyStage.PERSISTENCE,
+            MissionGenerationLatencyStage.WORKER_TOTAL,
+        )))
     }
 
     private fun fixture(): Fixture {

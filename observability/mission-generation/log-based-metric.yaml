@@ -1,0 +1,32 @@
+# Template only: replace the three service placeholders from deployed revision variables
+# before applying. This repository does not apply GCP resources.
+name: mission_generation_stage_latency
+description: Mission-generation stage duration from safe application latency events.
+filter: >-
+  resource.type="cloud_run_revision"
+  AND (resource.labels.service_name="<API_CLOUD_RUN_SERVICE>"
+       OR resource.labels.service_name="<DISPATCHER_CLOUD_RUN_SERVICE>"
+       OR resource.labels.service_name="<WORKER_CLOUD_RUN_SERVICE>")
+  AND textPayload:"mission_generation_latency"
+valueExtractor: 'REGEXP_EXTRACT(textPayload, "duration_ms=([0-9]+)")'
+labelExtractors:
+  stage: 'REGEXP_EXTRACT(textPayload, "stage=([a-z_]+)")'
+  outcome: 'REGEXP_EXTRACT(textPayload, "outcome=([a-z_]+)")'
+  generation_source: 'REGEXP_EXTRACT(textPayload, "generation_source=([a-z_]+)")'
+bucketOptions:
+  explicitBuckets:
+    bounds: [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000]
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: ms
+  labels:
+    - key: stage
+      valueType: STRING
+      description: Bounded mission-generation stage name.
+    - key: outcome
+      valueType: STRING
+      description: Bounded stage outcome.
+    - key: generation_source
+      valueType: STRING
+      description: Bounded generation source, or none.

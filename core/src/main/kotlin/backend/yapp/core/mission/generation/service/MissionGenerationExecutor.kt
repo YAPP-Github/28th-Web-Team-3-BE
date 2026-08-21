@@ -5,6 +5,7 @@ import backend.yapp.core.mission.generation.domain.MissionDraftRepository
 import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
+import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
 import backend.yapp.core.mission.generation.domain.MissionItem
 import backend.yapp.core.mission.generation.domain.MissionMetricType
 import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
@@ -34,12 +35,34 @@ class MissionGenerationExecutor(
     private val knowledgeVerificationPort: MissionKnowledgeVerificationPort,
     private val knowledgeTracePort: MissionKnowledgeTracePort,
     private val alternativeGenerator: MissionAlternativeGenerationPort,
+    private val outboxRepository: MissionGenerationOutboxRepository? = null,
+    private val latencyRecorder: MissionGenerationLatencyRecorder = NoopMissionGenerationLatencyRecorder,
 ) {
-    fun execute(jobId: UUID): MissionGenerationExecutionResult {
+    fun execute(jobId: UUID, generation: Int): MissionGenerationExecutionResult {
+        val workerReceivedAt = workService.clock.instant()
+        recordQueueDelay(jobId, generation, workerReceivedAt)
         val work = when (val preparation = workService.prepare(jobId)) {
             is MissionGenerationPreparation.Claimed -> preparation.work
-            MissionGenerationPreparation.ActiveLease -> return MissionGenerationExecutionResult.ACTIVE_LEASE
-            MissionGenerationPreparation.Skipped -> return MissionGenerationExecutionResult.SKIPPED
+            MissionGenerationPreparation.ActiveLease -> {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.WORKER_TOTAL,
+                    MissionGenerationLatencyOutcome.DUPLICATE,
+                    null,
+                    Duration.between(workerReceivedAt, workService.clock.instant()),
+                    jobId,
+                )
+                return MissionGenerationExecutionResult.ACTIVE_LEASE
+            }
+            MissionGenerationPreparation.Skipped -> {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.WORKER_TOTAL,
+                    MissionGenerationLatencyOutcome.SKIPPED,
+                    null,
+                    Duration.between(workerReceivedAt, workService.clock.instant()),
+                    jobId,
+                )
+                return MissionGenerationExecutionResult.SKIPPED
+            }
         }
         try {
             val personalizationContext = MissionSearchQueryFactory.create(
@@ -50,6 +73,7 @@ class MissionGenerationExecutor(
                 baselineFrequency = work.baselineFrequency,
                 baselineAmountWon = work.baselineAmountWon,
             )
+            val retrievalStartedAt = workService.clock.instant()
             val retrieved = runCatching {
                 knowledgeRetrievalPort.retrieve(
                     MissionKnowledgeRetrievalRequest(
@@ -57,15 +81,47 @@ class MissionGenerationExecutor(
                         today = LocalDate.now(workService.clock),
                     ),
                 )
-            }.onFailure { exception ->
-                log.warn("mission_generation.knowledge_retrieval.failed item={}", work.item, exception)
+            }.onFailure {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.RETRIEVAL,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    null,
+                    Duration.between(retrievalStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
             }.getOrNull()
-            val verifiedIds = runCatching {
+            if (retrieved != null) {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.RETRIEVAL,
+                    MissionGenerationLatencyOutcome.SUCCEEDED,
+                    null,
+                    Duration.between(retrievalStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
+            }
+            val verificationStartedAt = workService.clock.instant()
+            val verification = runCatching {
                 knowledgeVerificationPort.verify(retrieved?.knowledge.orEmpty())
                     .mapTo(mutableSetOf()) { it.id }
-            }.onFailure { exception ->
-                log.warn("mission_generation.knowledge_verification.failed item={}", work.item, exception)
-            }.getOrDefault(emptySet())
+            }.onFailure {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.VERIFICATION,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    null,
+                    Duration.between(verificationStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
+            }
+            val verifiedIds = verification.getOrDefault(emptySet())
+            if (verification.isSuccess) {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.VERIFICATION,
+                    MissionGenerationLatencyOutcome.SUCCEEDED,
+                    null,
+                    Duration.between(verificationStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
+            }
             val verifiedKnowledge = retrieved?.knowledge.orEmpty().filter { it.id in verifiedIds }
             val selection = MissionKnowledgeSelector.select(work.jobId, verifiedKnowledge)
             runCatching {
@@ -79,8 +135,8 @@ class MissionGenerationExecutor(
                         selectionPolicy = selection.policy,
                     ),
                 )
-            }.onFailure { exception ->
-                log.warn("mission_generation.knowledge_trace.failed item={}", work.item, exception)
+            }.onFailure {
+                log.warn("mission_generation.knowledge_trace.failed")
             }
             log.info(
                 "mission_generation.knowledge.used item={} candidateCount={} verifiedCount={} selectedCount={} policy={}",
@@ -90,19 +146,100 @@ class MissionGenerationExecutor(
                 selection.knowledge.size,
                 selection.policy,
             )
-            val generated = alternativeGenerator.generate(
-                MissionAlternativeGenerationRequest(
-                    item = work.item,
-                    knowledgeContexts = selection.knowledge,
-                    personalizationContext = personalizationContext,
-                ),
+            val generationStartedAt = workService.clock.instant()
+            val generated = try {
+                alternativeGenerator.generate(
+                    MissionAlternativeGenerationRequest(
+                        item = work.item,
+                        knowledgeContexts = selection.knowledge,
+                        personalizationContext = personalizationContext,
+                    ),
+                )
+            } catch (exception: Exception) {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.AI_GENERATION,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    null,
+                    Duration.between(generationStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
+                throw exception
+            }
+            latencyRecorder.record(
+                MissionGenerationLatencyStage.AI_GENERATION,
+                MissionGenerationLatencyOutcome.SUCCEEDED,
+                generated.source,
+                Duration.between(generationStartedAt, workService.clock.instant()),
+                work.jobId,
             )
-            workService.complete(work, generated)
+            val persistenceStartedAt = workService.clock.instant()
+            val completion = try {
+                workService.complete(work, generated)
+            } catch (exception: Exception) {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.PERSISTENCE,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    generated.source,
+                    Duration.between(persistenceStartedAt, workService.clock.instant()),
+                    work.jobId,
+                )
+                throw exception
+            }
+            latencyRecorder.record(
+                MissionGenerationLatencyStage.PERSISTENCE,
+                if (completion == null) MissionGenerationLatencyOutcome.SKIPPED else MissionGenerationLatencyOutcome.SUCCEEDED,
+                generated.source,
+                Duration.between(persistenceStartedAt, workService.clock.instant()),
+                work.jobId,
+            )
+            latencyRecorder.record(
+                MissionGenerationLatencyStage.WORKER_TOTAL,
+                if (completion == null) MissionGenerationLatencyOutcome.SKIPPED else MissionGenerationLatencyOutcome.SUCCEEDED,
+                generated.source,
+                Duration.between(workerReceivedAt, workService.clock.instant()),
+                work.jobId,
+            )
+            completion?.let {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.END_TO_END,
+                    MissionGenerationLatencyOutcome.SUCCEEDED,
+                    it.source,
+                    Duration.between(it.createdAt, it.completedAt),
+                    work.jobId,
+                )
+            }
             return MissionGenerationExecutionResult.COMPLETED
         } catch (exception: Exception) {
-            workService.releaseOrFail(work)
+            val release = workService.releaseOrFail(work)
+            latencyRecorder.record(
+                MissionGenerationLatencyStage.WORKER_TOTAL,
+                release.outcome,
+                null,
+                Duration.between(workerReceivedAt, workService.clock.instant()),
+                work.jobId,
+            )
+            release.completion?.let {
+                latencyRecorder.record(
+                    MissionGenerationLatencyStage.END_TO_END,
+                    MissionGenerationLatencyOutcome.FAILED,
+                    null,
+                    Duration.between(it.createdAt, it.completedAt),
+                    work.jobId,
+                )
+            }
             throw exception
         }
+    }
+
+    private fun recordQueueDelay(jobId: UUID, generation: Int, receivedAt: java.time.Instant) {
+        val publishedAt = outboxRepository?.findByJobIdAndGeneration(jobId, generation)?.publishedAt
+        latencyRecorder.record(
+            MissionGenerationLatencyStage.QUEUE,
+            if (publishedAt == null) MissionGenerationLatencyOutcome.UNPAIRED else MissionGenerationLatencyOutcome.SUCCEEDED,
+            null,
+            publishedAt?.let { Duration.between(it, receivedAt) } ?: Duration.ZERO,
+            jobId,
+        )
     }
 
     companion object {
@@ -150,9 +287,9 @@ class MissionGenerationWorkService(
     fun complete(
         work: MissionGenerationWork,
         generated: MissionAlternativeGenerationResult,
-    ) {
-        val job = jobRepository.findByIdForUpdate(work.jobId) ?: return
-        if (!job.ownsLease(work.leaseToken, clock.instant())) return
+    ): MissionGenerationCompletion? {
+        val job = jobRepository.findByIdForUpdate(work.jobId) ?: return null
+        if (!job.ownsLease(work.leaseToken, clock.instant())) return null
         if (generated.alternatives.isEmpty() || generated.alternatives.size > MAX_ALTERNATIVES) {
             error("AI returned an invalid alternative count")
         }
@@ -189,12 +326,24 @@ class MissionGenerationWorkService(
         }
         draftRepository.saveAll(drafts)
         job.succeed(now, now.plus(DRAFT_TTL), generated.source)
+        return MissionGenerationCompletion(job.createdAt, now, generated.source)
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun releaseOrFail(work: MissionGenerationWork) {
-        jobRepository.findByIdForUpdate(work.jobId)
-            ?.releaseOrFail(work.leaseToken, clock.instant(), MAX_ATTEMPTS)
+    fun releaseOrFail(work: MissionGenerationWork): MissionGenerationReleaseResult {
+        val job = jobRepository.findByIdForUpdate(work.jobId)
+            ?: return MissionGenerationReleaseResult(MissionGenerationLatencyOutcome.SKIPPED)
+        if (!job.releaseOrFail(work.leaseToken, clock.instant(), MAX_ATTEMPTS)) {
+            return MissionGenerationReleaseResult(MissionGenerationLatencyOutcome.SKIPPED)
+        }
+        return if (job.status == MissionGenerationJobStatus.FAILED) {
+            MissionGenerationReleaseResult(
+                MissionGenerationLatencyOutcome.FAILED,
+                MissionGenerationCompletion(job.createdAt, checkNotNull(job.completedAt), null),
+            )
+        } else {
+            MissionGenerationReleaseResult(MissionGenerationLatencyOutcome.RETRY)
+        }
     }
 
     companion object {
@@ -216,6 +365,17 @@ data class MissionGenerationWork(
     val birthDate: LocalDate,
     val address: ResidentialArea?,
     val leaseToken: UUID,
+)
+
+data class MissionGenerationCompletion(
+    val createdAt: java.time.Instant,
+    val completedAt: java.time.Instant,
+    val source: MissionDraftGenerationSource?,
+)
+
+data class MissionGenerationReleaseResult(
+    val outcome: MissionGenerationLatencyOutcome,
+    val completion: MissionGenerationCompletion? = null,
 )
 
 sealed interface MissionGenerationPreparation {
