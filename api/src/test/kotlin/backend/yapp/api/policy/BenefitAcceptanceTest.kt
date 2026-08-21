@@ -112,11 +112,11 @@ class BenefitAcceptanceTest(
     }
 
     @Test
-    fun `tips are empty until data is added`() {
+    fun `tips are seeded and served`() {
         val token = issueGuestToken()
-        mockMvc.perform(get("/api/tips").header("Authorization", "Bearer $token"))
+        mockMvc.perform(get("/api/tips?size=100").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.length()").value(0))
+            .andExpect(jsonPath("$.length()").value(29))
     }
 
     @Test
