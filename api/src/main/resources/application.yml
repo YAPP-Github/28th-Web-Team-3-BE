@@ -22,7 +22,7 @@ spring:
     retry:
       max-attempts: ${SPRING_AI_RETRY_MAX_ATTEMPTS:1}
       backoff:
-        initial-interval: ${SPRING_AI_RETRY_INITIAL_INTERVAL:PT0.5S}
+        initial-interval: ${SPRING_AI_RETRY_INITIAL_INTERVAL:PT3S}
         multiplier: ${SPRING_AI_RETRY_MULTIPLIER:2}
         max-interval: ${SPRING_AI_RETRY_MAX_INTERVAL:PT2S}
 
