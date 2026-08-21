@@ -6,6 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
+import java.time.Duration
 import org.mockito.Mockito
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.model.ChatModel
@@ -82,6 +84,13 @@ class MissionAiInfrastructureConfigTest {
             .run { context ->
                 assertNotNull(context.startupFailure)
             }
+    }
+
+    @Test
+    fun `rejects a provider timeout over the worker attempt budget`() {
+        assertFailsWith<IllegalArgumentException> {
+            MissionGenerationProperties(providerTimeout = Duration.ofSeconds(61))
+        }
     }
 
     @Test

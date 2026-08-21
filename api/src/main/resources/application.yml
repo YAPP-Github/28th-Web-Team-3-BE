@@ -66,6 +66,7 @@ mission:
     scheduler-enabled: ${MISSION_LIFECYCLE_SCHEDULER_ENABLED:false}
   generation:
     ai-activation: ${AI_ACTIVATION:off}
+    provider-timeout: ${MISSION_GENERATION_PROVIDER_TIMEOUT:PT60S}
     rate-limit-retry:
       max-attempts: ${MISSION_GENERATION_RATE_LIMIT_RETRY_MAX_ATTEMPTS:3}
       initial-backoff: ${MISSION_GENERATION_RATE_LIMIT_RETRY_INITIAL_BACKOFF:PT0.5S}

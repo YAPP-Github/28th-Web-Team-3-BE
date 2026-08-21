@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties("mission.generation")
 data class MissionGenerationProperties(
     val aiActivation: String = "off",
+    val providerTimeout: Duration = Duration.ofSeconds(60),
     val executor: ExecutorProperties = ExecutorProperties(),
     val staleRunningTimeout: Duration = Duration.ofMinutes(10),
     val rateLimitRetry: MissionDraftRateLimitRetryProperties = MissionDraftRateLimitRetryProperties(),
@@ -13,7 +14,20 @@ data class MissionGenerationProperties(
     val recommendation: RecommendationProperties = RecommendationProperties(),
     val delivery: DeliveryProperties = DeliveryProperties(),
     val immediateDelivery: ImmediateDeliveryProperties = ImmediateDeliveryProperties(),
-)
+) {
+    init {
+        require(!providerTimeout.isNegative && !providerTimeout.isZero) {
+            "mission.generation.provider-timeout must be positive"
+        }
+        require(providerTimeout <= MAX_PROVIDER_TIMEOUT) {
+            "mission.generation.provider-timeout must not exceed $MAX_PROVIDER_TIMEOUT"
+        }
+    }
+
+    private companion object {
+        val MAX_PROVIDER_TIMEOUT: Duration = Duration.ofSeconds(60)
+    }
+}
 
 data class MissionDraftRateLimitRetryProperties(
     /** The total number of provider calls, including the initial call. */

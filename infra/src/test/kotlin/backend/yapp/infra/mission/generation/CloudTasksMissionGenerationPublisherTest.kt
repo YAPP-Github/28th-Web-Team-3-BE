@@ -54,7 +54,7 @@ class CloudTasksMissionGenerationPublisherTest {
         assertEquals("tasks-invoker@example.test", task.httpRequest.oidcToken.serviceAccountEmail)
         assertEquals("https://worker.example.test", task.httpRequest.oidcToken.audience)
         assertEquals("2", task.httpRequest.headersMap["X-Mission-Generation"])
-        assertEquals(300, task.dispatchDeadline.seconds)
+        assertEquals(90, task.dispatchDeadline.seconds)
         assertEquals(Duration.ofMillis(500), context.value.timeoutDuration)
     }
 }

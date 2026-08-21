@@ -77,6 +77,11 @@ jobs:
       MISSION_WORKER_RUNTIME_SERVICE_ACCOUNT: mission-worker-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT: mission-dispatcher-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       MISSION_QUEUE: mission-generation
+      MISSION_QUEUE_MAX_DISPATCHES_PER_SECOND: ${{ vars.MISSION_QUEUE_MAX_DISPATCHES_PER_SECOND || '1' }}
+      MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES: ${{ vars.MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES || '1' }}
+      MISSION_WORKER_MAX_INSTANCES: ${{ vars.MISSION_WORKER_MAX_INSTANCES || '1' }}
+      MISSION_WORKER_HIKARI_MAXIMUM_POOL_SIZE: ${{ vars.MISSION_WORKER_HIKARI_MAXIMUM_POOL_SIZE || '1' }}
+      MISSION_WORKER_HIKARI_MINIMUM_IDLE: ${{ vars.MISSION_WORKER_HIKARI_MINIMUM_IDLE || '0' }}
       NAVER_BLOG_AI_CONTEXT_COUNT: ${{ vars.NAVER_BLOG_AI_CONTEXT_COUNT || '15' }}
 
     steps:
@@ -136,7 +141,8 @@ jobs:
           fi
           gcloud tasks queues "${queue_command}" "${MISSION_QUEUE}" \
               --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
-              --max-attempts 5 --max-concurrent-dispatches 1 --max-dispatches-per-second 1 \
+              --max-attempts 5 --max-concurrent-dispatches "${MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES}" \
+              --max-dispatches-per-second "${MISSION_QUEUE_MAX_DISPATCHES_PER_SECOND}" \
               --min-backoff 10s --max-backoff 300s --quiet
           gcloud tasks queues add-iam-policy-binding "${MISSION_QUEUE}" \
             --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
@@ -172,10 +178,11 @@ jobs:
             --service-account "${MISSION_WORKER_RUNTIME_SERVICE_ACCOUNT}" \
             --memory "1Gi" \
             --concurrency 1 \
+            --max "${MISSION_WORKER_MAX_INSTANCES}" \
             --min-instances 0 \
             --cpu-boost \
-            --timeout 600 \
-            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-worker,AI_ACTIVATION=on,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,NAVER_BLOG_AI_CONTEXT_COUNT=${NAVER_BLOG_AI_CONTEXT_COUNT},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
+            --timeout 120 \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-worker,AI_ACTIVATION=on,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,MISSION_GENERATION_PROVIDER_TIMEOUT=PT60S,SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=${MISSION_WORKER_HIKARI_MAXIMUM_POOL_SIZE},SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=${MISSION_WORKER_HIKARI_MINIMUM_IDLE},NAVER_BLOG_AI_CONTEXT_COUNT=${NAVER_BLOG_AI_CONTEXT_COUNT},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest,SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_GENAI_API_KEY=GOOGLE_GENAI_API_KEY:latest,NAVER_BLOG_CLIENT_ID=NAVER_BLOG_CLIENT_ID:latest,NAVER_BLOG_CLIENT_SECRET=NAVER_BLOG_CLIENT_SECRET:latest" \
             --no-allow-unauthenticated \
             --quiet
@@ -249,9 +256,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          queue_dispatch_rate="$(gcloud tasks queues describe "${MISSION_QUEUE}" \
+            --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
+            --format='value(rateLimits.maxDispatchesPerSecond)')"
+          queue_concurrent_dispatches="$(gcloud tasks queues describe "${MISSION_QUEUE}" \
+            --project "${GCP_PROJECT_ID}" --location "${GCP_REGION}" \
+            --format='value(rateLimits.maxConcurrentDispatches)')"
           worker_service_min="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(metadata.annotations.run.googleapis.com/minScale)')"
+          worker_service_max="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+            --format='value(metadata.annotations.run.googleapis.com/maxScale)')"
           dispatcher_service_min="$(gcloud run services describe "${MISSION_DISPATCHER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(metadata.annotations.run.googleapis.com/minScale)')"
@@ -267,6 +283,16 @@ jobs:
           worker_concurrency="$(gcloud run revisions describe "${worker_revision}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(spec.containerConcurrency)')"
+          worker_timeout="$(gcloud run revisions describe "${worker_revision}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+            --format='value(spec.timeoutSeconds)')"
+          worker_env_json="$(gcloud run revisions describe "${worker_revision}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+            --format='json(spec.containers[0].env)')"
+          worker_hikari_max="$(printf '%s' "${worker_env_json}" | jq -er \
+            '.[] | select(.name == "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE") | .value')"
+          worker_hikari_min_idle="$(printf '%s' "${worker_env_json}" | jq -er \
+            '.[] | select(.name == "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE") | .value')"
           worker_url="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(status.url)')"
@@ -276,10 +302,17 @@ jobs:
             --flatten='bindings[].members' \
             --filter="bindings.role=roles/run.invoker AND bindings.members=serviceAccount:${tasks_invoker}" \
             --format='value(bindings.role)')"
+          awk -v actual="${queue_dispatch_rate}" -v expected="${MISSION_QUEUE_MAX_DISPATCHES_PER_SECOND}" \
+            'BEGIN { exit !(actual == expected) }'
+          test "${queue_concurrent_dispatches}" = "${MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES}"
           test "${worker_service_min}" = 1
+          test "${worker_service_max}" = "${MISSION_WORKER_MAX_INSTANCES}"
           test "${dispatcher_service_min}" = 0
           test -z "${worker_revision_min}" || test "${worker_revision_min}" = 0
           test "${worker_cpu_boost}" = true
           test "${worker_concurrency}" = 1
+          test "${worker_timeout}" = 120
+          test "${worker_hikari_max}" = "${MISSION_WORKER_HIKARI_MAXIMUM_POOL_SIZE}"
+          test "${worker_hikari_min_idle}" = "${MISSION_WORKER_HIKARI_MINIMUM_IDLE}"
           [[ "${worker_url}" == https://* ]]
           test "${worker_invoker_role}" = roles/run.invoker
