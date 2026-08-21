@@ -19,10 +19,12 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.context.ApplicationEventPublisher
 
 class MissionGenerationServiceTest {
     private val now = Instant.parse("2026-07-23T00:00:00Z")
@@ -71,6 +73,39 @@ class MissionGenerationServiceTest {
         verify(fixture.outboxRepository, never()).save(
             org.mockito.ArgumentMatchers.any(),
         )
+        verify(fixture.eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any())
+    }
+
+    @Test
+    fun `new generation publishes one outbox-created event for after-commit delivery`() {
+        val fixture = fixture()
+        `when`(fixture.onboardingRepository.findByGuestUserIdForUpdate(GUEST_USER_ID))
+            .thenReturn(
+                OnboardingProfile(
+                    GUEST_USER_ID,
+                    birthDate = LocalDate.of(2000, 1, 1),
+                    address = ResidentialArea.SEOUL,
+                    status = OnboardingStatus.COMPLETED,
+                ),
+            )
+        `when`(fixture.jobRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(MissionGenerationJob::class.java)))
+            .thenAnswer { invocation -> invocation.arguments[0] }
+        `when`(fixture.outboxRepository.save(org.mockito.ArgumentMatchers.any()))
+            .thenAnswer { invocation -> invocation.arguments[0] }
+
+        fixture.service.request(
+            GUEST_USER_ID,
+            MissionCategory.MEAL,
+            MissionItem.DELIVERY_FOOD,
+            1,
+            1,
+        )
+
+        val outbox = ArgumentCaptor.forClass(backend.yapp.core.mission.generation.domain.MissionGenerationOutbox::class.java)
+        verify(fixture.outboxRepository).save(outbox.capture())
+        val event = ArgumentCaptor.forClass(MissionGenerationOutboxCreatedEvent::class.java)
+        verify(fixture.eventPublisher).publishEvent(event.capture())
+        assertEquals(outbox.value.id, event.value.outboxId)
     }
 
     private fun fixture(): Fixture {
@@ -79,6 +114,7 @@ class MissionGenerationServiceTest {
         val draftRepository = mock(MissionDraftRepository::class.java)
         val missionRepository = mock(MissionRepository::class.java)
         val outboxRepository = mock(MissionGenerationOutboxRepository::class.java)
+        val eventPublisher = mock(ApplicationEventPublisher::class.java)
         val service = MissionGenerationService(
             jobRepository = jobRepository,
             draftRepository = draftRepository,
@@ -86,12 +122,14 @@ class MissionGenerationServiceTest {
             onboardingProfileRepository = onboardingRepository,
             clock = Clock.fixed(now, ZoneOffset.UTC),
             outboxRepository = outboxRepository,
+            eventPublisher = eventPublisher,
         )
         return Fixture(
             service,
             jobRepository,
             onboardingRepository,
             outboxRepository,
+            eventPublisher,
         )
     }
 
@@ -100,6 +138,7 @@ class MissionGenerationServiceTest {
         val jobRepository: MissionGenerationJobRepository,
         val onboardingRepository: OnboardingProfileRepository,
         val outboxRepository: MissionGenerationOutboxRepository,
+        val eventPublisher: ApplicationEventPublisher,
     )
 
     companion object {

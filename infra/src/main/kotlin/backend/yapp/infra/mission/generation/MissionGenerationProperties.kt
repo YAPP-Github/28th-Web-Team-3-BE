@@ -12,6 +12,7 @@ data class MissionGenerationProperties(
     val prompt: MissionPromptProperties = MissionPromptProperties(),
     val recommendation: RecommendationProperties = RecommendationProperties(),
     val delivery: DeliveryProperties = DeliveryProperties(),
+    val immediateDelivery: ImmediateDeliveryProperties = ImmediateDeliveryProperties(),
 )
 
 data class MissionDraftRateLimitRetryProperties(
@@ -37,6 +38,17 @@ data class DeliveryProperties(
     val workerUrl: String = "",
     val oidcServiceAccount: String = "",
 )
+
+data class ImmediateDeliveryProperties(
+    val enabled: Boolean = false,
+    val publishDeadline: Duration = Duration.ofMillis(500),
+) {
+    init {
+        require(!publishDeadline.isNegative && !publishDeadline.isZero) {
+            "mission.generation.immediate-delivery.publish-deadline must be positive"
+        }
+    }
+}
 
 data class MissionPromptProperties(
     val version: String = "mission-copy-v1",

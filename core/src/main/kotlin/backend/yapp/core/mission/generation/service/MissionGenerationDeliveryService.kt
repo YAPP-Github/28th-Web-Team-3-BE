@@ -55,6 +55,18 @@ class MissionGenerationDeliveryTransactions(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun claimById(outboxId: UUID): MissionGenerationOutboxTask? {
+        val now = clock.instant()
+        val outbox = outboxRepository.findByIdForUpdate(outboxId) ?: return null
+        val token = UUID.randomUUID()
+        return if (outbox.claim(now, OUTBOX_CLAIM_TIMEOUT, token)) {
+            MissionGenerationOutboxTask(outbox.id, outbox.jobId, outbox.generation, token)
+        } else {
+            null
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun markPublished(id: UUID, claimToken: UUID, taskName: String) {
         val now = clock.instant()
         outboxRepository.findByIdForUpdate(id)
