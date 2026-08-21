@@ -264,22 +264,22 @@ jobs:
             --format='value(rateLimits.maxConcurrentDispatches)')"
           worker_service_min="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='value(metadata.annotations.run.googleapis.com/minScale)')"
+            --format='value(metadata.annotations."run.googleapis.com/minScale")')"
           worker_service_max="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='value(metadata.annotations.run.googleapis.com/maxScale)')"
+            --format='value(metadata.annotations."run.googleapis.com/maxScale")')"
           dispatcher_service_min="$(gcloud run services describe "${MISSION_DISPATCHER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='value(metadata.annotations.run.googleapis.com/minScale)')"
+            --format='value(metadata.annotations."run.googleapis.com/minScale")')"
           worker_revision="$(gcloud run services describe "${MISSION_WORKER_SERVICE}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(status.latestReadyRevisionName)')"
           worker_revision_min="$(gcloud run revisions describe "${worker_revision}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='value(metadata.annotations.autoscaling.knative.dev/minScale)')"
+            --format='value(metadata.annotations."autoscaling.knative.dev/minScale")')"
           worker_cpu_boost="$(gcloud run revisions describe "${worker_revision}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
-            --format='value(metadata.annotations.run.googleapis.com/startup-cpu-boost)')"
+            --format='value(metadata.annotations."run.googleapis.com/startup-cpu-boost")')"
           worker_concurrency="$(gcloud run revisions describe "${worker_revision}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
             --format='value(spec.containerConcurrency)')"
