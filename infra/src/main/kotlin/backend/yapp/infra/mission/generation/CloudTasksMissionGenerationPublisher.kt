@@ -73,7 +73,7 @@ class CloudTasksMissionGenerationPublisher(
         val task = Task.newBuilder()
             .setName(taskName)
             .setHttpRequest(request)
-            .setDispatchDeadline(Duration.newBuilder().setSeconds(300))
+            .setDispatchDeadline(Duration.newBuilder().setSeconds(90))
             .build()
         try {
             client.createTaskCallable().call(

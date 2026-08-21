@@ -6,6 +6,9 @@ import backend.yapp.core.mission.generation.port.MissionSemanticRetriever
 import backend.yapp.core.mission.generation.port.MissionKnowledgeRetrievalPort
 import backend.yapp.core.mission.generation.port.MissionKnowledgeTracePort
 import backend.yapp.core.mission.generation.port.MissionKnowledgeVerificationPort
+import com.google.genai.Client
+import com.google.genai.types.HttpOptions
+import com.google.genai.types.HttpRetryOptions
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.embedding.EmbeddingModel
@@ -21,6 +24,28 @@ import tools.jackson.databind.ObjectMapper
 @Configuration
 @EnableConfigurationProperties(MissionGenerationProperties::class)
 class MissionAiInfrastructureConfig {
+    @Bean(destroyMethod = "close")
+    @ConditionalOnProperty(
+        prefix = "mission.generation",
+        name = ["ai-activation"],
+        havingValue = "on",
+    )
+    fun googleGenAiClient(
+        properties: MissionGenerationProperties,
+        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
+    ): Client {
+        validateGoogleGenAiAuthentication(apiKey)
+        return Client.builder()
+            .apiKey(apiKey)
+            .httpOptions(
+                HttpOptions.builder()
+                    .timeout(properties.providerTimeout.toMillis().toInt())
+                    .retryOptions(HttpRetryOptions.builder().attempts(1).build())
+                    .build(),
+            )
+            .build()
+    }
+
     @Bean
     fun missionKnowledgeRetriever(
         jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,

@@ -16,5 +16,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(testFixtures(project(":core")))
     testImplementation("org.springframework.security:spring-security-oauth2-jose")
+    testImplementation("com.google.genai:google-genai:1.58.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testRuntimeOnly("com.h2database:h2")
 }

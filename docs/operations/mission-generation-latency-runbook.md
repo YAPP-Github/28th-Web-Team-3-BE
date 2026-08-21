@@ -34,6 +34,14 @@ The workflow verifies the worker service minimum, dispatcher service minimum, la
 
 After an approved deployment, use the latency event from the observability rollout to compare an idle period of at least 15 minutes with a warm baseline. Record request receipt to first application event and total generation latency separately; a warm worker reduces the normal scale-from-zero startup segment, but does not guarantee a particular AI-generation duration. Record at least 24 hours of Cloud Run billable instance time and cost before estimating the steady-state impact.
 
+## Throughput rollout
+
+The production workflow keeps worker container concurrency at `1` and defines the initial stage through deployment variables: queue dispatch rate=`1`, queue concurrent dispatches=`1`, worker max instances=`1`, and worker Hikari maximum pool size=`1` (minimum idle=`0`). It also uses a 60-second provider transport timeout without SDK retries, a 90-second Cloud Tasks dispatch deadline, and a 120-second Cloud Run worker timeout. The worker's service-level minimum of `1` and startup CPU boost remain required.
+
+Do not set stage `2` or `3` values in repository defaults. After separate deployment and load-test approval, verify an approved Gemini quota/cost limit and the full DB/PgBouncer connection budget before raising all of queue rate, queue concurrency, and worker max instances together. The worker Hikari maximum pool must stay within that approved budget.
+
+At each stage, run the approved scenario at least three times and record p50/p95/p99, Gemini 429, job failures, Cloud Tasks delay, Cloud Run instances, and DB/PgBouncer connections. Keep the worker attempt within 75 seconds. Return to the previous stable values on any 429, job failure, Cloud Tasks/Worker 5xx increase, DB/pool saturation, more than 20% p95/p99 regression, warm end-to-end p95 above 30 seconds, or approved quota/cost overrun. While request-time knowledge verification remains enabled, record that it can contribute to worker time and quota use.
+
 ## Rollback
 
 For the worker-warmth rollback, use the same approved deployment path and set both services back to a service-level minimum of `0`:
@@ -44,5 +52,7 @@ gcloud run services update "${MISSION_DISPATCHER_SERVICE}" --project "${GCP_PROJ
 ```
 
 Then verify both service-level minima are `0` and the current worker revision's minimum is empty or `0`; leave startup CPU boost unchanged unless a separate latency/cost decision calls for changing it. The normal post-deploy check intentionally expects worker min=`1`, so do not use it to validate this rollback.
+
+For a throughput rollback, use the same approved deployment path and restore queue dispatch rate and concurrent dispatches, worker max instances, and worker Hikari maximum pool to the previous stable stage (initially all `1`; minimum idle=`0`). Confirm the resulting queue and worker revision settings with the post-deploy checks. A provider timeout that is caught by the worker releases the lease through the existing retry path; a forced process termination can retain its current lease until recovery, so do not shorten the lease below the Cloud Run timeout without a separate idempotency design review.
 
 For the observability rollback, disable the latency log filter and external metric/dashboard definitions first. Keep `worker_started_at` and `completed_at`: they are additive nullable columns and remain compatible with earlier application revisions.

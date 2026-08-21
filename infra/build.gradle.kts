@@ -21,4 +21,5 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     testImplementation("org.assertj:assertj-core")
     testImplementation("org.springframework.boot:spring-boot-test")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
