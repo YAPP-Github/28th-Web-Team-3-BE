@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
-@Tag(name = "Bookmark", description = "저장됨(북마크) 통합 목록. 유형(POLICY/TIP)·카테고리 필터.")
+@Tag(name = "Bookmark", description = "저장됨(북마크) 통합 목록. 유형(POLICY=혜택 / TIP=절약 팁)·카테고리 필터.")
 @RestController
 @RequestMapping("/api/bookmarks")
 class BookmarkController(
@@ -20,12 +20,12 @@ class BookmarkController(
 ) {
     @Operation(
         summary = "저장됨(북마크) 목록 조회",
-        description = "현재 게스트가 저장한 혜택·팁을 최신순으로 통합 조회한다. `type`(POLICY/TIP)·`category`로 필터링 가능.",
+        description = "현재 게스트가 저장한 혜택·절약 팁을 최신순으로 통합 조회한다. `type`(POLICY/TIP)·`category`로 필터링 가능.",
     )
     @GetMapping
     fun saved(
         @AuthenticationPrincipal guestUserId: Long,
-        @Parameter(description = "콘텐츠 유형 필터. POLICY 또는 TIP. 미지정 시 전체.")
+        @Parameter(description = "콘텐츠 유형 필터. POLICY(혜택) 또는 TIP(절약 팁). 미지정 시 전체.")
         @RequestParam(required = false) type: ContentType?,
         @Parameter(description = "카테고리 필터. 미지정 시 전체.")
         @RequestParam(required = false) category: String?,

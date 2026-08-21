@@ -9,7 +9,8 @@ import jakarta.persistence.Table
 import java.time.Instant
 
 /**
- * 블로그 팁(절약 팁 등). 콘텐츠 데이터 소스는 후속 작업으로 미룬다 — 현재는 조회·저장(북마크) 구조만 제공한다.
+ * 절약 팁(블로그·영상 등에서 정리한 소비 절약 팁). `category`(식비/생활/취미) + `subcategory`(선택항목)로 분류하며
+ * `sourceUrl`(원문 링크)을 함께 제공한다.
  */
 @Entity
 @Table(name = "blog_tip")
@@ -20,6 +21,10 @@ class BlogTip(
     var description: String? = null,
     @Column(name = "category", length = 50)
     var category: String? = null,
+    @Column(name = "subcategory", length = 50)
+    var subcategory: String? = null,
+    @Column(name = "source_url", length = 1000)
+    var sourceUrl: String? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)
