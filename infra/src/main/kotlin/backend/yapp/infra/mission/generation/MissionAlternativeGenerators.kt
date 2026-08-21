@@ -92,6 +92,7 @@ class SpringAiMissionAlternativeGenerator(
             {count}는 주간 실행 횟수이며 반드시 {count}회 또는 {count}번 형태로 행동과 결합하세요.
             {count}를 금액, 기간, 배수, 종류·개수, 단계, 분량 단위와 결합하지 마세요.
             절약 금액, 우선순위 라벨, 출처, 링크를 만들지 마세요.
+            미션은 띄어쓰기 포함 최대 25글자로 생성하세요.
         """
 
         private const val REQUIRED_ALTERNATIVE_COUNT = 3
