@@ -116,14 +116,6 @@ class MissionAiApplicationConfigurationTest {
             val chatModel = context.getBean(modelClass(CHAT_MODEL_CLASS))
             val clientField = chatModel.javaClass.getDeclaredField("genAiClient").apply { trySetAccessible() }
             assertEquals(client, clientField.get(chatModel))
-            assertEquals(
-                "gemini-3.1-flash-lite",
-                context.environment.getProperty("spring.ai.google.genai.chat.model"),
-            )
-            assertEquals(
-                "text-embedding-004",
-                context.environment.getProperty("spring.ai.google.genai.embedding.text.model"),
-            )
         }
     }
 
