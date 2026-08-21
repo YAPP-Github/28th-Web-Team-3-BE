@@ -58,6 +58,10 @@ class MissionGenerationJob(
     var leaseToken: UUID? = null,
     @Column(name = "lease_expires_at")
     var leaseExpiresAt: Instant? = null,
+    @Column(name = "worker_started_at")
+    var workerStartedAt: Instant? = null,
+    @Column(name = "completed_at")
+    var completedAt: Instant? = null,
 ) {
     fun start(now: Instant): Boolean = claim(now, UUID.randomUUID(), java.time.Duration.ofMinutes(10))
 
@@ -67,6 +71,7 @@ class MissionGenerationJob(
         status = MissionGenerationJobStatus.RUNNING
         this.leaseToken = leaseToken
         leaseExpiresAt = now.plus(leaseDuration)
+        if (workerStartedAt == null) workerStartedAt = now
         attemptCount++
         updatedAt = now
         return true
@@ -107,6 +112,7 @@ class MissionGenerationJob(
         activeGenerationKey = null
         this.expiresAt = expiresAt
         this.generationSource = generationSource
+        if (completedAt == null) completedAt = now
         leaseToken = null
         leaseExpiresAt = null
         updatedAt = now
@@ -117,6 +123,7 @@ class MissionGenerationJob(
         status = MissionGenerationJobStatus.FAILED
         activeGenerationKey = null
         failureCode = code
+        if (completedAt == null) completedAt = now
         leaseToken = null
         leaseExpiresAt = null
         updatedAt = now

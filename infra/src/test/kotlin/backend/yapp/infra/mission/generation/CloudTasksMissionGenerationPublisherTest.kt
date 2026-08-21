@@ -39,6 +39,7 @@ class CloudTasksMissionGenerationPublisherTest {
         assertEquals("https://worker.example.test/internal/mission-generation/jobs/$jobId/execute", task.value.httpRequest.url)
         assertEquals("tasks-invoker@example.test", task.value.httpRequest.oidcToken.serviceAccountEmail)
         assertEquals("https://worker.example.test", task.value.httpRequest.oidcToken.audience)
+        assertEquals("2", task.value.httpRequest.headersMap["X-Mission-Generation"])
         assertEquals(300, task.value.dispatchDeadline.seconds)
     }
 }

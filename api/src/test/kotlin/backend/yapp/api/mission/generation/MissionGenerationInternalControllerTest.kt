@@ -14,9 +14,9 @@ class MissionGenerationInternalControllerTest {
     fun `active lease returns retryable status to Cloud Tasks`() {
         val executor = mock(MissionGenerationExecutor::class.java)
         val jobId = UUID.randomUUID()
-        `when`(executor.execute(jobId)).thenReturn(MissionGenerationExecutionResult.ACTIVE_LEASE)
+        `when`(executor.execute(jobId, 1)).thenReturn(MissionGenerationExecutionResult.ACTIVE_LEASE)
 
-        val response = MissionGenerationWorkerController(executor).execute(jobId)
+        val response = MissionGenerationWorkerController(executor).execute(jobId, 1)
 
         assertEquals(503, response.statusCode.value())
     }
@@ -25,9 +25,9 @@ class MissionGenerationInternalControllerTest {
     fun `completed execution is acknowledged only after executor returns`() {
         val executor = mock(MissionGenerationExecutor::class.java)
         val jobId = UUID.randomUUID()
-        `when`(executor.execute(jobId)).thenReturn(MissionGenerationExecutionResult.COMPLETED)
+        `when`(executor.execute(jobId, 1)).thenReturn(MissionGenerationExecutionResult.COMPLETED)
 
-        val response = MissionGenerationWorkerController(executor).execute(jobId)
+        val response = MissionGenerationWorkerController(executor).execute(jobId, 1)
 
         assertEquals(204, response.statusCode.value())
     }
@@ -36,9 +36,9 @@ class MissionGenerationInternalControllerTest {
     fun `skipped execution is acknowledged without retry`() {
         val executor = mock(MissionGenerationExecutor::class.java)
         val jobId = UUID.randomUUID()
-        `when`(executor.execute(jobId)).thenReturn(MissionGenerationExecutionResult.SKIPPED)
+        `when`(executor.execute(jobId, 1)).thenReturn(MissionGenerationExecutionResult.SKIPPED)
 
-        val response = MissionGenerationWorkerController(executor).execute(jobId)
+        val response = MissionGenerationWorkerController(executor).execute(jobId, 1)
 
         assertEquals(204, response.statusCode.value())
     }
