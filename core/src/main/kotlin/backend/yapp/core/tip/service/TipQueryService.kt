@@ -10,20 +10,25 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 팁(블로그) 목록 요약. */
+/** 절약 팁 목록 요약. */
 data class TipSummary(
     val id: Long,
     val title: String,
+    val description: String?,
     val category: String?,
+    val subcategory: String?,
+    val sourceUrl: String?,
     val bookmarked: Boolean,
 )
 
-/** 팁 상세. */
+/** 절약 팁 상세. */
 data class TipDetail(
     val id: Long,
     val title: String,
     val description: String?,
     val category: String?,
+    val subcategory: String?,
+    val sourceUrl: String?,
     val bookmarked: Boolean,
 )
 
@@ -33,13 +38,10 @@ class TipQueryService(
     private val bookmarkRepository: ContentBookmarkRepository,
 ) {
     @Transactional(readOnly = true)
-    fun list(guestUserId: Long, category: String?, page: Int, size: Int): List<TipSummary> {
-        val pageable = PageRequest.of(page, size)
-        val tips = if (category.isNullOrBlank()) {
-            tipRepository.findAll(pageable).content
-        } else {
-            tipRepository.findByCategory(category, pageable).content
-        }
+    fun list(guestUserId: Long, category: String?, subcategory: String?, page: Int, size: Int): List<TipSummary> {
+        val tips = tipRepository
+            .search(category?.ifBlank { null }, subcategory?.ifBlank { null }, PageRequest.of(page, size))
+            .content
         val bookmarkedIds = bookmarkedIds(guestUserId, tips.map { it.id })
         return tips.map { it.toSummary(it.id in bookmarkedIds) }
     }
@@ -49,7 +51,7 @@ class TipQueryService(
         val tip = tipRepository.findById(id).orElseThrow { BaseException(ErrorCode.TIP_NOT_FOUND) }
         val bookmarked = bookmarkRepository
             .existsByGuestUserIdAndContentTypeAndContentId(guestUserId, ContentType.TIP, id)
-        return TipDetail(tip.id, tip.title, tip.description, tip.category, bookmarked)
+        return TipDetail(tip.id, tip.title, tip.description, tip.category, tip.subcategory, tip.sourceUrl, bookmarked)
     }
 
     private fun bookmarkedIds(guestUserId: Long, ids: List<Long>): Set<Long> {
@@ -60,5 +62,6 @@ class TipQueryService(
             .toSet()
     }
 
-    private fun BlogTip.toSummary(bookmarked: Boolean) = TipSummary(id, title, category, bookmarked)
+    private fun BlogTip.toSummary(bookmarked: Boolean) =
+        TipSummary(id, title, description, category, subcategory, sourceUrl, bookmarked)
 }
