@@ -117,9 +117,9 @@ class MissionLifecycleAcceptanceTest(
         mockMvc.perform(get("/api/missions/catalog").header(AUTHORIZATION, "Bearer $token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.categories.length()").value(3))
-            .andExpect(jsonPath("$.categories[0].items.length()").value(6))
+            .andExpect(jsonPath("$.categories[0].items.length()").value(4))
             .andExpect(jsonPath("$.categories[1].items.length()").value(4))
-            .andExpect(jsonPath("$.categories[2].items.length()").value(3))
+            .andExpect(jsonPath("$.categories[2].items.length()").value(2))
             .andExpect(jsonPath("$.categories[1].items[?(@.code == 'SELF_DEVELOPMENT')]").isEmpty)
             .andExpect(jsonPath("$.categories[2].items[?(@.code == 'DIGITAL_CONTENT')]").isEmpty)
 
