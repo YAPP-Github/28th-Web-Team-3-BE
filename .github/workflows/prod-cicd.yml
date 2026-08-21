@@ -180,7 +180,7 @@ jobs:
             --cpu 2 \
             --concurrency 1 \
             --max "${MISSION_WORKER_MAX_INSTANCES}" \
-            --min-instances 1 \
+            --min-instances 0 \
             --cpu-boost \
             --timeout 120 \
             --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-worker,AI_ACTIVATION=on,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,MISSION_GENERATION_PROVIDER_TIMEOUT=PT60S,SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=${MISSION_WORKER_HIKARI_MAXIMUM_POOL_SIZE},SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=${MISSION_WORKER_HIKARI_MINIMUM_IDLE},NAVER_BLOG_AI_CONTEXT_COUNT=${NAVER_BLOG_AI_CONTEXT_COUNT},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
@@ -203,7 +203,7 @@ jobs:
             --service-account "${MISSION_DISPATCHER_RUNTIME_SERVICE_ACCOUNT}" \
             --memory "1Gi" \
             --concurrency 1 \
-            --min-instances 1 \
+            --min-instances 0 \
             --timeout 300 \
             --set-env-vars "SPRING_PROFILES_ACTIVE=prod,APP_ROLE=mission-dispatcher,AI_ACTIVATION=off,MISSION_LIFECYCLE_SCHEDULER_ENABLED=false,MISSION_GENERATION_DELIVERY_ENABLED=true,MISSION_GENERATION_DELIVERY_PROJECT_ID=${GCP_PROJECT_ID},MISSION_GENERATION_DELIVERY_LOCATION=${GCP_REGION},MISSION_GENERATION_DELIVERY_QUEUE=${MISSION_QUEUE},MISSION_GENERATION_WORKER_URL=${worker_url},MISSION_GENERATION_TASKS_OIDC_SERVICE_ACCOUNT=${tasks_invoker},JWT_ISSUER=yapp,JWT_AUDIENCE=yapp-client,JWT_ACCESS_TOKEN_TTL=PT3H,JWT_REFRESH_TOKEN_TTL=P14D" \
             --set-secrets "SPRING_DATABASE_URL=SPRING_DATABASE_URL:latest,SPRING_DATABASE_USERNAME=SPRING_DATABASE_USER:latest,SPRING_DATABASE_PASSWORD=SPRING_DATABASE_PASSWORD:latest,SERVER_URL=SERVER_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
@@ -303,12 +303,16 @@ jobs:
             --flatten='bindings[].members' \
             --filter="bindings.role=roles/run.invoker AND bindings.members=serviceAccount:${tasks_invoker}" \
             --format='value(bindings.role)')"
+          printf '%s\n' \
+            "mission worker service min: ${worker_service_min}" \
+            "mission worker revision min: ${worker_revision_min:-0}" \
+            "mission dispatcher service min: ${dispatcher_service_min}"
           awk -v actual="${queue_dispatch_rate}" -v expected="${MISSION_QUEUE_MAX_DISPATCHES_PER_SECOND}" \
             'BEGIN { exit !(actual == expected) }'
           test "${queue_concurrent_dispatches}" = "${MISSION_QUEUE_MAX_CONCURRENT_DISPATCHES}"
           test "${worker_service_min}" = 1
           test "${worker_service_max}" = "${MISSION_WORKER_MAX_INSTANCES}"
-          test -z "${dispatcher_service_min}" || test "${dispatcher_service_min}" = 0
+          test "${dispatcher_service_min}" = 1
           test -z "${worker_revision_min}" || test "${worker_revision_min}" = 0
           test "${worker_cpu_boost}" = true
           test "${worker_concurrency}" = 1
