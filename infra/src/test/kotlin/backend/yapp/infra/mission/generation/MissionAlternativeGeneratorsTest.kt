@@ -48,9 +48,9 @@ class MissionAlternativeGeneratorsTest {
 
         assertEquals(3, result.alternatives.size)
         assertEquals("포장 주문으로 {count}번의 배달비 줄이기", result.alternatives.first().titleTemplate)
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "주간 실행 횟수")
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "{count}회 또는 {count}번")
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "세 대안 모두")
+        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "정확히 한 번의 {count}")
+        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "{count}는 반드시")
+        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "세 대안은 행동 방식이 겹치지 않게")
     }
 
     @Test
@@ -70,8 +70,8 @@ class MissionAlternativeGeneratorsTest {
 
         val systemMessage = checkNotNull(model.lastPrompt.getSystemMessage().text)
         val userMessage = checkNotNull(model.lastPrompt.getUserMessage().text)
-        assertContains(systemMessage, "첫 번째 대안만 그 지식에 근거")
-        assertContains(systemMessage, "두 번째와 세 번째 대안은")
+        assertContains(systemMessage, "첫 번째 대안은 반드시 그 지식의 핵심")
+        assertContains(systemMessage, "두 번째와 세 번째 대안에는")
         assertContains(userMessage, "knowledgeId=7")
         assertContains(userMessage, "항목=편의점 | 사용자=20대 서울 | 소비=3회 30000원")
     }

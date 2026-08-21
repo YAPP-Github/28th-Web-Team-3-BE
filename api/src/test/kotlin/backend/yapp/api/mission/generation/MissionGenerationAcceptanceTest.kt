@@ -1,6 +1,7 @@
 package backend.yapp.api.mission.generation
 
 import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
+import backend.yapp.core.mission.generation.domain.MissionItem
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
 import java.time.Instant
@@ -8,6 +9,7 @@ import java.util.UUID
 import javax.sql.DataSource
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -117,6 +119,54 @@ class MissionGenerationAcceptanceTest(
 
                     assertEquals(expectedMissionKnowledge(), knowledge)
                     assertEquals(false, knowledge.any { it.contains("|SNACK|") })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `direct mission catalog has thirty active templates for every active item`() {
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(
+                    """
+                        SELECT item_code, COUNT(*) AS template_count, MAX(char_length(REPLACE(title_template, '{count}', '10'))) AS max_title_length
+                        FROM mission_action_template
+                        WHERE active = TRUE
+                        GROUP BY item_code
+                    """.trimIndent(),
+                ).use { result ->
+                    val counts = buildMap {
+                        while (result.next()) {
+                            assertTrue(result.getInt("max_title_length") <= 25)
+                            put(result.getString("item_code"), result.getInt("template_count"))
+                        }
+                    }
+
+                    assertEquals(
+                        MissionItem.entries.filter { it.active }.associate { it.name to 30 },
+                        counts,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `generation selects direct missions from the item catalog`() {
+        val token = readyGuestToken()
+        val jobId = requestJob(token)
+
+        executor.execute(UUID.fromString(jobId), 1)
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(
+                "SELECT generation_source FROM mission_generation_job WHERE id = ?",
+            ).use { statement ->
+                statement.setObject(1, UUID.fromString(jobId))
+                statement.executeQuery().use { result ->
+                    result.next()
+                    assertEquals("DIRECT", result.getString("generation_source"))
                 }
             }
         }

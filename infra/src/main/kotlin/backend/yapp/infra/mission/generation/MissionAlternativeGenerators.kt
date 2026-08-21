@@ -6,8 +6,12 @@ import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRes
 import backend.yapp.core.mission.generation.port.MissionAlternativeTemplate
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import backend.yapp.core.mission.generation.service.MissionTitleRenderer
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.sql.ResultSet
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.converter.BeanOutputConverter
+import org.springframework.jdbc.core.JdbcTemplate
 import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.KotlinModule
@@ -31,6 +35,59 @@ class StaticMissionAlternativeGenerator : MissionAlternativeGenerationPort {
             ),
             source = MissionDraftGenerationSource.MOCK,
         )
+}
+
+class DatabaseMissionAlternativeGenerator(
+    private val jdbcTemplate: JdbcTemplate,
+) : MissionAlternativeGenerationPort {
+    override fun generate(request: MissionAlternativeGenerationRequest): MissionAlternativeGenerationResult {
+        val candidates = jdbcTemplate.query(
+            """
+                SELECT id, title_template
+                FROM mission_action_template
+                WHERE item_code = ? AND active = TRUE
+                ORDER BY id
+            """.trimIndent(),
+            ::mapTemplate,
+            request.item.name,
+        )
+        require(candidates.size >= REQUIRED_ALTERNATIVE_COUNT) {
+            "At least $REQUIRED_ALTERNATIVE_COUNT direct mission templates are required for ${request.item.name}"
+        }
+        return MissionAlternativeGenerationResult(
+            alternatives = candidates
+                .sortedBy { template -> stableRandomKey(request.jobId, template.id) }
+                .take(REQUIRED_ALTERNATIVE_COUNT)
+                .map { template ->
+                    MissionTitleRenderer.validate(template.titleTemplate)
+                    require(MissionTitleRenderer.render(template.titleTemplate, MAX_TARGET_COUNT).length <= MAX_TITLE_LENGTH) {
+                        "Direct mission title must not exceed $MAX_TITLE_LENGTH characters after rendering"
+                    }
+                    MissionAlternativeTemplate(template.titleTemplate, DESCRIPTION)
+                },
+            source = MissionDraftGenerationSource.DIRECT,
+        )
+    }
+
+    private fun mapTemplate(resultSet: ResultSet, rowNumber: Int): DirectMissionTemplate =
+        DirectMissionTemplate(resultSet.getLong("id"), resultSet.getString("title_template"))
+
+    private fun stableRandomKey(jobId: java.util.UUID, templateId: Long): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest("$jobId:$templateId".toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+
+    private data class DirectMissionTemplate(
+        val id: Long,
+        val titleTemplate: String,
+    )
+
+    companion object {
+        private const val REQUIRED_ALTERNATIVE_COUNT = 3
+        private const val MAX_TARGET_COUNT = 10
+        private const val MAX_TITLE_LENGTH = 25
+        private const val DESCRIPTION = "이번 주 소비를 줄이는 행동을 실천해 보세요."
+    }
 }
 
 class SpringAiMissionAlternativeGenerator(

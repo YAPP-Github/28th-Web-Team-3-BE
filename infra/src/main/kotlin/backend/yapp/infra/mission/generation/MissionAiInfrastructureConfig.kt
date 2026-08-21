@@ -82,28 +82,11 @@ class MissionAiInfrastructureConfig {
         OfficialSourceMissionKnowledgeVerifier(chatClientBuilder.build())
 
     @Bean
-    @ConditionalOnProperty(
-        prefix = "mission.generation",
-        name = ["ai-activation"],
-        havingValue = "off",
-        matchIfMissing = true,
-    )
-    fun staticMissionAlternativeGenerator(): MissionAlternativeGenerationPort =
-        StaticMissionAlternativeGenerator()
-
-    @Bean
-    @ConditionalOnProperty(
-        prefix = "mission.generation",
-        name = ["ai-activation"],
-        havingValue = "on",
-    )
-    fun aiMissionAlternativeGenerator(
-        chatClientBuilder: ChatClient.Builder,
-        @Value("\${spring.ai.google.genai.api-key:}") apiKey: String,
-    ): MissionAlternativeGenerationPort {
-        validateGoogleGenAiAuthentication(apiKey)
-        return SpringAiMissionAlternativeGenerator(chatClientBuilder.build())
-    }
+    fun directMissionAlternativeGenerator(
+        jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    ): MissionAlternativeGenerationPort = jdbcTemplateProvider.ifAvailable
+        ?.let(::DatabaseMissionAlternativeGenerator)
+        ?: StaticMissionAlternativeGenerator()
 
     @Bean
     @ConditionalOnProperty(

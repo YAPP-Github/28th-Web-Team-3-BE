@@ -150,6 +150,7 @@ class MissionGenerationExecutor(
             val generated = try {
                 alternativeGenerator.generate(
                     MissionAlternativeGenerationRequest(
+                        jobId = work.jobId,
                         item = work.item,
                         knowledgeContexts = selection.knowledge,
                         personalizationContext = personalizationContext,
