@@ -26,6 +26,23 @@ Log-based metrics can have up to 10 minutes of collection delay in this operatio
 
 The current k6 p95 of 30 seconds includes polling and is only a provisional client-side guardrail, not a server-stage SLO.
 
+## Worker warmth configuration
+
+The production workflow deploys the worker with startup CPU boost and an explicit revision-level minimum of `0`, then applies the worker's service-level minimum of `1`. It also applies the dispatcher's service-level minimum of `0` and an explicit revision-level minimum of `0`. Do not combine a nonzero revision-level minimum with a service-level minimum: it can keep extra revisions warm and increase cost.
+
+The workflow verifies the worker service minimum, dispatcher service minimum, latest worker revision's minimum, startup CPU boost, concurrency, private worker URL, and the Cloud Tasks invoker binding. Deployment itself still requires separate production approval.
+
+After an approved deployment, use the latency event from the observability rollout to compare an idle period of at least 15 minutes with a warm baseline. Record request receipt to first application event and total generation latency separately; a warm worker reduces the normal scale-from-zero startup segment, but does not guarantee a particular AI-generation duration. Record at least 24 hours of Cloud Run billable instance time and cost before estimating the steady-state impact.
+
 ## Rollback
 
-Disable the latency log filter and external metric/dashboard definitions first. Keep `worker_started_at` and `completed_at`: they are additive nullable columns and remain compatible with earlier application revisions.
+For the worker-warmth rollback, use the same approved deployment path and set both services back to a service-level minimum of `0`:
+
+```bash
+gcloud run services update "${MISSION_WORKER_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --min 0
+gcloud run services update "${MISSION_DISPATCHER_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --min 0
+```
+
+Then verify both service-level minima are `0` and the current worker revision's minimum is empty or `0`; leave startup CPU boost unchanged unless a separate latency/cost decision calls for changing it. The normal post-deploy check intentionally expects worker min=`1`, so do not use it to validate this rollback.
+
+For the observability rollback, disable the latency log filter and external metric/dashboard definitions first. Keep `worker_started_at` and `completed_at`: they are additive nullable columns and remain compatible with earlier application revisions.
