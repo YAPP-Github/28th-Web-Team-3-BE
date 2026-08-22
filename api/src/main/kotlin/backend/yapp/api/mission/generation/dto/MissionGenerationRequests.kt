@@ -19,6 +19,6 @@ data class MissionGenerationCreateRequest(
 )
 
 data class MissionConfirmRequest(
-    @field:Size(min = 1)
+    @field:Size(min = 1, max = 3)
     val selectedDraftIds: List<UUID>,
 )

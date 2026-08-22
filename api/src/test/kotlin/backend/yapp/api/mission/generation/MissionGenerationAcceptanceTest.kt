@@ -1,6 +1,5 @@
 package backend.yapp.api.mission.generation
 
-import backend.yapp.core.mission.generation.service.MissionGenerationExecutor
 import backend.yapp.core.mission.generation.domain.MissionItem
 import com.jayway.jsonpath.JsonPath
 import com.nimbusds.jwt.SignedJWT
@@ -28,7 +27,6 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 class MissionGenerationAcceptanceTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val dataSource: DataSource,
-    @Autowired private val executor: MissionGenerationExecutor,
 ) {
     @Test
     fun `synchronous candidates return three direct missions without creating a generation job`() {
@@ -61,10 +59,9 @@ class MissionGenerationAcceptanceTest(
     }
 
     @Test
-    fun `one item request creates deterministic candidates and same item can be generated again`() {
+    fun `one item request completes immediately with three full-baseline drafts and can confirm all drafts`() {
         val token = readyGuestToken()
         val firstJobId = requestJob(token)
-        executor.execute(UUID.fromString(firstJobId), 1)
 
         val draftsJson = mockMvc.perform(
             get("$GENERATION_PATH/$firstJobId/drafts").header(AUTHORIZATION, "Bearer $token"),
@@ -73,10 +70,10 @@ class MissionGenerationAcceptanceTest(
             .andExpect(jsonPath("$.categories[0].category").value("MEAL"))
             .andExpect(jsonPath("$.categories[0].drafts.length()").value(3))
             .andExpect(jsonPath("$.categories[0].drafts[0].item").value("DELIVERY_FOOD"))
-            .andExpect(jsonPath("$.categories[0].drafts[0].targetCount").value(2))
-            .andExpect(jsonPath("$.categories[0].drafts[0].estimatedSavingsWon").value(20_000))
-            .andExpect(jsonPath("$.categories[0].drafts[2].targetCount").value(1))
-            .andExpect(jsonPath("$.categories[0].drafts[2].estimatedSavingsWon").value(10_000))
+            .andExpect(jsonPath("$.categories[0].drafts[0].targetCount").value(5))
+            .andExpect(jsonPath("$.categories[0].drafts[0].estimatedSavingsWon").value(50_000))
+            .andExpect(jsonPath("$.categories[0].drafts[2].targetCount").value(5))
+            .andExpect(jsonPath("$.categories[0].drafts[2].estimatedSavingsWon").value(50_000))
             .andExpect(jsonPath("$.categories[0].drafts[0].savingsDisclaimer").isNotEmpty)
             .andReturn().response.contentAsString
         val draftIds: List<String> = JsonPath.read(draftsJson, "$.categories[0].drafts[*].id")
@@ -85,9 +82,9 @@ class MissionGenerationAcceptanceTest(
             post("$GENERATION_PATH/$firstJobId/confirm")
                 .header(AUTHORIZATION, "Bearer $token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"selectedDraftIds":["${draftIds[0]}","${draftIds[2]}"]}"""),
+                .content("""{"selectedDraftIds":["${draftIds[0]}","${draftIds[1]}","${draftIds[2]}"]}"""),
         ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.missions.length()").value(2))
+            .andExpect(jsonPath("$.missions.length()").value(3))
 
         val secondJobId = requestJob(token)
         assertNotEquals(firstJobId, secondJobId)
@@ -209,8 +206,6 @@ class MissionGenerationAcceptanceTest(
         val token = readyGuestToken()
         val jobId = requestJob(token)
 
-        executor.execute(UUID.fromString(jobId), 1)
-
         dataSource.connection.use { connection ->
             connection.prepareStatement(
                 "SELECT generation_source FROM mission_generation_job WHERE id = ?",
@@ -225,20 +220,21 @@ class MissionGenerationAcceptanceTest(
     }
 
     @Test
-    fun `three active knowledge candidates are verified then recorded as one selection`() {
+    fun `synchronous generation does not enqueue worker delivery or knowledge retrieval`() {
         val token = readyGuestToken()
         val response = request(
             token,
             """{"category":"LIVING","item":"HOUSEHOLD_GOODS","baselineFrequency":3,"baselineAmountWon":30000}""",
-        ).andExpect(status().isAccepted).andReturn().response.contentAsString
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.draftsAvailable").value(true))
+            .andReturn().response.contentAsString
         val jobId = JsonPath.read<String>(response, "$.jobId")
-
-        executor.execute(UUID.fromString(jobId), 1)
 
         dataSource.connection.use { connection ->
             connection.prepareStatement(
                 """
-                    SELECT candidate_count, verified_count, selected_knowledge_ids, selection_policy
+                    SELECT COUNT(*)
                     FROM mission_knowledge_retrieval_trace
                     WHERE job_id = ?
                 """.trimIndent(),
@@ -246,17 +242,23 @@ class MissionGenerationAcceptanceTest(
                 statement.setObject(1, UUID.fromString(jobId))
                 statement.executeQuery().use { result ->
                     result.next()
-                    assertEquals(3, result.getInt("candidate_count"))
-                    assertEquals(3, result.getInt("verified_count"))
-                    assertEquals(1, result.getString("selected_knowledge_ids").split(",").size)
-                    assertEquals("DETERMINISTIC_RANDOM_1", result.getString("selection_policy"))
+                    assertEquals(0, result.getInt(1))
+                }
+            }
+            connection.prepareStatement(
+                "SELECT COUNT(*) FROM mission_generation_outbox WHERE job_id = ?",
+            ).use { statement ->
+                statement.setObject(1, UUID.fromString(jobId))
+                statement.executeQuery().use { result ->
+                    result.next()
+                    assertEquals(0, result.getInt(1))
                 }
             }
         }
     }
 
     private fun requestJob(token: String): String {
-        val body = request(token, VALID_BODY).andExpect(status().isAccepted)
+        val body = request(token, VALID_BODY).andExpect(status().isOk)
             .andReturn().response.contentAsString
         return JsonPath.read(body, "$.jobId")
     }

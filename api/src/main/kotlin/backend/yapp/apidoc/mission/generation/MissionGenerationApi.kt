@@ -18,18 +18,18 @@ import org.springframework.http.ResponseEntity
 
 @Tag(
     name = "Mission Generation",
-    description = "비동기 미션 초안 생성 job, polling, 초안 조회와 미션 시작 확정 API",
+    description = "동기 완료 미션 초안 생성 job, 상태 조회, 초안 조회와 미션 시작 확정 API",
 )
 @SecurityRequirement(name = "accessTokenAuth")
 interface MissionGenerationApi {
     @Operation(
-        summary = "미션 생성 job 요청",
-        description = "카테고리·항목·주간 빈도·주간 금액을 입력해 하나의 항목에 대한 미션 후보를 생성한다.",
+        summary = "동기 완료 미션 생성 job 요청",
+        description = "카테고리·항목·주간 빈도·주간 금액을 입력하면 DB 액션 템플릿 기반 초안 3개를 저장하고 SUCCEEDED 상태의 job을 반환한다.",
     )
     @ApiResponses(
         ApiResponse(
-            responseCode = "202",
-            description = "생성 job 접수",
+            responseCode = "200",
+            description = "초안 3개 생성 완료 job 반환",
             content = [Content(schema = Schema(implementation = MissionGenerationJobResponse::class))],
         ),
         ApiResponse(
@@ -75,7 +75,7 @@ interface MissionGenerationApi {
 
     @Operation(
         summary = "미션 초안 선택 확정",
-        description = "전체 초안 중 중복 없이 1개 이상을 ACTIVE 미션으로 저장한다.",
+        description = "전체 초안 중 중복 없이 1~3개를 ACTIVE 미션으로 저장한다.",
     )
     @ApiResponses(
         ApiResponse(
