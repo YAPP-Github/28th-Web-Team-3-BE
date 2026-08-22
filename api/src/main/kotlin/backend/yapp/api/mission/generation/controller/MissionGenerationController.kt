@@ -30,7 +30,7 @@ class MissionGenerationController(
         @AuthenticationPrincipal guestUserId: Long,
         @Valid @RequestBody request: MissionGenerationCreateRequest,
     ): ResponseEntity<MissionGenerationJobResponse> =
-        ResponseEntity.accepted().body(
+        ResponseEntity.ok(
             MissionGenerationJobResponse.from(
                 service.request(
                     guestUserId = guestUserId,

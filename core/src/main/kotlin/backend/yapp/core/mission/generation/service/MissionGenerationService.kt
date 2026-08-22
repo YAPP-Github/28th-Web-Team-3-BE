@@ -4,15 +4,18 @@ import backend.yapp.common.exception.BaseException
 import backend.yapp.common.exception.ErrorCode
 import backend.yapp.core.mission.generation.domain.ConfirmationResult
 import backend.yapp.core.mission.generation.domain.Mission
+import backend.yapp.core.mission.generation.domain.MissionDraft
 import backend.yapp.core.mission.generation.domain.MissionDraftRepository
+import backend.yapp.core.mission.generation.domain.MissionDraftTemplateRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJob
-import backend.yapp.core.mission.generation.domain.MissionGenerationOutbox
-import backend.yapp.core.mission.generation.domain.MissionGenerationOutboxRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobRepository
 import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionRepository
 import backend.yapp.core.mission.generation.domain.MissionCategory
 import backend.yapp.core.mission.generation.domain.MissionItem
+import backend.yapp.core.mission.generation.domain.MissionMetricType
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationPort
+import backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRequest
 import backend.yapp.core.onboarding.domain.OnboardingProfileRepository
 import backend.yapp.core.onboarding.domain.OnboardingStatus
 import java.nio.charset.StandardCharsets
@@ -20,10 +23,10 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.UUID
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -32,10 +35,10 @@ class MissionGenerationService(
     private val jobRepository: MissionGenerationJobRepository,
     private val draftRepository: MissionDraftRepository,
     private val missionRepository: MissionRepository,
+    private val templateRepository: MissionDraftTemplateRepository,
+    private val alternativeGenerator: MissionAlternativeGenerationPort,
     private val onboardingProfileRepository: OnboardingProfileRepository,
     private val clock: Clock,
-    private val outboxRepository: MissionGenerationOutboxRepository,
-    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun request(
@@ -81,15 +84,42 @@ class MissionGenerationService(
                 createdAt = now,
             ),
         )
-        val outbox = outboxRepository.save(
-            MissionGenerationOutbox(
-                id = UUID.randomUUID(),
+        check(job.start(now))
+        val generated = alternativeGenerator.generate(
+            MissionAlternativeGenerationRequest(
+                item = item,
+                knowledgeContexts = emptyList(),
                 jobId = job.id,
-                nextAttemptAt = now,
-                createdAt = now,
             ),
         )
-        eventPublisher.publishEvent(MissionGenerationOutboxCreatedEvent(outbox.id))
+        check(generated.alternatives.size == REQUIRED_DRAFT_COUNT) {
+            "Exactly $REQUIRED_DRAFT_COUNT mission drafts are required"
+        }
+        val template = checkNotNull(templateRepository.findByTargetCodeAndActiveTrue(item.name)) {
+            "Mission item template is missing: ${item.name}"
+        }
+        val drafts = generated.alternatives.mapIndexed { index, alternative ->
+            MissionDraft(
+                id = UUID.randomUUID(),
+                jobId = job.id,
+                templateId = template.id,
+                category = category,
+                item = item,
+                titleTemplate = alternative.titleTemplate,
+                priorityOrder = index + 1,
+                title = MissionTitleRenderer.render(alternative.titleTemplate, baselineFrequency),
+                description = alternative.description.take(MAX_DESCRIPTION_LENGTH),
+                actionCode = item.name,
+                metricType = MissionMetricType.COUNT,
+                targetCount = baselineFrequency,
+                targetUnit = TARGET_UNIT,
+                estimatedSavingsWon = baselineAmountWon,
+                savingsEstimateVersion = SAVINGS_ESTIMATE_VERSION,
+                createdAt = now,
+            )
+        }
+        draftRepository.saveAll(drafts)
+        job.succeed(now, now.plus(DRAFT_TTL), generated.source)
         return job.toSnapshot()
     }
 
@@ -124,7 +154,7 @@ class MissionGenerationService(
 
     @Transactional
     fun confirm(guestUserId: Long, jobId: UUID, selectedDraftIds: List<UUID>): List<MissionSnapshot> {
-        if (selectedDraftIds.size < MIN_SELECTION ||
+        if (selectedDraftIds.size !in MIN_SELECTION..MAX_SELECTION ||
             selectedDraftIds.distinct().size != selectedDraftIds.size
         ) {
             throw BaseException(ErrorCode.MISSION_CONFIRM_INVALID)
@@ -233,5 +263,11 @@ class MissionGenerationService(
 
     companion object {
         private const val MIN_SELECTION = 1
+        private const val MAX_SELECTION = 3
+        private const val REQUIRED_DRAFT_COUNT = 3
+        private const val MAX_DESCRIPTION_LENGTH = 500
+        private const val TARGET_UNIT = "TIMES_PER_WEEK"
+        private const val SAVINGS_ESTIMATE_VERSION = "V2_DIRECT_CANDIDATE"
+        private val DRAFT_TTL: Duration = Duration.ofHours(24)
     }
 }
