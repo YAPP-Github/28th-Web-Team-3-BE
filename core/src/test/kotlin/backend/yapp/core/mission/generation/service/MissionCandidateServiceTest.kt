@@ -21,7 +21,7 @@ import org.mockito.Mockito.`when`
 class MissionCandidateServiceTest {
     private val onboardingProfileRepository = mock(OnboardingProfileRepository::class.java)
     @Test
-    fun `returns three candidates with the full requested target for each alternative`() {
+    fun `allocates requested frequency and savings across alternatives`() {
         completedOnboarding()
         val service = MissionCandidateService(
             onboardingProfileRepository,
@@ -42,14 +42,42 @@ class MissionCandidateServiceTest {
             guestUserId = GUEST_USER_ID,
             category = MissionCategory.MEAL,
             item = MissionItem.DELIVERY_FOOD,
-            baselineFrequency = 1,
-            baselineAmountWon = 15_000,
+            baselineFrequency = 7,
+            baselineAmountWon = 70_000,
         )
 
         assertEquals(3, candidates.size)
-        assertEquals(listOf("집밥으로 1회 대체하기", "쿠폰으로 1번 절약하기", "할인 메뉴를 1회 이용하기"), candidates.map { it.title })
-        assertEquals(listOf(1, 1, 1), candidates.map { it.targetCount })
-        assertEquals(listOf(15_000, 15_000, 15_000), candidates.map { it.estimatedSavingsWon })
+        assertEquals(listOf("집밥으로 3회 대체하기", "쿠폰으로 2번 절약하기", "할인 메뉴를 2회 이용하기"), candidates.map { it.title })
+        assertEquals(listOf(3, 2, 2), candidates.map { it.targetCount })
+        assertEquals(listOf(30_000, 20_000, 20_000), candidates.map { it.estimatedSavingsWon })
+        assertEquals(listOf("V2_DETERMINISTIC", "V2_DETERMINISTIC", "V2_DETERMINISTIC"), candidates.map { it.savingsEstimateVersion })
+    }
+
+    @Test
+    fun `limits candidates to the baseline frequency below three`() {
+        completedOnboarding()
+        val service = MissionCandidateService(
+            onboardingProfileRepository,
+            fixedAlternativeGenerator(),
+        )
+
+        val oneTimeCandidates = service.candidates(
+            guestUserId = GUEST_USER_ID,
+            category = MissionCategory.MEAL,
+            item = MissionItem.DELIVERY_FOOD,
+            baselineFrequency = 1,
+            baselineAmountWon = 10_000,
+        )
+        val twoTimeCandidates = service.candidates(
+            guestUserId = GUEST_USER_ID,
+            category = MissionCategory.MEAL,
+            item = MissionItem.DELIVERY_FOOD,
+            baselineFrequency = 2,
+            baselineAmountWon = 20_000,
+        )
+
+        assertEquals(listOf(1), oneTimeCandidates.map { it.targetCount })
+        assertEquals(listOf(1, 1), twoTimeCandidates.map { it.targetCount })
     }
 
     @Test
@@ -84,6 +112,21 @@ class MissionCandidateServiceTest {
             ),
         )
     }
+
+    private fun fixedAlternativeGenerator(): MissionAlternativeGenerationPort =
+        object : MissionAlternativeGenerationPort {
+            override fun generate(
+                request: backend.yapp.core.mission.generation.port.MissionAlternativeGenerationRequest,
+            ): MissionAlternativeGenerationResult =
+                MissionAlternativeGenerationResult(
+                alternatives = listOf(
+                    MissionAlternativeTemplate("집밥으로 {count}회 대체하기", "설명 1"),
+                    MissionAlternativeTemplate("쿠폰으로 {count}번 절약하기", "설명 2"),
+                    MissionAlternativeTemplate("할인 메뉴를 {count}회 이용하기", "설명 3"),
+                ),
+                source = MissionDraftGenerationSource.DIRECT,
+            )
+        }
 
     companion object {
         private const val GUEST_USER_ID = 1L

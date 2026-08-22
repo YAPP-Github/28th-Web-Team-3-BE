@@ -40,22 +40,22 @@ class MissionGenerationAcceptanceTest(
                 .header(AUTHORIZATION, "Bearer $token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":1,"baselineAmountWon":15000}""",
+                    """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":7,"baselineAmountWon":70000}""",
                 ),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.candidates.length()").value(3))
             .andExpect(jsonPath("$.candidates[0].item").value("DELIVERY_FOOD"))
             .andExpect(jsonPath("$.candidates[1].item").value("DELIVERY_FOOD"))
             .andExpect(jsonPath("$.candidates[2].item").value("DELIVERY_FOOD"))
-            .andExpect(jsonPath("$.candidates[0].targetCount").value(1))
-            .andExpect(jsonPath("$.candidates[1].targetCount").value(1))
-            .andExpect(jsonPath("$.candidates[2].targetCount").value(1))
-            .andExpect(jsonPath("$.candidates[0].estimatedSavingsWon").value(15_000))
-            .andExpect(jsonPath("$.candidates[1].estimatedSavingsWon").value(15_000))
-            .andExpect(jsonPath("$.candidates[2].estimatedSavingsWon").value(15_000))
-            .andExpect(jsonPath("$.candidates[0].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
-            .andExpect(jsonPath("$.candidates[1].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
-            .andExpect(jsonPath("$.candidates[2].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
+            .andExpect(jsonPath("$.candidates[0].targetCount").value(3))
+            .andExpect(jsonPath("$.candidates[1].targetCount").value(2))
+            .andExpect(jsonPath("$.candidates[2].targetCount").value(2))
+            .andExpect(jsonPath("$.candidates[0].estimatedSavingsWon").value(30_000))
+            .andExpect(jsonPath("$.candidates[1].estimatedSavingsWon").value(20_000))
+            .andExpect(jsonPath("$.candidates[2].estimatedSavingsWon").value(20_000))
+            .andExpect(jsonPath("$.candidates[0].savingsEstimateVersion").value("V2_DETERMINISTIC"))
+            .andExpect(jsonPath("$.candidates[1].savingsEstimateVersion").value("V2_DETERMINISTIC"))
+            .andExpect(jsonPath("$.candidates[2].savingsEstimateVersion").value("V2_DETERMINISTIC"))
 
         assertEquals(jobsBefore, generationJobCount())
     }
