@@ -36,9 +36,10 @@ class MissionGenerationExecutorTest {
         `when`(fixture.retriever.retrieve(fixture.request)).thenReturn(retrieval)
         `when`(fixture.verifier.verify(knowledge)).thenReturn(knowledge)
         val generationRequest = MissionAlternativeGenerationRequest(
-            fixture.work.item,
-            knowledge,
-            fixture.personalizationContext,
+            item = fixture.work.item,
+            knowledgeContexts = knowledge,
+            personalizationContext = fixture.personalizationContext,
+            jobId = fixture.work.jobId,
         )
         `when`(fixture.generator.generate(generationRequest))
             .thenReturn(fixture.generated)
@@ -72,9 +73,10 @@ class MissionGenerationExecutorTest {
         )
         `when`(fixture.verifier.verify(candidates)).thenReturn(candidates)
         val generationRequest = MissionAlternativeGenerationRequest(
-            fixture.work.item,
-            selected,
-            fixture.personalizationContext,
+            item = fixture.work.item,
+            knowledgeContexts = selected,
+            personalizationContext = fixture.personalizationContext,
+            jobId = fixture.work.jobId,
         )
         `when`(fixture.generator.generate(generationRequest)).thenReturn(fixture.generated)
 
@@ -100,9 +102,10 @@ class MissionGenerationExecutorTest {
         `when`(fixture.retriever.retrieve(fixture.request)).thenThrow(IllegalStateException("db failed"))
         `when`(fixture.verifier.verify(emptyList())).thenReturn(emptyList())
         val generationRequest = MissionAlternativeGenerationRequest(
-            fixture.work.item,
-            emptyList(),
-            fixture.personalizationContext,
+            item = fixture.work.item,
+            knowledgeContexts = emptyList(),
+            personalizationContext = fixture.personalizationContext,
+            jobId = fixture.work.jobId,
         )
         `when`(fixture.generator.generate(generationRequest))
             .thenReturn(fixture.generated)
@@ -121,9 +124,10 @@ class MissionGenerationExecutorTest {
         )
         `when`(fixture.verifier.verify(emptyList())).thenReturn(emptyList())
         val generationRequest = MissionAlternativeGenerationRequest(
-            fixture.work.item,
-            emptyList(),
-            fixture.personalizationContext,
+            item = fixture.work.item,
+            knowledgeContexts = emptyList(),
+            personalizationContext = fixture.personalizationContext,
+            jobId = fixture.work.jobId,
         )
         `when`(fixture.generator.generate(generationRequest))
             .thenThrow(IllegalStateException("provider failed"))
@@ -149,7 +153,12 @@ class MissionGenerationExecutorTest {
         `when`(fixture.verifier.verify(emptyList())).thenReturn(emptyList())
         `when`(
             fixture.generator.generate(
-                MissionAlternativeGenerationRequest(fixture.work.item, emptyList(), fixture.personalizationContext),
+                MissionAlternativeGenerationRequest(
+                    item = fixture.work.item,
+                    knowledgeContexts = emptyList(),
+                    personalizationContext = fixture.personalizationContext,
+                    jobId = fixture.work.jobId,
+                ),
             ),
         ).thenReturn(fixture.generated)
 

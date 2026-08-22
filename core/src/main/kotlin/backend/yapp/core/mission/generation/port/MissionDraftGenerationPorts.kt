@@ -44,6 +44,7 @@ data class MissionDraftContentResult(
 
 enum class MissionDraftGenerationSource {
     MOCK,
+    DIRECT,
     AI,
     @Deprecated("Legacy source retained for persisted OpenAI generation history")
     OPENAI,

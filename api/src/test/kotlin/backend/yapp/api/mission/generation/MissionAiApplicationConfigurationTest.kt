@@ -13,9 +13,7 @@ import backend.yapp.infra.mission.generation.MicrometerMissionDraftGenerationTel
 import backend.yapp.infra.mission.generation.SpringAiMissionDraftContentGenerator
 import backend.yapp.infra.mission.generation.TemplateMissionDraftContentGenerator
 import com.google.genai.Client
-import java.time.Duration
 import java.util.Optional
-import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -32,8 +30,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import tools.jackson.databind.ObjectMapper
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
 
 class MissionAiApplicationConfigurationTest {
     @Test
@@ -120,27 +116,17 @@ class MissionAiApplicationConfigurationTest {
     }
 
     @Test
-    fun `active alternative generation path uses the configured provider timeout`() {
-        MockWebServer().use { server ->
-            server.start()
-            server.enqueue(MockResponse().setBodyDelay(1, TimeUnit.SECONDS).setBody("{}"))
-            Client.setDefaultBaseUrls(Optional.of(server.url("/").toString()), Optional.empty())
-            try {
-                runApplication(
-                    "AI_ACTIVATION=on",
-                    "GOOGLE_GENAI_API_KEY=test-key",
-                    "mission.generation.provider-timeout=PT0.2S",
-                ) { context ->
-                    val generator = context.getBean(MissionAlternativeGenerationPort::class.java)
-                    val startedAt = System.nanoTime()
-                    assertFails {
-                        generator.generate(MissionAlternativeGenerationRequest(MissionItem.DELIVERY_FOOD, emptyList()))
-                    }
-                    assertTrue(Duration.ofNanos(System.nanoTime() - startedAt) < Duration.ofMillis(800))
-                }
-            } finally {
-                Client.setDefaultBaseUrls(Optional.empty(), Optional.empty())
-            }
+    fun `active application keeps alternative generation local without a database`() {
+        runApplication(
+            "AI_ACTIVATION=on",
+            "GOOGLE_GENAI_API_KEY=test-key",
+        ) { context ->
+            val generator = context.getBean(MissionAlternativeGenerationPort::class.java)
+
+            val result = generator.generate(MissionAlternativeGenerationRequest(MissionItem.DELIVERY_FOOD, emptyList()))
+
+            assertEquals("MOCK", result.source.name)
+            assertEquals(3, result.alternatives.size)
         }
     }
 

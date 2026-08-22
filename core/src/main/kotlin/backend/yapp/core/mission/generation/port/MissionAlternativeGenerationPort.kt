@@ -12,6 +12,7 @@ data class MissionAlternativeGenerationRequest(
     val item: MissionItem,
     val knowledgeContexts: List<MissionKnowledge>,
     val personalizationContext: String = "",
+    val jobId: UUID = UUID(0, 0),
 )
 
 data class MissionAlternativeTemplate(
