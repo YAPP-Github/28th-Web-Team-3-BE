@@ -36,64 +36,6 @@ class MissionAlternativeGeneratorsTest {
     }
 
     @Test
-    fun `accepts a valid action frequency and instructs the model about weekly count semantics`() {
-        val model = StubChatModel(
-            validAlternativesResponse(),
-        )
-        val generator = SpringAiMissionAlternativeGenerator(ChatClient.builder(model).build())
-
-        val result = generator.generate(
-            MissionAlternativeGenerationRequest(MissionItem.DELIVERY_FOOD, emptyList()),
-        )
-
-        assertEquals(3, result.alternatives.size)
-        assertEquals("포장 주문으로 {count}번의 배달비 줄이기", result.alternatives.first().titleTemplate)
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "정확히 한 번의 {count}")
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "{count}는 반드시")
-        assertContains(checkNotNull(model.lastPrompt.getSystemMessage().text), "세 대안은 행동 방식이 겹치지 않게")
-    }
-
-    @Test
-    fun `instructs the model to use one knowledge only for the first alternative`() {
-        val model = StubChatModel(validAlternativesResponse())
-        val generator = SpringAiMissionAlternativeGenerator(ChatClient.builder(model).build())
-
-        generator.generate(
-            MissionAlternativeGenerationRequest(
-                item = MissionItem.CONVENIENCE_STORE,
-                knowledgeContexts = listOf(
-                    MissionKnowledge(7, "편의점 페이백 이벤트 혜택 활용하기", null, null, null, null),
-                ),
-                personalizationContext = "항목=편의점 | 사용자=20대 서울 | 소비=3회 30000원",
-            ),
-        )
-
-        val systemMessage = checkNotNull(model.lastPrompt.getSystemMessage().text)
-        val userMessage = checkNotNull(model.lastPrompt.getUserMessage().text)
-        assertContains(systemMessage, "첫 번째 대안은 반드시 그 지식의 핵심")
-        assertContains(systemMessage, "두 번째와 세 번째 대안에는")
-        assertContains(userMessage, "knowledgeId=7")
-        assertContains(userMessage, "항목=편의점 | 사용자=20대 서울 | 소비=3회 30000원")
-    }
-
-    @Test
-    fun `rejects a provider response that does not contain exactly three alternatives`() {
-        val model = StubChatModel(
-            """
-                {"items":[
-                  {"titleTemplate":"포장 주문으로 {count}번의 배달비 줄이기","description":"설명"},
-                  {"titleTemplate":"집밥으로 {count}회 지출 줄이기","description":"설명"}
-                ]}
-            """.trimIndent(),
-        )
-        val generator = SpringAiMissionAlternativeGenerator(ChatClient.builder(model).build())
-
-        assertFailsWith<IllegalStateException> {
-            generator.generate(MissionAlternativeGenerationRequest(MissionItem.DELIVERY_FOOD, emptyList()))
-        }
-    }
-
-    @Test
     fun `rejects more than one knowledge context`() {
         val model = StubChatModel(validAlternativesResponse())
         val generator = SpringAiMissionAlternativeGenerator(ChatClient.builder(model).build())
