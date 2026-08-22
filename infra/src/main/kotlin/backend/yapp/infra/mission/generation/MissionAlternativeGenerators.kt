@@ -85,7 +85,7 @@ class DatabaseMissionAlternativeGenerator(
     companion object {
         private const val REQUIRED_ALTERNATIVE_COUNT = 3
         private const val MAX_TARGET_COUNT = 10
-        private const val MAX_TITLE_LENGTH = 25
+        private const val MAX_TITLE_LENGTH = 120
         private const val DESCRIPTION = "이번 주 소비를 줄이는 행동을 실천해 보세요."
     }
 }

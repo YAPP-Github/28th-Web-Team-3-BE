@@ -125,7 +125,7 @@ class MissionGenerationAcceptanceTest(
     }
 
     @Test
-    fun `direct mission catalog has thirty active templates for every active item`() {
+    fun `direct mission catalog matches the configured item templates`() {
         dataSource.connection.use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -138,15 +138,36 @@ class MissionGenerationAcceptanceTest(
                 ).use { result ->
                     val counts = buildMap {
                         while (result.next()) {
-                            assertTrue(result.getInt("max_title_length") <= 25)
+                            assertTrue(result.getInt("max_title_length") <= 120)
                             put(result.getString("item_code"), result.getInt("template_count"))
                         }
                     }
 
                     assertEquals(
-                        MissionItem.entries.filter { it.active }.associate { it.name to 30 },
+                        mapOf(
+                            MissionItem.DELIVERY_FOOD.name to 5,
+                            MissionItem.DINING_OUT.name to 5,
+                            MissionItem.CAFE.name to 7,
+                            MissionItem.CONVENIENCE_STORE.name to 8,
+                            MissionItem.CLOTHING.name to 7,
+                            MissionItem.COSMETICS.name to 10,
+                            MissionItem.HOUSEHOLD_GOODS.name to 4,
+                            MissionItem.BEAUTY.name to 4,
+                            MissionItem.CLASS.name to 4,
+                            MissionItem.PERFORMANCE_TICKET.name to 6,
+                        ),
                         counts,
                     )
+                }
+                statement.executeQuery(
+                    """
+                        SELECT COUNT(*)
+                        FROM mission_action_template
+                        WHERE char_length(title_template) - char_length(REPLACE(title_template, '{count}', '')) <> char_length('{count}')
+                    """.trimIndent(),
+                ).use { result ->
+                    result.next()
+                    assertEquals(0, result.getInt(1))
                 }
             }
         }
