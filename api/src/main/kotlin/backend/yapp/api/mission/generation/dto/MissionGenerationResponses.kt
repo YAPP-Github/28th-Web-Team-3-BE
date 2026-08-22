@@ -5,6 +5,7 @@ import backend.yapp.core.mission.generation.domain.MissionGenerationJobStatus
 import backend.yapp.core.mission.generation.domain.MissionItem
 import backend.yapp.core.mission.generation.port.MissionDraftGenerationSource
 import backend.yapp.core.mission.generation.service.MissionDraftSnapshot
+import backend.yapp.core.mission.generation.service.MissionCandidateSnapshot
 import backend.yapp.core.mission.generation.service.MissionGenerationJobSnapshot
 import backend.yapp.core.mission.generation.service.MissionSnapshot
 import java.time.Instant
@@ -31,6 +32,48 @@ data class MissionGenerationJobResponse(
                 expiresAt = snapshot.expiresAt,
                 confirmed = snapshot.confirmed,
                 pollingIntervalMillis = 2_000,
+            )
+    }
+}
+
+data class MissionCandidatesResponse(
+    val candidates: List<MissionCandidateResponse>,
+) {
+    companion object {
+        fun from(candidates: List<MissionCandidateSnapshot>): MissionCandidatesResponse =
+            MissionCandidatesResponse(candidates.map(MissionCandidateResponse::from))
+    }
+}
+
+data class MissionCandidateResponse(
+    val category: MissionCategory,
+    val item: MissionItem,
+    val title: String,
+    val description: String,
+    val actionCode: String,
+    val metricType: String,
+    val targetCount: Int,
+    val targetUnit: String,
+    val estimatedSavingsWon: Int,
+    val savingsEstimateVersion: String,
+    val savingsLabel: String,
+    val savingsDisclaimer: String,
+) {
+    companion object {
+        fun from(snapshot: MissionCandidateSnapshot): MissionCandidateResponse =
+            MissionCandidateResponse(
+                category = snapshot.category,
+                item = snapshot.item,
+                title = snapshot.title,
+                description = snapshot.description,
+                actionCode = snapshot.actionCode,
+                metricType = snapshot.metricType.name,
+                targetCount = snapshot.targetCount,
+                targetUnit = snapshot.targetUnit,
+                estimatedSavingsWon = snapshot.estimatedSavingsWon,
+                savingsEstimateVersion = snapshot.savingsEstimateVersion,
+                savingsLabel = "미션을 완료하면 평소보다 ${snapshot.item.label}비를 ${snapshot.estimatedSavingsWon}원 아낄 수 있어요",
+                savingsDisclaimer = SAVINGS_DISCLAIMER,
             )
     }
 }
