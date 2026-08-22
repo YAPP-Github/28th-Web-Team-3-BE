@@ -31,6 +31,36 @@ class MissionGenerationAcceptanceTest(
     @Autowired private val executor: MissionGenerationExecutor,
 ) {
     @Test
+    fun `synchronous candidates return three direct missions without creating a generation job`() {
+        val token = readyGuestToken()
+        val jobsBefore = generationJobCount()
+
+        mockMvc.perform(
+            post("/api/missions/generations")
+                .header(AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"category":"MEAL","item":"DELIVERY_FOOD","baselineFrequency":1,"baselineAmountWon":15000}""",
+                ),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.candidates.length()").value(3))
+            .andExpect(jsonPath("$.candidates[0].item").value("DELIVERY_FOOD"))
+            .andExpect(jsonPath("$.candidates[1].item").value("DELIVERY_FOOD"))
+            .andExpect(jsonPath("$.candidates[2].item").value("DELIVERY_FOOD"))
+            .andExpect(jsonPath("$.candidates[0].targetCount").value(1))
+            .andExpect(jsonPath("$.candidates[1].targetCount").value(1))
+            .andExpect(jsonPath("$.candidates[2].targetCount").value(1))
+            .andExpect(jsonPath("$.candidates[0].estimatedSavingsWon").value(15_000))
+            .andExpect(jsonPath("$.candidates[1].estimatedSavingsWon").value(15_000))
+            .andExpect(jsonPath("$.candidates[2].estimatedSavingsWon").value(15_000))
+            .andExpect(jsonPath("$.candidates[0].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
+            .andExpect(jsonPath("$.candidates[1].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
+            .andExpect(jsonPath("$.candidates[2].savingsEstimateVersion").value("V2_DIRECT_CANDIDATE"))
+
+        assertEquals(jobsBefore, generationJobCount())
+    }
+
+    @Test
     fun `one item request creates deterministic candidates and same item can be generated again`() {
         val token = readyGuestToken()
         val firstJobId = requestJob(token)
@@ -96,6 +126,7 @@ class MissionGenerationAcceptanceTest(
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.paths['$GENERATION_PATH'].post").exists())
+            .andExpect(jsonPath("$.paths['/api/missions/generations'].post").exists())
             .andExpect(jsonPath("$.components.schemas.MissionGenerationCreateRequest.properties.item").exists())
             .andExpect(jsonPath("$.paths['/api/missions/surveys']").doesNotExist())
     }
@@ -229,6 +260,16 @@ class MissionGenerationAcceptanceTest(
             .andReturn().response.contentAsString
         return JsonPath.read(body, "$.jobId")
     }
+
+    private fun generationJobCount(): Int =
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM mission_generation_job").use { result ->
+                    result.next()
+                    result.getInt(1)
+                }
+            }
+        }
 
     private fun expectedMissionKnowledge(): Set<String> = setOf(
         "MEAL|DELIVERY_FOOD|배달 메뉴 대신 집에서 직접 만드는 레시피 찾아보기",
