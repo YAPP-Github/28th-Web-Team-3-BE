@@ -12,11 +12,24 @@ mosaicLayout:
         title: Application stage p50/p95/p99
         xyChart:
           dataSets:
-            - timeSeriesFilter:
-                filter: metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
+                  aggregation:
+                    perSeriesAligner: ALIGN_PERCENTILE_50
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
+                  aggregation:
+                    perSeriesAligner: ALIGN_PERCENTILE_95
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
+                  aggregation:
+                    perSeriesAligner: ALIGN_PERCENTILE_99
+                    alignmentPeriod: 60s
     - xPos: 6
       yPos: 0
       width: 6
@@ -25,21 +38,24 @@ mosaicLayout:
         title: Cloud Tasks depth, attempt delay, and task count
         xyChart:
           dataSets:
-            - timeSeriesFilter:
-                filter: metric.type="cloudtasks.googleapis.com/queue/depth"
-                aggregation:
-                  perSeriesAligner: ALIGN_MEAN
-                  alignmentPeriod: 60s
-            - timeSeriesFilter:
-                filter: metric.type="cloudtasks.googleapis.com/queue/task_attempt_delays"
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
-            - timeSeriesFilter:
-                filter: metric.type="cloudtasks.googleapis.com/queue/task_attempt_count"
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="cloudtasks.googleapis.com/queue/depth"
+                  aggregation:
+                    perSeriesAligner: ALIGN_MEAN
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="cloudtasks.googleapis.com/queue/task_attempt_delays"
+                  aggregation:
+                    perSeriesAligner: ALIGN_DELTA
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: metric.type="cloudtasks.googleapis.com/queue/task_attempt_count"
+                  aggregation:
+                    perSeriesAligner: ALIGN_DELTA
+                    alignmentPeriod: 60s
     - xPos: 0
       yPos: 4
       width: 6
@@ -48,34 +64,38 @@ mosaicLayout:
         title: Cloud Run request, startup, instance, and concurrency
         xyChart:
           dataSets:
-            - timeSeriesFilter:
-                filter: >-
-                  metric.type="run.googleapis.com/request_latencies"
-                  AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
-            - timeSeriesFilter:
-                filter: >-
-                  metric.type="run.googleapis.com/container/startup_latencies"
-                  AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
-            - timeSeriesFilter:
-                filter: >-
-                  metric.type="run.googleapis.com/container/instance_count"
-                  AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
-                aggregation:
-                  perSeriesAligner: ALIGN_MEAN
-                  alignmentPeriod: 60s
-            - timeSeriesFilter:
-                filter: >-
-                  metric.type="run.googleapis.com/container/max_request_concurrencies"
-                  AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
-                aggregation:
-                  perSeriesAligner: ALIGN_MAX
-                  alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: >-
+                    metric.type="run.googleapis.com/request_latencies"
+                    AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
+                  aggregation:
+                    perSeriesAligner: ALIGN_DELTA
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: >-
+                    metric.type="run.googleapis.com/container/startup_latencies"
+                    AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
+                  aggregation:
+                    perSeriesAligner: ALIGN_DELTA
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: >-
+                    metric.type="run.googleapis.com/container/instance_count"
+                    AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
+                  aggregation:
+                    perSeriesAligner: ALIGN_MEAN
+                    alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: >-
+                    metric.type="run.googleapis.com/container/max_request_concurrencies"
+                    AND resource.labels.service_name=one_of("<API_CLOUD_RUN_SERVICE>", "<DISPATCHER_CLOUD_RUN_SERVICE>", "<WORKER_CLOUD_RUN_SERVICE>")
+                  aggregation:
+                    perSeriesAligner: ALIGN_MAX
+                    alignmentPeriod: 60s
     - xPos: 6
       yPos: 4
       width: 6
@@ -84,10 +104,11 @@ mosaicLayout:
         title: Dispatch and generation outcomes
         xyChart:
           dataSets:
-            - timeSeriesFilter:
-                filter: >-
-                  metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
-                  AND metric.labels.stage=one_of("dispatch", "queue", "worker_total", "end_to_end")
-                aggregation:
-                  perSeriesAligner: ALIGN_DELTA
-                  alignmentPeriod: 60s
+            - timeSeriesQuery:
+                timeSeriesFilter:
+                  filter: >-
+                    metric.type="logging.googleapis.com/user/mission_generation_stage_latency"
+                    AND metric.labels.stage=one_of("dispatch", "queue", "worker_total", "end_to_end")
+                  aggregation:
+                    perSeriesAligner: ALIGN_DELTA
+                    alignmentPeriod: 60s
