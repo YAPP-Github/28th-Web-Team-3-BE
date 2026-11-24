@@ -40,17 +40,24 @@ class MissionCandidateService(
             "Exactly $REQUIRED_CANDIDATE_COUNT mission candidates are required"
         }
 
-        return alternatives.map { alternative ->
+        val selectedAlternatives = alternatives.take(baselineFrequency)
+        val allocations = MissionTargetAllocator.allocate(
+            baselineFrequency,
+            baselineAmountWon,
+            selectedAlternatives.size,
+        )
+
+        return selectedAlternatives.zip(allocations).map { (alternative, allocation) ->
             MissionCandidateSnapshot(
                 category = category,
                 item = item,
-                title = MissionTitleRenderer.render(alternative.titleTemplate, baselineFrequency),
+                title = MissionTitleRenderer.render(alternative.titleTemplate, allocation.targetCount),
                 description = alternative.description,
                 actionCode = item.name,
                 metricType = MissionMetricType.COUNT,
-                targetCount = baselineFrequency,
+                targetCount = allocation.targetCount,
                 targetUnit = TARGET_UNIT,
-                estimatedSavingsWon = baselineAmountWon,
+                estimatedSavingsWon = allocation.estimatedSavingsWon,
                 savingsEstimateVersion = SAVINGS_ESTIMATE_VERSION,
             )
         }
@@ -80,7 +87,7 @@ class MissionCandidateService(
     companion object {
         private const val REQUIRED_CANDIDATE_COUNT = 3
         private const val TARGET_UNIT = "TIMES_PER_WEEK"
-        private const val SAVINGS_ESTIMATE_VERSION = "V2_DIRECT_CANDIDATE"
+        private const val SAVINGS_ESTIMATE_VERSION = "V2_DETERMINISTIC"
     }
 }
 
